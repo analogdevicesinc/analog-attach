@@ -1,9 +1,10 @@
-import { FixupContext, PropertySchema } from "../FixupWalker.js";
+import { FixupContext } from "../FixupWalker.js";
+import { PropertySchema, Schema } from "../Schema.js";
 
 const SINGLE_VALUE_KEYWORDS = ["const", "enum", "pattern", "minimum", "maximum", "multipleOf"];
 
 /** dt-schema `lib.py:_is_string_schema`: a `const`, `enum` or `pattern` of strings. */
-export function is_string_schema(schema: Record<string, unknown>): boolean {
+export function is_string_schema(schema: Schema): boolean {
     return ["const", "enum", "pattern"].some(keyword => {
         if (!(keyword in schema)) { return false; }
         const value = schema[keyword];
@@ -24,7 +25,7 @@ function constrains_values(items: unknown): boolean {
 export function fixup_string_to_array(schema: PropertySchema, _context: FixupContext): PropertySchema {
     if (typeof schema === "boolean" || !is_string_schema(schema)) { return schema; }
 
-    const single: Record<string, unknown> = {};
+    const single: Schema = {};
 
     for (const keyword of SINGLE_VALUE_KEYWORDS) {
         if (keyword in schema) {

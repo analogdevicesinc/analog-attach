@@ -1,4 +1,5 @@
 import { NodeFixup } from "../FixupWalker.js";
+import { Schema } from "../Schema.js";
 
 /** Conditions only match: what the fixup adds to a node must not become something they require. */
 const CONDITION_KEYS = new Set(["if", "not", "select"]);
@@ -15,7 +16,7 @@ export const fixup_interrupts: NodeFixup = (schema, path) => {
 
     if (typeof properties !== "object" || properties === null || path.some(key => CONDITION_KEYS.has(key))) { return; }
 
-    const declared = properties as Record<string, unknown>;
+    const declared = properties as Schema;
 
     if (("interrupts" in declared || "interrupt-controller" in declared) && !("interrupt-parent" in declared)) {
         declared["interrupt-parent"] = { minItems: 1, maxItems: 1, type: "array" };
@@ -26,7 +27,7 @@ if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
 
-    const fixup = (schema: Record<string, unknown>, path: string[] = []) => {
+    const fixup = (schema: Schema, path: string[] = []) => {
         fixup_interrupts(schema, path);
         return schema;
     };

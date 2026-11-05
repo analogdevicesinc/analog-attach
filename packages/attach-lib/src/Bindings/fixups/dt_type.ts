@@ -1,6 +1,7 @@
 import { DT_TYPE } from "../RefResolver.js";
-import { PropertyFixup, PropertySchema } from "../FixupWalker.js";
+import { PropertyFixup } from "../FixupWalker.js";
 import { property_type, PropertyTypes } from "../PropertyTypes.js";
+import { PropertySchema } from "../Schema.js";
 
 /** Places a schema describes the property's own value in; the rest (conditions, refinements) only say more about it. */
 const NOT_THE_DEFINITION = new Set(["if", "not", "select", "then", "else"]);
@@ -44,7 +45,7 @@ if (import.meta.vitest) {
         patterns: [{ pattern: /-gpios?$/, type: "phandle-array" }],
         counted: new Map([["ranges", "uint32-matrix"]]),
     };
-    const tagged = (schema: Record<string, unknown> | boolean, name: string, path = ["properties", name]) => fixup_dt_type(types)(schema, { path, name });
+    const tagged = (schema: PropertySchema, name: string, path = ["properties", name]) => fixup_dt_type(types)(schema, { path, name });
 
     test("a property without a type gets the one of its name", () => {
         expect(tagged({ maxItems: 1 }, "reg")).toStrictEqual({ maxItems: 1, dtType: "address" });

@@ -1,14 +1,9 @@
-type Schema = Record<string, unknown>;
-
+import { is_schema, Schema } from "./Schema.js";
 /**
  * Where the `$ref` of a schema that says more than its `$ref` waits while ref-parser dereferences it
  * (`stash_references`), to be merged with the schema after (`restore_references`).
  */
 const STASHED_REF = "$stashed-ref";
-
-function is_schema(value: unknown): value is Schema {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /**
  * Moves each `$ref` of `document` that has keywords beside it under `STASHED_REF`, alone: `{$ref: X, maximum: 6}`

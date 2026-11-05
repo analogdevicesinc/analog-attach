@@ -1,15 +1,15 @@
 /* eslint-disable unicorn/prevent-abbreviations */
-import { DtBindingSchema } from "./Schema.js";
+import { DtBindingSchema, is_schema, Schema } from "./Schema.js";
 import { SchemaContext } from "./Context.js";
 import { dereference } from "./RefResolver.js";
 import { PathValue, RefResolvedBinding } from "./UtilityTypes.js";
-import { compare_arrays, find_entry_in_object, find_in_object, get_by_path, is_plain_object, map_object } from "./ObjectUtilities.js";
+import { compare_arrays, find_entry_in_object, find_in_object, get_by_path, map_object } from "./ObjectUtilities.js";
 import { definitions_by_name } from "./RedefinitionMerger.js";
 import { Result } from "../result.js";
 
 type PathDefinition = {
     path: string[],
-    definition: Record<string, unknown>,
+    definition: Schema,
 }
 
 /**
@@ -26,11 +26,11 @@ function defined_in_its_node(binding: unknown, path: string[]): boolean {
 
     const node = node_path.length === 0 ? binding : get_by_path(binding as object, node_path);
     const name = path.at(-1);
-    if (!is_plain_object(node) || name === undefined) {
+    if (!is_schema(node) || name === undefined) {
         return false;
     }
 
-    return (definitions_by_name(node).get(name) ?? []).some(definition => is_plain_object(definition));
+    return (definitions_by_name(node).get(name) ?? []).some(definition => is_schema(definition));
 }
 
 // TODO: handle recursive definitions
@@ -88,7 +88,7 @@ export async function resolve_properties(
 
             properties_definitions.push({
                 path: unresolved_property.path,
-                definition: resolved_prop_defs[0].value as Record<string, unknown>,
+                definition: resolved_prop_defs[0].value as Schema,
             });
         }
     }

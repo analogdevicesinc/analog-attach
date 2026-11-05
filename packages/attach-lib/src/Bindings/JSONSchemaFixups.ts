@@ -1,4 +1,4 @@
-import { DtBindingSchema } from "./Schema.js";
+import { DtBindingSchema, Schema } from "./Schema.js";
 import { fixup_branch_counts } from "./fixups/branch_counts.js";
 import { fixup_collapse_allOf } from "./fixups/collapse_allOf.js";
 import { fixup_dt_type } from "./fixups/dt_type.js";
@@ -190,9 +190,9 @@ if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
 
-    const fixuped = (properties: Record<string, unknown>) =>
-        (apply_JSONSchema_fixups({ $id: "id", $schema: "s", title: "t", maintainers: [], properties } as unknown as DtBindingSchema).properties as Record<string, Record<string, unknown>>);
-    const bounds = (schema: Record<string, unknown> | undefined) => [schema?.["minItems"], schema?.["maxItems"]];
+    const fixuped = (properties: Schema) =>
+        (apply_JSONSchema_fixups({ $id: "id", $schema: "s", title: "t", maintainers: [], properties } as unknown as DtBindingSchema).properties as Record<string, Schema>);
+    const bounds = (schema: Schema | undefined) => [schema?.["minItems"], schema?.["maxItems"]];
 
     test("a property that is a oneOf of consts is an enum, a string one still a list of them", () => {
         const { compatible, "nvidia,pull": pull } = fixuped({

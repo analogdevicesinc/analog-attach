@@ -1,8 +1,5 @@
-import { DtBindingSchema } from "./Schema.js";
+import { DtBindingSchema, is_schema, Schema, PropertySchema } from "./Schema.js";
 import { is_node_pattern } from "./PatternKind.js";
-
-/** A property's schema; `true` / `false` are schemas too, and are left alone. */
-export type PropertySchema = Record<string, unknown> | boolean;
 
 export type FixupContext = {
     /** Where the schema is: `["properties", "reg"]`, then `["then", ...]` and so on down into conditionals. */
@@ -17,18 +14,12 @@ export type FixupContext = {
 export type PropertyFixup = (schema: PropertySchema, context: FixupContext) => PropertySchema;
 
 /** A fixup of a node schema (one that has `properties`), changing it in place. `pointer` is as `FixupContext`'s. */
-export type NodeFixup = (schema: Record<string, unknown>, path: string[], pointer?: string[]) => void;
+export type NodeFixup = (schema: Schema, path: string[], pointer?: string[]) => void;
 
 export type Fixups = {
     property: PropertyFixup[];
     node: NodeFixup[];
 };
-
-type Schema = Record<string, unknown>;
-
-function is_schema(value: unknown): value is Schema {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** Keys whose value is a schema of the same node. */
 const SUB_SCHEMA_KEYS = ["select", "if", "then", "else", "not", "additionalProperties"];

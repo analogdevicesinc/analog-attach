@@ -1,5 +1,5 @@
 import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "./ParsedBinding.js";
-import { DtBindingSchema } from "./Schema.js";
+import { DtBindingSchema, Schema } from "./Schema.js";
 import { AttachType, AttachEnumType, Cell, EnumOption, List } from "./StructuralTypes.js";
 import { find_entry_in_object } from "./ObjectUtilities.js";
 import { is_node_pattern } from "./PatternKind.js";
@@ -60,7 +60,7 @@ function translate_node_schema(schema: DtBindingSchema | undefined): ResolvedPro
     return properties.filter((property, index) => properties.findIndex(other => other.key === property.key) === index);
 }
 
-function collect_properties(properties: Record<string, unknown> | undefined): ResolvedProperty[] {
+function collect_properties(properties: Schema | undefined): ResolvedProperty[] {
     const collected: ResolvedProperty[] = [];
 
     for (const [name, value] of Object.entries(properties ?? {})) {
@@ -350,7 +350,7 @@ function row_cells(row: List, type: string): List {
 function narrow_matrix(object: any, type: string): AttachType {
     const items = Array.isArray(object.items) ? object.items[0] : object.items;
     // The description of the first row says nothing of the others, nor does the row's type (see `row_cells`)
-    const { description: _description, [DT_TYPE]: _row_type, ...row_schema } = typeof items === "object" && items !== null ? items : {} as Record<string, unknown>;
+    const { description: _description, [DT_TYPE]: _row_type, ...row_schema } = typeof items === "object" && items !== null ? items : {} as Schema;
     // The default of a matrix of one cell (`-microvolt`'s `default: 4096000`) is that cell's
     const one_cell = object.maxItems === 1 && row_schema.maxItems === 1 && "default" in object;
     const row = narrow_array_object({ ...row_schema, type: "array", ...(one_cell ? { default: object.default } : {}) });
@@ -743,7 +743,7 @@ if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
 
-    const translated = (properties: Record<string, unknown>) =>
+    const translated = (properties: Schema) =>
         Object.fromEntries(translate_JSONSchema({ $id: "id", $schema: "s", title: "t", maintainers: [], properties } as DtBindingSchema).properties.map(({ key, value }) => [key, value]));
 
     test("a matrix type is a matrix, its rows what the items say", () => {
@@ -826,13 +826,13 @@ if (import.meta.vitest) {
         expect(wide).toStrictEqual({ _t: "matrix", minItems: 1, maxItems: 1, rows: [{ _t: "list", item: microvolt_cell(), minItems: 1, maxItems: 2 }] });
     });
 
-    const compatible_options = (schema: Record<string, unknown>) => {
+    const compatible_options = (schema: Schema) => {
         const type = translated({ compatible: schema }).compatible;
         if (type._t !== "list" || Array.isArray(type.item) || type.item._t !== "enum") { throw new Error(`not a list of enum: ${JSON.stringify(type, (_, v) => typeof v === "bigint" ? Number(v) : v)}`); }
         return { options: type.item.enum, minItems: type.minItems, maxItems: type.maxItems };
     };
 
-    const not_enumerated = (schema: Record<string, unknown>) => {
+    const not_enumerated = (schema: Schema) => {
         const type = translated({ compatible: schema }).compatible;
         return !(type._t === "list" && !Array.isArray(type.item) && type.item._t === "enum");
     };
