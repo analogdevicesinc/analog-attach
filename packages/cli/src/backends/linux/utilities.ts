@@ -52,6 +52,11 @@ export function resolve_path(path_string: string, overlay: DeviceTreeOverlay, ba
     return { reference, in_overlay, in_base };
 }
 
+/** The refusal of a name that isn't a node name (`add --name`, `rename`). */
+export function invalid_node_name_message(name: string): string {
+    return `Invalid node name: ${name} (use letters, digits and _ , . -, then an optional @<unit-address>)`;
+}
+
 export function not_found_message(path_string: string, overlay: DeviceTreeOverlay, base?: DeviceTree): string {
     const split = split_property_reference(path_string);
     if (split.property_name !== undefined) {

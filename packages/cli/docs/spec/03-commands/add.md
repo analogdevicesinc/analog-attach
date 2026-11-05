@@ -132,7 +132,7 @@ mode.
 
 **ADD-031** The CLI shall check, in this order, and refuse at the first that
 fails: the parent (ADD-030), the label (ADD-040), an empty unit address
-(ADD-043), a child with the same key (ADD-050). (The copy templates check
+(ADD-043), the name (ADD-053), a child with the same key (ADD-050). (The copy templates check
 the key before the label, ADD-066.)
 
 ### 7.1 Label
@@ -158,6 +158,14 @@ smallest `<n>` from 1 that is free. (`adi,ad7124-8` → `ad7124_8`, then
 
 **ADD-043** If the name ends in `@` (an empty unit address), then the CLI shall
 refuse with `Empty unit address (name@ is invalid)`.
+
+**ADD-053** If the name isn't a node name, then the CLI shall refuse with
+`Invalid node name: <name> (use letters, digits and _ , . -, then an optional
+@<unit-address>)`. A node name is a base name of letters, digits, `_`, `,`,
+`.` and `-` that starts with a letter, a digit or `_` and doesn't start like a
+number (`12`, `1,a`, `0x1f`), then optionally `@` and a unit address of the
+same characters. These are the characters both the overlay's parser and dtc
+accept, so `+` and `#` are refused, as are a second `@`, `/` and whitespace.
 
 **ADD-044** Where the name has a unit address, the CLI shall keep it. When it
 is hexadecimal (`hex-unit`), the CLI shall write a `reg` for that address

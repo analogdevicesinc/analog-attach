@@ -1,9 +1,10 @@
-import { DeviceTree, DeviceTreeOverlay, get_full_node_name, type DTNode } from "attach-lib";
+import { DeviceTree, DeviceTreeOverlay, get_full_node_name, parent_path_string, suggest_parents, type DTNode, type PathAndLabel } from "attach-lib";
 
 import { answer, refuse, type ExtraCommand } from "../../../../interface/backend-interface";
 import type { CommonResponse } from "../../protocol/types";
-import { resolve_node_identifier, resolve_path, not_found_message, positional_word } from "../../utilities";
-import { load_workspace } from "../../config/workspace";
+import { resolve_node_identifier, resolve_path, not_found_message, positional_word, node_compatibles } from "../../utilities";
+import { load_workspace, optional_bindings, type Bindings } from "../../config/workspace";
+import { load_binding } from "../list/data";
 
 /** `move <path> <destination>`: a node the overlay adds, to another parent. */
 export const move: ExtraCommand<Record<never, never>, CommonResponse> = {
@@ -31,7 +32,17 @@ export const move: ExtraCommand<Record<never, never>, CommonResponse> = {
         const { source: devicetree, tree: base } = workspace.base;
         const { path: input, tree: overlay } = workspace.overlay;
 
-        const result = move_overlay_node(base, overlay, path_argument, destination);
+        const planned = plan_move(base, overlay, path_argument, destination);
+        if (typeof planned !== "string") {
+            const bindings = optional_bindings(workspace);
+            const allowed = bindings.ok ? await valid_parents(planned.node, overlay.merged_tree() ?? base, bindings.value) : undefined;
+            const mismatch = allowed === undefined ? undefined : wrong_parent(allowed, planned.destination_path);
+            // A wrong parent is refused. To make it a warning instead: session.warn(the message) and go on.
+            if (mismatch !== undefined) {
+                return refuse(`Cannot move ${path_argument} under ${destination}: ${mismatch.compatible} goes under ${mismatch.parents.join(", ")} (see: ${session.program} list parent ${mismatch.compatible})`);
+            }
+        }
+        const result = typeof planned === "string" ? planned : apply_move(overlay, planned);
         switch (result) {
             case "moved": {
                 workspace.overlay.save();
@@ -55,12 +66,32 @@ export const move: ExtraCommand<Record<never, never>, CommonResponse> = {
     },
 };
 
+type MoveRefusal = "not-found" | "in-base" | "is-root" | "parent-not-found" | "conflict" | "into-self";
+
+/** A move every check of `plan_move` passed: the node, where it is, and the destination's path. */
+interface PlannedMove {
+    node: DTNode;
+    node_path: string;
+    destination_path: string;
+}
+
 export function move_overlay_node(
     base: DeviceTree,
     overlay: DeviceTreeOverlay,
     identifier: string,
     parent_identifier: string,
-): "moved" | "not-found" | "in-base" | "is-root" | "parent-not-found" | "conflict" | "into-self" {
+): "moved" | MoveRefusal {
+    const planned = plan_move(base, overlay, identifier, parent_identifier);
+    return typeof planned === "string" ? planned : apply_move(overlay, planned);
+}
+
+/** Resolve the node and the destination, and check the move: nothing is changed. */
+export function plan_move(
+    base: DeviceTree,
+    overlay: DeviceTreeOverlay,
+    identifier: string,
+    parent_identifier: string,
+): PlannedMove | MoveRefusal {
 
     const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
 
@@ -81,17 +112,47 @@ export function move_overlay_node(
     // R2: check effective_children at destination for duplicates
     if (overlay.effective_children(destination_path).has(get_full_node_name(node))) { return "conflict"; }
 
+    return { node, node_path: found.node_path, destination_path };
+}
+
+/** Append the node to the destination, then remove it from its old place. */
+function apply_move(overlay: DeviceTreeOverlay, { node, node_path, destination_path }: PlannedMove): "moved" | "parent-not-found" | "not-found" {
     const destination_node = overlay.ensure_node(destination_path);
     if (destination_node === undefined) { return "parent-not-found"; }
 
     destination_node.children.push(node);
 
-    if (!overlay.remove_node(found.node_path)) {
+    if (!overlay.remove_node(node_path)) {
         destination_node.children.pop();
         return "not-found";
     }
 
     return "moved";
+}
+
+/**
+ * The parents the node's binding allows in `tree` (the merged tree, so a bus the overlay adds
+ * counts), from the first of its compatibles that has a binding. Nothing when it has none.
+ */
+async function valid_parents(node: DTNode, tree: DeviceTree, bindings: Bindings): Promise<{ compatible: string; parents: PathAndLabel[] } | undefined> {
+    for (const compatible of node_compatibles(node)) {
+        const binding = await load_binding(bindings, compatible);
+        if (binding.ok) { return { compatible, parents: suggest_parents(tree, binding.binding) }; }
+    }
+    return undefined;
+}
+
+/**
+ * When the destination isn't one of the valid parents: the compatible and the parents, by label
+ * or else path, as `list parent` gives them. Nothing when it is, or when no parent is known.
+ */
+export function wrong_parent(
+    { compatible, parents }: { compatible: string; parents: PathAndLabel[] },
+    destination_path: string,
+): { compatible: string; parents: string[] } | undefined {
+    if (parents.length === 0) { return undefined; }
+    if (parents.some(parent => parent_path_string(parent) === destination_path)) { return undefined; }
+    return { compatible, parents: parents.map(parent => parent.label ?? parent_path_string(parent)) };
 }
 
 
@@ -140,6 +201,14 @@ if (import.meta.vitest) {
         compatible = "adi,ad7124-8";
     };
 };`;
+
+    test("wrong_parent: the valid parents when the destination is none of them", () => {
+        const allowed = { compatible: "adi,ad7124-8", parents: [{ path: ["/", "soc", "spi@7e204000"], label: "spi0" }, { path: ["/", "soc", "spi@7e215080"] }] };
+        expect(wrong_parent(allowed, "/soc/spi@7e204000")).toBeUndefined();
+        expect(wrong_parent(allowed, "/soc/spi@7e215080")).toBeUndefined();
+        expect(wrong_parent(allowed, "/soc/i2c@7e804000")).toEqual({ compatible: "adi,ad7124-8", parents: ["spi0", "/soc/spi@7e215080"] });
+        expect(wrong_parent({ compatible: "x,y", parents: [] }, "/anywhere")).toBeUndefined();
+    });
 
     test("move_overlay_node - moves node from spi0 to spi1", () => {
         const base = DT.new_from_string(base_dts);
