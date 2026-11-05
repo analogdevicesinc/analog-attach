@@ -18,7 +18,7 @@ import {
 import { answer, cancelled, command, input_error, PromptCancelled, refuse, type AddArguments, type InteractiveSession } from "../../../../interface/backend-interface";
 import { load_workspace, type Bindings } from "../../config/workspace";
 import type { Settings } from "../../config/settings";
-import { bus_kind, find_binding, parse_node_path, resolve_path, type BusKind } from "../../utilities";
+import { bus_kind, find_binding, invalid_node_name_message, parse_node_path, resolve_path, type BusKind } from "../../utilities";
 import type { AddResponse } from "../../protocol/types";
 import { describe_missing, missing_lines, missing_required_of, type NewNode } from "../../missing-required";
 import { ask_for_missing } from "../../missing-interview";
@@ -419,6 +419,7 @@ export function add_device(base: DeviceTree, overlay: DeviceTreeOverlay, request
 function failure_message(result: Exclude<AddNodeResult, { status: "added" | "parent-not-found" }>, parent: string): string {
     switch (result.status) {
         case "empty-unit-address": { return "Empty unit address (name@ is invalid)"; }
+        case "invalid-name": { return invalid_node_name_message(result.name); }
         case "invalid-label": { return `Invalid label: ${result.label} (must match [A-Za-z_][A-Za-z0-9_]*)`; }
         case "label-taken": { return `Label ${result.label} is already used by ${result.owner}`; }
         case "duplicate": { return `${parent} already has a child named ${result.key}`; }

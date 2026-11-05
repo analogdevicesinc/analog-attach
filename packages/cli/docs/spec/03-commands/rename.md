@@ -27,9 +27,8 @@ unit address's radix (RENAME-030).
 ## 3. Input
 
 **RENAME-001** The CLI shall not check `<path>` per GRM-020 to GRM-023 (open
-issue D-3 of `delete.md`), and shall not check `<new-name>` at all: any
-string is accepted, including one with `/`, whitespace or nothing before `@`.
-(Open issue N-1.)
+issue D-3 of `delete.md`). `<new-name>` is checked once the node is found
+(RENAME-023).
 
 ## 4. The node
 
@@ -54,6 +53,13 @@ no `@`, the node keeps its unit address: `rename adc myadc` on `adc@2` gives
 `myadc@2`. When there is an `@` with something after it, that is the new unit
 address. When `@` ends the name, the node is left without a unit address.
 (Open issue N-2.)
+
+**RENAME-023** If the node is in the overlay (RENAME-010 to RENAME-012) and
+`<new-name>` isn't a node name (`add.md` ADD-053; the empty unit address of
+RENAME-020 aside), then the CLI shall refuse with `Invalid node name:
+<new-name> (use letters, digits and _ , . -, then an optional
+@<unit-address>)`, before checking RENAME-021. `rename adc foo/bar`, `rename
+adc "a b"`, `rename adc ""` and `rename adc @2` are refused.
 
 **RENAME-021** If the parent already has a child, in the base or the overlay,
 with the new key (name and unit address), and that key isn't the node's own,
@@ -123,13 +129,6 @@ and answer `Renamed '<path>' to '<new-name>'` (`severity` `info`). An
 external node is renamed the same way (open issue N-4).
 
 ## 9. Open issues
-
-**N-1. `rename` can write an overlay that doesn't parse.** The new name isn't
-checked, and the overlay isn't parsed again before it is saved. `rename adc
-foo/bar`, `rename adc "a b"` and `rename adc ""` (which gives `adc: @2 { … }`)
-are saved. The next command then fails with `overlay: … does not parse`. A
-fix: refuse names that aren't valid node names, as `update` does with its
-parse-back check.
 
 **N-2. `name@` drops the unit address.** `add --name adc@` is refused
 (ADD-043). `rename adc adc@` renames the node to `adc` and leaves its `reg`.
