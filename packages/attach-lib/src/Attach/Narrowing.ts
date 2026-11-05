@@ -52,15 +52,29 @@ const TYPE_SIZE: KeywordDefinition = {
 const DT_TYPE_KEYWORD: KeywordDefinition = { keyword: DT_TYPE, schemaType: "string" };
 
 /**
+ * The patterns of a binding as JavaScript reads them. They are Python's (dt-schema's `re`): a JavaScript `RegExp`
+ * without the `u` flag takes the escapes Python does (`^data\-only@`), and `{,2}` (exynos-ppmu's
+ * `^ppmu-event[0-9]+(-[a-z0-9]+){,2}$`) is `{0,2}`.
+ */
+const PYTHON_REGEXP = Object.assign(
+    (pattern: string): RegExp => new RegExp(pattern.replaceAll(/(?<!\\)\{,(\d+)\}/g, "{0,$1}")),
+    { code: "python_regexp" },
+);
+
+/**
  * An AJV instance that knows the `typeSize` keyword, mirroring dt-schema's
  * `validator.py:typeSize`: the instance's `size` (default 32) must equal the schema's.
  *
- * Without AJV's strict schema checks: it only narrows the `if/then` branches here, so it takes what dt-schema's
+ * Without AJV's checks of the schema: it only narrows the `if/then` branches here, so it takes what dt-schema's
  * validator takes. A name that a pattern matches too (graph.yaml's `endpoint`), an `additionalItems` beside one
- * `items` schema and an unknown keyword are valid JSON Schema, which strict mode refuses to compile.
+ * `items` schema and an unknown keyword are valid JSON Schema, which strict mode refuses to compile, and a
+ * `description:` left empty (emc2305's `emcs205,max-state`) is no string, which the meta-schema refuses.
  */
 export function create_ajv(): Ajv2019 {
-    const ajv = new Ajv2019({ allErrors: true, logger: false, strictSchema: false });
+    const ajv = new Ajv2019({
+        allErrors: true, logger: false, strictSchema: false, validateSchema: false,
+        unicodeRegExp: false, code: { regExp: PYTHON_REGEXP },
+    });
     ajv.addKeyword(TYPE_SIZE);
     ajv.addKeyword(DT_TYPE_KEYWORD);
     return ajv;
@@ -95,8 +109,8 @@ export function compile_targets(schema: DtBindingSchema): NarrowingTargets {
         compiled: create_ajv().compile(without_nested_ids(schema) as object),
     };
 
-    // Kept apart from the root's instance, as a pattern schema may reuse its ids.
-    const pattern_ajv = create_ajv();
+    // Each on an instance of its own: a pattern schema keeps its `$id`, the root's or another pattern's (s2mpu02's
+    // `^LDO..$` and `^BUCK[1-7]$` are both regulator.yaml), and an instance takes an `$id` once.
     const patterns = new Map<string, NarrowingTarget>();
 
     for (const [pattern, pattern_schema] of Object.entries((schema.patternProperties ?? {}) as Record<string, DtBindingSchema | boolean>)) {
@@ -107,7 +121,7 @@ export function compile_targets(schema: DtBindingSchema): NarrowingTargets {
         patterns.set(pattern, {
             original: pattern_schema as DtBindingSchema,
             current: structuredClone(pattern_schema) as DtBindingSchema,
-            compiled: pattern_ajv.compile(without_nested_ids(pattern_schema) as object),
+            compiled: create_ajv().compile(without_nested_ids(pattern_schema) as object),
         });
     }
 
