@@ -27,6 +27,10 @@
       ]
     },
     "linux-preview": {
+      "oneOf": [{ "$ref": "#/$defs/linux-subtree-preview" }, { "$ref": "#/$defs/linux-reference-preview" }]
+    },
+    "linux-subtree-preview": {
+      "description": "The whole overlay, or a node with children (DELETE-010, DELETE-024).",
       "allOf": [{ "$ref": "#/$defs/base-preview" }],
       "properties": {
         "ok": { "const": true },
@@ -37,6 +41,17 @@
           "type": "array",
           "items": { "type": "array", "minItems": 1, "items": { "type": "string" } }
         }
+      },
+      "unevaluatedProperties": false
+    },
+    "linux-reference-preview": {
+      "description": "A node other properties of the overlay refer to (DELETE-028), as noos-preview: paths has [<path>], then [<owner>, <property>] per referencing property.",
+      "allOf": [{ "$ref": "#/$defs/base-preview" }],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^'.+' is referenced by [0-9]+ propert(y|ies); deleting it would clear (that reference|those references)\\. Re-run with --force\\.$" },
+        "severity": { "const": "warn" },
+        "paths": { "type": "array", "items": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "type": "string", "minLength": 1 } } }
       },
       "unevaluatedProperties": false
     },

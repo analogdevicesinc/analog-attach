@@ -248,6 +248,33 @@ describe("the Linux backend through main", () => {
         expect(JSON.parse(duplicate.stdout)).toMatchObject({ ok: false });
     });
 
+    test("delete of a referenced node previews the references; --force clears them", async () => {
+        configure();
+        const workfile = path.join(project, "overlay.dtso");
+        fs.writeFileSync(workfile, OVERLAY.replace("\t\treg = <0>;\n", "\t\treg = <0>;\n\t\trefin1-supply = <&vref>;\n")
+            + "\n&{/} {\n\tvref: vref {\n\t\tcompatible = \"regulator-fixed\";\n\t};\n};\n");
+        const before = fs.readFileSync(workfile, "utf8");
+
+        const preview = await run(["--json", "delete", "vref"]);
+        expect(JSON.parse(preview.stdout)).toEqual({
+            ok: true,
+            message: "'vref' is referenced by 1 property; deleting it would clear that reference. Re-run with --force.",
+            severity: "warn",
+            node_count: 1,
+            property_count: 1,
+            paths: [["vref"], ["adc", "refin1-supply"]],
+        });
+        const text = await run(["delete", "vref"]);
+        expect(text.stdout).toBe("vref: referenced by\n\n  adc refin1-supply\n\nNothing was changed. Re-run with --force to delete the node and clear those references.\n");
+        expect(fs.readFileSync(workfile, "utf8")).toBe(before);
+
+        const forced = await run(["--json", "delete", "vref", "--force"]);
+        expect(JSON.parse(forced.stdout)).toEqual({ ok: true, message: "Deleted vref and cleared 1 reference to it", severity: "info" });
+        const after = fs.readFileSync(workfile, "utf8");
+        expect(after).not.toContain("vref");
+        expect(after).toContain("adc: adc@0");
+    });
+
     test("move refuses a parent the binding doesn't allow, naming the ones it does", async () => {
         configure();
         fs.writeFileSync(path.join(base, "base.dts"), BASE_WITH_SPI1);

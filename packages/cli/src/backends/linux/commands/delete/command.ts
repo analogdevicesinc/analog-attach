@@ -1,9 +1,10 @@
-import { DeviceTree, DeviceTreeOverlay, type DTNode } from "attach-lib";
+import { DeviceTree, DeviceTreeOverlay, references_to, type DTNode, type ReferenceTo } from "attach-lib";
 
 import { answer, command, refuse, type DeleteArguments } from "../../../../interface/backend-interface";
 import { load_workspace } from "../../config/workspace";
 import { resolve_node_identifier, not_found_message } from "../../utilities";
 import type { DeleteResponse, DeletePreview } from "../../protocol/types";
+import { display_path } from "../../unresolved";
 
 /** What a delete would remove: the response, and the lines that list it. */
 function preview_answer(preview: { node_count: number; property_count: number; paths: string[][] }) {
@@ -17,6 +18,37 @@ function preview_answer(preview: { node_count: number; property_count: number; p
         paths: preview.paths,
     };
     return answer<DeleteResponse>(response, [message, ...preview.paths.map(p => `  ${p.join("/")}`)].join("\n"));
+}
+
+/** A referencing property as the CLI names it: the holder label-first, then the property. */
+interface Referrer {
+    owner: string;
+    property: string;
+}
+
+function referrers(overlay: DeviceTreeOverlay, references: ReferenceTo[]): Referrer[] {
+    const labels = overlay.all_labels();
+    return references.map(reference => ({ owner: display_path(reference.path, labels), property: reference.property }));
+}
+
+const properties = (amount: number): string => `${String(amount)} ${amount === 1 ? "property" : "properties"}`;
+const references_word = (amount: number): string => `${String(amount)} ${amount === 1 ? "reference" : "references"}`;
+
+/** A node other properties refer to, previewed as the noos backend does: the node, then each referencing property. */
+function reference_preview(identifier: string, node: DTNode, found: Referrer[]) {
+    const those = found.length === 1 ? "that reference" : "those references";
+    const response: DeletePreview = {
+        ok: true,
+        message: `'${identifier}' is referenced by ${properties(found.length)}; deleting it would clear ${those}. Re-run with --force.`,
+        severity: "warn",
+        node_count: count_subtree(node).node_count,
+        property_count: found.length,
+        paths: [[identifier], ...found.map(referrer => [referrer.owner, referrer.property])],
+    };
+    const text = `${identifier}: referenced by\n\n`
+        + found.map(referrer => `  ${referrer.owner} ${referrer.property}\n`).join("")
+        + "\nNothing was changed. Re-run with --force to delete the node and clear those references.";
+    return answer<DeleteResponse>(response, text);
 }
 
 export const delete_command = command<DeleteArguments, DeleteResponse>({
@@ -67,11 +99,15 @@ A node with children, or the whole overlay, is only previewed without --force.`,
 
         const identifier = path_argument;
         const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
-        if (found !== undefined && !found.is_in_base && found.parent_node !== undefined
-            && found.node.children.length > 0 && !force) {
-            return Promise.resolve(preview_answer(count_subtree(found.node)));
+        const added = found !== undefined && !found.is_in_base && found.parent_node !== undefined ? found : undefined;
+        const references = added === undefined ? [] : references_to(overlay, added.node_path);
+        if (added !== undefined && !force) {
+            if (references.length > 0) { return Promise.resolve(reference_preview(identifier, added.node, referrers(overlay, references))); }
+            if (added.node.children.length > 0) { return Promise.resolve(preview_answer(count_subtree(added.node))); }
         }
 
+        // With --force, the properties that refer to the node go first, so no reference dangles.
+        for (const reference of references) { overlay.remove_property(reference.path, reference.property); }
         const result = delete_overlay_node(base, overlay, identifier);
         switch (result) {
             case "not-found": { return Promise.resolve(refuse(not_found_message(identifier, overlay, base))); }
@@ -81,9 +117,10 @@ A node with children, or the whole overlay, is only previewed without --force.`,
             case "is-root": { return Promise.resolve(refuse("Cannot delete the root node")); }
             case "deleted": {
                 workspace.overlay.save();
+                const cleared = references.length === 0 ? "" : ` and cleared ${references_word(references.length)} to it`;
                 return Promise.resolve(answer<DeleteResponse>(
-                    { ok: true, message: `Deleted ${identifier}`, severity: "info" },
-                    `Deleted ${identifier} from ${input}`,
+                    { ok: true, message: `Deleted ${identifier}${cleared}`, severity: "info" },
+                    `Deleted ${identifier}${cleared} from ${input}`,
                 ));
             }
         }
