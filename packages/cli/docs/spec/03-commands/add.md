@@ -31,7 +31,7 @@ Grammar: rule `add` in `01-grammar.abnf`.
 | Valid parents | The nodes `list parent <compatible>` lists, in its order: the base's nodes that the binding allows as a parent. Computed from the base only. |
 | Bus kind | `spi` or `i2c`. A node's bus kind comes from its name (`spi`, `i2c`), or else from the first of its compatibles that contains the word `spi` or `i2c`. Other nodes have none. |
 | Copy template | `example:<N>` or `overlay:<ref>`. |
-| Interactive run | A terminal run (COM-012) in human mode without `--quiet`. |
+| Interactive run | A terminal run (COM-012) in human mode without `--quiet`, with the `interview` setting `true` (the default). The parent question (ADD-021) is part of the interview: with `interview` `false` the run asks nothing, as a piped one. |
 | New node | The node this command adds. Its *key* is its name with the unit address (`adi,ad7124-8@2`). |
 
 ## 3. Resources

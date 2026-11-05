@@ -34,8 +34,8 @@ no_caches() {
 # Steps:
 #   1. Set deploy-user pi with --global.
 #   2. Run config, with --json.
-#   3. Check it succeeds and lists the nine linux settings in order, in the categories Deploy,
-#      General and Workspace.
+#   3. Check it succeeds and lists the thirteen linux settings in order, in the categories Build,
+#      Deploy, General and Workspace.
 #   4. Check linux and devicetree are required and overlay-syntax is not.
 #   5. Check the sources: linux local, deploy-user global, overlay-syntax default (fragment),
 #      deploy-ip unset.
@@ -45,8 +45,8 @@ no_caches() {
 	run_json config
 	assert_success
 	assert_json '[.configs[].field_name] | join(",")' \
-		"backend,linux,devicetree,workfile,overlay-syntax,preprocess-command,deploy-ip,deploy-user,deploy-password"
-	assert_json '[.configs[].category] | unique | sort | join(",")' "Deploy,General,Workspace"
+		"backend,linux,devicetree,workfile,overlay-syntax,preprocess-command,interview,build-command,build-dir,deploy-command,deploy-ip,deploy-user,deploy-password"
+	assert_json '[.configs[].category] | unique | sort | join(",")' "Build,Deploy,General,Workspace"
 	assert_json '.configs[] | select(.field_name == "linux") | .required' true
 	assert_json '.configs[] | select(.field_name == "devicetree") | .required' true
 	assert_json '.configs[] | select(.field_name == "overlay-syntax") | .required' false

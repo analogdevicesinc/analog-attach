@@ -36,22 +36,22 @@ duplicate_labels() {
 	printf '/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 {\n\t\ttarget = <&spi0>;\n\t\t__overlay__ {\n\t\t\tx: a@0 { reg = <0>; };\n\t\t\tx: b@1 { reg = <1>; };\n\t\t};\n\t};\n};\n' >"$WORKFILE"
 }
 
-# Description: build compiles the overlay into a .dtbo next to it, with the added node in it and
+# Description: build compiles the overlay into a .dtbo in the build folder, with the added node in it and
 # the reference to the base's spi0 left as a fixup for the loader.
 # Steps:
 #   1. Create the overlay with init and add adi,adxl345 under spi0.
 #   2. Run build, with --json; check it succeeds (.ok true).
-#   3. Check overlay.dtbo exists and starts with the flattened devicetree magic d00dfeed.
+#   3. Check build/overlay.dtbo exists and starts with the flattened devicetree magic d00dfeed.
 #   4. Decompile it with the bundled dtc; check it has the adxl345 compatible and a __fixups__
 #      entry for spi0 on fragment@0's target.
 # bats test_tags=req:BUILD-01, req:BUILD-01-LNX, id:L0033
-@test "build compiles the overlay into a .dtbo next to it" {
+@test "build compiles the overlay into a .dtbo in the build folder" {
 	with_overlay
 	aa add adi,adxl345 --parent spi0 >/dev/null 2>&1
 	run_json build
 	assert_success
 	assert_json '.ok' true
-	local dtbo="$PROJECT/overlay.dtbo"
+	local dtbo="$PROJECT/build/overlay.dtbo"
 	[ -f "$dtbo" ]
 	# A flattened device tree: magic d00dfeed.
 	[ "$(head -c 4 "$dtbo" | od -An -tx1 | tr -d ' ')" = d00dfeed ]
@@ -67,13 +67,13 @@ duplicate_labels() {
 #   1. Create the overlay with init and build it, with --json; check it succeeds (.ok true) and
 #      keep a copy of the .dtbo.
 #   2. Add adi,adxl345 under spi0 and build again, with --json; check it succeeds (.ok true).
-#   3. Check overlay.dtbo differs from the copy and starts with the flattened devicetree magic
+#   3. Check build/overlay.dtbo differs from the copy and starts with the flattened devicetree magic
 #      d00dfeed.
 #   4. Decompile it with the bundled dtc; check it has the adxl345 compatible.
 # bats test_tags=req:BUILD-01-LNX, id:L0034
 @test "build replaces an earlier .dtbo" {
 	with_overlay
-	local dtbo="$PROJECT/overlay.dtbo"
+	local dtbo="$PROJECT/build/overlay.dtbo"
 	run_json build
 	assert_success
 	assert_json '.ok' true
@@ -102,7 +102,7 @@ duplicate_labels() {
 	assert_json '.errors[0].field' workfile
 	assert_json '.errors[0].message' "workfile: $WORKFILE does not exist"
 	assert_json '.hints[0]' "Run 'analog-attach init' to create it, or 'analog-attach config workfile <name>' to use another."
-	[ ! -e "$PROJECT/overlay.dtbo" ]
+	[ ! -e "$PROJECT/build/overlay.dtbo" ]
 	run aa build
 	assert_output --partial "Run 'analog-attach init' to create it"
 }
@@ -126,7 +126,7 @@ duplicate_labels() {
 	assert_json '.errors[0].field' tools
 	assert_json '.errors[0].message' "Bundled tools not found: $BATS_TEST_TMPDIR/install/bundled/linux/tools/dtc"
 	assert_json '.hints[0]' 'The analog-attach installation is incomplete; rebuild it (scripts/bundle-dt-schema.sh).'
-	[ ! -e "$PROJECT/overlay.dtbo" ]
+	[ ! -e "$PROJECT/build/overlay.dtbo" ]
 }
 
 # Description: build fails with a configuration error when the preprocessor can't read the base
@@ -143,23 +143,23 @@ duplicate_labels() {
 	run_config_error build
 	assert_json '.errors | length > 0' true
 	assert_json '[.errors[].message] | join(" ") | test("no-such-cpp")' true
-	[ ! -e "$PROJECT/overlay.dtbo" ]
+	[ ! -e "$PROJECT/build/overlay.dtbo" ]
 }
 
 # Description: build reports the absolute path of the .dtbo it wrote.
 # Steps:
 #   1. Create the overlay with init.
-#   2. Run build, with --json; check the path is the project's overlay.dtbo and the message is
+#   2. Run build, with --json; check the path is the project's build/overlay.dtbo and the message is
 #      Compiled overlay.
 #   3. Run build in human mode; check the output shows that path.
 # bats test_tags=req:BUILD-03, id:L0038
 @test "build reports the absolute path of the .dtbo" {
 	with_overlay
 	run_json build
-	assert_json '.path' "$PROJECT/overlay.dtbo"
+	assert_json '.path' "$PROJECT/build/overlay.dtbo"
 	assert_json '.message' 'Compiled overlay'
 	run aa build
-	assert_output --partial "$PROJECT/overlay.dtbo"
+	assert_output --partial "$PROJECT/build/overlay.dtbo"
 }
 
 # Description: build reports where its output is in the same form as the other ecosystems: a
@@ -175,7 +175,7 @@ duplicate_labels() {
 	run aa build
 	assert_success
 	assert_line "Build completed successfully"
-	assert_line "  $PROJECT/overlay.dtbo"
+	assert_line "  $PROJECT/build/overlay.dtbo"
 }
 
 # Description: a failed compile shows dtc's messages, says the build failed, and writes no .dtbo.
@@ -195,7 +195,7 @@ duplicate_labels() {
 	assert_line --index 0 "Build failed:"
 	assert_output --partial "ERROR (duplicate_label)"
 	assert_output --partial "Duplicate label 'x'"
-	[ ! -e "$PROJECT/overlay.dtbo" ]
+	[ ! -e "$PROJECT/build/overlay.dtbo" ]
 	run_json build
 	assert_json '.ok' false
 	assert_json '.severity' error

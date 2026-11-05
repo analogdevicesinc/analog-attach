@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "deploy.schema.json",
   "title": "deploy response",
-  "description": "Standard output of deploy in JSON mode (DEPLOY-011, DEPLOY-022). $defs/base is DeployResponse (overview 2.1).",
+  "description": "Standard output of deploy in JSON mode (DEPLOY-011, DEPLOY-013, DEPLOY-022). $defs/base is DeployResponse (overview 2.1).",
   "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
   "$defs": {
     "base": { "description": "DeployResponse: a CommonResponse.", "$ref": "common.schema.json#/$defs/common" },
@@ -20,7 +20,18 @@
           },
           "unevaluatedProperties": false
         },
-        { "$ref": "common.schema.json#/$defs/refusal", "description": "The copy failed: message is 'Deploy failed (scp):', a newline and the command's standard error (DEPLOY-011)." }
+        {
+          "description": "deploy-command ran in place of scp and the reboot (DEPLOY-013).",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^Deployed .+ with '.*'$" },
+            "severity": { "const": "info" }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal", "description": "The copy failed: message is 'Deploy failed (scp):', a newline and the command's standard error (DEPLOY-011); or deploy-command exited with a non-zero status: 'Deploy failed with exit code <n>' (DEPLOY-013)." },
+        { "$ref": "common.schema.json#/$defs/config-refusal" }
       ]
     },
     "noos": {

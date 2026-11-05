@@ -413,10 +413,20 @@ const with_spi1 = (fixture: LinuxHarness): void => { fs.writeFileSync(path.join(
 /** The deploy settings, and the .dtbo `build` would have written. */
 const deploy_settings = (fixture: LinuxHarness): void => {
     const { linux } = fixture;
-    fs.writeFileSync(path.join(linux.project, "overlay.dtbo"), "");
+    fs.mkdirSync(path.join(linux.project, "build"), { recursive: true });
+    fs.writeFileSync(path.join(linux.project, "build", "overlay.dtbo"), "");
     linux.write_settings({
         "linux": linux.linux, "devicetree": path.join(linux.base, "base.dts"), "workfile": path.join(linux.project, "overlay.dtso"),
         "deploy-ip": "192.0.2.1", "deploy-user": "pi", "deploy-password": "secret",
+    });
+};
+
+/** build-command and deploy-command set: the user's commands in place of dtc and scp. */
+const own_commands = (fixture: LinuxHarness): void => {
+    const { linux } = fixture;
+    linux.write_settings({
+        "linux": linux.linux, "devicetree": path.join(linux.base, "base.dts"), "workfile": path.join(linux.project, "overlay.dtso"),
+        "build-command": "mkdir -p build && touch {output}", "deploy-command": "test -e {dtbo}",
     });
 };
 
@@ -505,10 +515,12 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "build", argv: ["build"], shape: "answer", prepare: fixture => { fixture.tools(); } },
     { route: "build", argv: ["build"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); } },
     { route: "build", argv: ["build"], shape: "config-refusal" },
+    { route: "build", argv: ["build"], shape: "answer", prepare: own_commands },
 
     { route: "deploy", argv: ["deploy"], shape: "answer", prepare: fixture => { deploy_settings(fixture); fixture.sshpass(); } },
     { route: "deploy", argv: ["deploy"], shape: "refusal", prepare: fixture => { deploy_settings(fixture); fixture.sshpass({ fail: true }); } },
     { route: "deploy", argv: ["deploy"], shape: "config-refusal" },
+    { route: "deploy", argv: ["deploy"], shape: "refusal", prepare: own_commands },
 
     { route: "move", argv: ["move", "adc", "spi1"], shape: "answer", prepare: with_spi1 },
     { route: "move", argv: ["move", "adc", "adc"], shape: "refusal" },

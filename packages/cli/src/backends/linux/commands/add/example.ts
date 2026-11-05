@@ -368,7 +368,7 @@ spi {
     test("find_examples — each example preprocessed and searched, the broken ones with their first error line", () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-examples-"));
         try {
-            const settings: Settings = { overlay_syntax: "fragment", preprocess_command: "cp {input} {output}" };
+            const settings: Settings = { overlay_syntax: "fragment", preprocess_command: "cp {input} {output}", interview: true, build_dir: "/build" };
             const spi = "spi {\n adc@0 { compatible = \"adi,ad7124-4\"; };\n};";
             const wired = "i2c1 {\n adc@48 { compatible = \"adi,ad7124-8\"; };\n};";
             const other = "i2c { sensor@1 { compatible = \"adi,adt7410\"; }; };";
@@ -390,7 +390,7 @@ spi {
     test("bus_example_values — the example on the parent's bus: an I2C address, an SPI clock, never the chip select", () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-examples-"));
         try {
-            const settings: Settings = { overlay_syntax: "fragment", preprocess_command: "cp {input} {output}" };
+            const settings: Settings = { overlay_syntax: "fragment", preprocess_command: "cp {input} {output}", interview: true, build_dir: "/build" };
             const search = find_examples(ADXL345_EXAMPLES, c => c === "adi,adxl345", settings, "/linux", directory);
             expect(bus_example_values(search, "i2c")).toEqual([{ property: "reg", value: 0x2An, index: 1 }]);
             expect(bus_example_values(search, "spi")).toEqual([{ property: "spi-max-frequency", value: 5_000_000n, index: 2 }]);

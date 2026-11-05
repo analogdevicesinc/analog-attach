@@ -1,8 +1,10 @@
 import * as fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
 import type { Outcome, Session } from "../../../interface/backend-interface";
+import { project_root } from "../../shell";
 import type { ConfigRefusal } from "../protocol/types";
 import { getBundledDtSchemaPath, getBundledToolsPath } from "../commands/skill/utilities";
 import { cache_warning, load_compat_index, validation_schema_path } from "./cache";
@@ -97,9 +99,16 @@ export type Workspace<N extends Need> = { settings: Settings; context: Workspace
 
 const bundle_hint = (program: string): string => `The ${program} installation is incomplete; rebuild it (scripts/bundle-dt-schema.sh).`;
 
-/** Derive the compiled artifact path from the overlay source path. */
-export function derive_dtbo_path(overlay: string): string {
-    return overlay.endsWith(".dtso") ? `${overlay.slice(0, -".dtso".length)}.dtbo` : `${overlay}.dtbo`;
+/** Where `build` writes the overlay's `.dtbo`: in `build_directory`, the file named after the overlay (`overlay.dtso` → `overlay.dtbo`). */
+export function derive_dtbo_path(overlay: string, build_directory: string): string {
+    const name = path.basename(overlay);
+    return path.join(build_directory, name.endsWith(".dtso") ? `${name.slice(0, -".dtso".length)}.dtbo` : `${name}.dtbo`);
+}
+
+/** The `build-dir` setting as a folder: relative to the project root unless absolute, `~` the home directory. */
+export function build_folder(setting: string, root: string): string {
+    const expanded = setting === "~" || setting.startsWith("~/") ? path.join(os.homedir(), setting.slice(1)) : setting;
+    return path.resolve(root, expanded);
 }
 
 function failures(...results: ConfigResult<unknown>[]): ConfigError[] {
@@ -112,7 +121,7 @@ function fail(error: ConfigError): { ok: false; errors: ConfigError[] } {
 
 function require_setting(settings: Settings, key: SettingKey, program: string): ConfigResult<string> {
     const value = settings[SETTING_FIELDS[key]];
-    if (value !== undefined) { return { ok: true, value }; }
+    if (typeof value === "string") { return { ok: true, value }; }
     const description = setting_spec(key)?.description;
     const hint = missing_hint(key, program);
     return fail({
@@ -267,7 +276,7 @@ function parse_deploy(settings: Settings, program: string): ConfigResult<DeployT
         return { ok: false, errors: failures(host, user, password, overlay) };
     }
 
-    const dtbo = derive_dtbo_path(overlay.value);
+    const dtbo = derive_dtbo_path(overlay.value, settings.build_dir);
     if (!fs.existsSync(dtbo)) {
         return fail({ field: "workfile", kind: "missing", message: `Compiled overlay ${dtbo} not found`, hint: "Run 'build' first." });
     }
@@ -358,7 +367,8 @@ export type Loaded<N extends Need> = { ok: true; workspace: Workspace<N> } | { o
  */
 export function load_workspace<N extends Need>(session: Session, needs: readonly N[]): Loaded<N> {
     const context = workspace_context(session);
-    const workspace = open_workspace(read_settings(session.settings), needs, context);
+    const settings = read_settings(session.settings);
+    const workspace = open_workspace({ ...settings, build_dir: build_folder(settings.build_dir, project_root(session)) }, needs, context);
     if (!workspace.ok) { return { ok: false, outcome: config_errors_outcome(session, workspace.errors) }; }
     if (needs.includes("bindings" as N)) {
         const bindings = (workspace.value as Workspace<"bindings">).bindings;
@@ -375,7 +385,6 @@ export function optional_bindings(workspace: Pick<Workspace<never>, "settings" |
 
 if (import.meta.vitest) {
     const { test, expect, beforeAll, afterAll } = import.meta.vitest;
-    const os = await import("node:os");
 
     let root: string;
     let linux: string;
@@ -465,6 +474,12 @@ if (import.meta.vitest) {
         expect(result.ok).toBe(false);
         if (result.ok) { return; }
         expect(result.errors[0]!.message).toContain("does not exist");
+    });
+
+    test("build_folder - relative to the project root unless absolute, ~ the home directory", () => {
+        expect(build_folder("build", "/p")).toBe("/p/build");
+        expect(build_folder("/abs/out", "/p")).toBe("/abs/out");
+        expect(build_folder("~/out", "/p")).toBe(path.join(os.homedir(), "out"));
     });
 
     test("open_workspace - deploy needs every deploy field", () => {
