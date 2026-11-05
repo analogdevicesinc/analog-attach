@@ -136,8 +136,8 @@ setup() {
 # its binding file and where it is set.
 # Steps:
 #   1. Run read ad7124_8 reg, with --json.
-#   2. Check it succeeds: a property reg, value 0, type number, the binding's description,
-#      required, from adi,ad7124.yaml, source overlay.
+#   2. Check it succeeds: a property reg, value [0], the binding's type an array of numbers,
+#      the binding's description, required, from adi,ad7124.yaml, source overlay.
 #   3. Run read ad7124_8 reg and check the first line is reg = <0>; and the second the
 #      description with the binding file.
 # bats test_tags=req:READ-03, id:L0236
@@ -146,8 +146,9 @@ setup() {
 	assert_success
 	assert_json '.kind' property
 	assert_json '.key' reg
-	assert_json '.value' 0
-	assert_json '.type.kind' number
+	assert_json '.value | tojson' '[0]'
+	assert_json '.type.kind' array
+	assert_json '.type.items.kind' number
 	assert_json '.description' "SPI chip select number for the device"
 	assert_json '.required' true
 	assert_json '.definition' adi,ad7124.yaml
@@ -178,14 +179,12 @@ setup() {
 	assert_line "  Default: 0"
 }
 
-# Gap: in JSON the type is the one the value is written as (a number), not the binding's (an
-# enum of 0, 1, 3), and the options aren't given; only the text has them (`Allowed:`).
 # Description: read --json of a property gives the binding's type, an enum, and its options.
 # Steps:
 #   1. Set adi,reference-select 3 on ad7124_8/channel@0.
 #   2. Run read ad7124_8/channel@0 adi,reference-select, with --json.
 #   3. Check it succeeds with type kind enum and the options 0, 1 and 3.
-# bats test_tags=req:READ-03, gap, id:L0238
+# bats test_tags=req:READ-03, id:L0238
 @test "read --json <node> <property> gives the binding's type and its allowed values" {
 	aa update ad7124_8/channel@0 adi,reference-select 3 >/dev/null
 	run_json read ad7124_8/channel@0 adi,reference-select
@@ -335,14 +334,14 @@ setup() {
 # Steps:
 #   1. Run read spi0.
 #   2. Check it succeeds and shows spidev0: spidev@0 collapsed on one line, marked base.
-#   3. Run read spi0, with --json, and check spidev@0 has origin base and no properties.
+#   3. Run read spi0, with --json, and check spidev@0 has origin external and no properties.
 # bats test_tags=req:READ-06, id:L0247
 @test "read of a base node collapses the base children the overlay doesn't reach" {
 	run aa read spi0
 	assert_success
 	assert_line '    spidev0: spidev@0 { … };   // base'
 	run_json read spi0
-	assert_json '.children[] | select(.key == "spidev@0") | .origin' base
+	assert_json '.children[] | select(.key == "spidev@0") | .origin' external
 	assert_json '.children[] | select(.key == "spidev@0") | .properties | length' 0
 }
 
@@ -373,14 +372,12 @@ setup() {
 	assert_json '.children[0].alias | length' 0
 }
 
-# Gap: `origin` is `overlay`, `base` or `both` (a base node the overlay changes), not `internal`
-# or `external` as in noos.
 # Description: read --json gives a node of the overlay the origin internal and a node of the base
 # the origin external.
 # Steps:
 #   1. Run read ad7124_8, with --json, and check .origin is internal.
 #   2. Run read spi0, with --json, and check .origin is external.
-# bats test_tags=req:READ-07, gap, id:L0250
+# bats test_tags=req:READ-07, id:L0250
 @test "read --json says a node of the overlay is internal and one of the base external" {
 	run_json read ad7124_8
 	assert_json '.origin' internal

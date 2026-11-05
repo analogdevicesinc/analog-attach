@@ -294,7 +294,8 @@ bash_complete() {
 # Steps:
 #   1. Create the overlay with init.
 #   2. Write list devices, with --json, and the engine's offers for add to files.
-#   3. Check list devices lists more than 1000 types and the offers are the same list.
+#   3. Check list devices lists more than 1000 types and the offers are the same ones (sorted:
+#      list devices orders them by category, the shell sorts the offers).
 #   4. Ask for add adi,ad7124 and check it offers adi,ad7124-4 and adi,ad7124-8.
 # bats test_tags=req:COMPLETION-04, id:L0053
 @test "completion offers the device types list devices lists" {
@@ -303,9 +304,9 @@ bash_complete() {
 	aa --json list devices >"$BATS_TEST_TMPDIR/devices.json"
 	aa __complete -- add '' >"$BATS_TEST_TMPDIR/complete.txt"
 	local devices
-	devices=$(jq -r '.devices[].key' "$BATS_TEST_TMPDIR/devices.json")
+	devices=$(jq -r '.devices[].key' "$BATS_TEST_TMPDIR/devices.json" | LC_ALL=C sort)
 	[ "$(wc -l <<<"$devices")" -gt 1000 ] || fail "list devices lists too little"
-	[ "$(grep -v '^__ANALOG_ATTACH_COMPLETE_' "$BATS_TEST_TMPDIR/complete.txt" | cut -f1)" = "$devices" ] ||
+	[ "$(grep -v '^__ANALOG_ATTACH_COMPLETE_' "$BATS_TEST_TMPDIR/complete.txt" | cut -f1 | LC_ALL=C sort)" = "$devices" ] ||
 		fail "completion and list devices differ"
 	run candidates add adi,ad7124
 	assert_output "$(printf 'adi,ad7124-4\nadi,ad7124-8')"

@@ -48,18 +48,16 @@ setup() {
 # Description: add refuses to run without a workfile, says how to create one, and creates none.
 # Steps:
 #   1. Add adi,adxl345 --parent i2c1, with --json, before any init.
-#   2. Check it fails (exit 2) with an error on standard error naming the workfile field.
+#   2. Check it is refused (exit 0, .ok false) with an error naming the workfile field.
 #   3. Check its hint points to init.
 #   4. Check no workfile was created.
 # bats test_tags=req:ADD-01, id:L0003
 @test "add needs a workfile, and creates none" {
 	run_json add adi,adxl345 --parent i2c1
-	assert_failure 2
-	local error="$stderr"
-	run jq -r '.errors[0].field' <<<"$error"
-	assert_output workfile
-	run jq -r '.hints[0]' <<<"$error"
-	assert_output --partial "Run 'analog-attach init' to create it"
+	assert_success
+	assert_json '.ok' false
+	assert_json '.errors[0].field' workfile
+	assert_json '.hints[0] | contains("Run '"'"'analog-attach init'"'"' to create it")' true
 	[ ! -e "$WORKFILE" ] || fail "add created the workfile"
 }
 

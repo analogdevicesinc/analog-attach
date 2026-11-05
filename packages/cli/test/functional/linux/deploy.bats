@@ -15,12 +15,13 @@ setup() {
 	with_overlay
 }
 
-# `run_config_error <words>`: run_json for a configuration error, which is JSON on standard
-# error (exit 2): $output is that JSON.
+# `run_config_error <words>`: run_json for a configuration error, a refusal with its errors and
+# hints (COM-071): exit 0, nothing on standard error, .ok false.
 run_config_error() {
 	run_json "$@"
-	assert_failure 2
-	output=$stderr
+	assert_success
+	[ -z "$stderr" ] || fail "standard error: $stderr"
+	assert_json '.ok' false
 }
 
 # `stand_ins [<scp exit status>]`: sshpass and scp stand-ins first on PATH. sshpass appends
@@ -58,7 +59,7 @@ path_with_only() {
 # to build it first, and copies nothing.
 # Steps:
 #   1. Put the sshpass and scp stand-ins on PATH.
-#   2. Run deploy, with --json; check it fails with exit 2, the error is on workfile and says the
+#   2. Run deploy, with --json; check it is refused, the error is on workfile and says the
 #      .dtbo is not found, and the hint says to run build first.
 #   3. Check the stand-ins were not called.
 #   4. Run deploy in human mode; check it gives the same message and hint.
@@ -180,8 +181,8 @@ path_with_only() {
 # sshpass is not on PATH.
 # Steps:
 #   1. Build the overlay.
-#   2. Run deploy, with --json, on a PATH with neither scp nor sshpass; check it fails with
-#      exit 2 and the error, on deploy, names both tools.
+#   2. Run deploy, with --json, on a PATH with neither scp nor sshpass; check it is refused
+#      and the error, on deploy, names both tools.
 #   3. Run it again on a PATH with scp only; check the error names sshpass alone.
 # bats test_tags=req:DEPLOY-03, id:L0108
 @test "deploy reports scp and sshpass missing" {
@@ -190,29 +191,26 @@ path_with_only() {
 	# bats itself needs the usual PATH: only the CLI runs with the other one.
 	path=$(path_with_only)
 	run --separate-stderr env PATH="$path" node "$CLI_DIR/dist/cli.js" --json deploy
-	assert_failure 2
-	output=$stderr
+	assert_success
+	assert_json '.ok' false
 	assert_json '.errors[0].field' deploy
 	assert_json '.errors[0].message' 'scp, sshpass not found on PATH (needed to deploy)'
 	path=$(path_with_only scp)
 	run --separate-stderr env PATH="$path" node "$CLI_DIR/dist/cli.js" --json deploy
-	output=$stderr
 	assert_json '.errors[0].message' 'sshpass not found on PATH (needed to deploy)'
 }
 
-# Gap: the errors name the deploy settings but not how to set them (setting_hint gives no
-# deploy-* a hint).
 # Description: deploy with no device address or password fails with a configuration error naming
 # the missing settings and how to set them, and copies nothing.
 # Steps:
 #   1. Build the overlay and drop the deploy-ip and deploy-password settings.
-#   2. Put the stand-ins on PATH and run deploy, with --json; check it fails with exit 2 and the
+#   2. Put the stand-ins on PATH and run deploy, with --json; check it is refused and the
 #      errors name deploy-ip and deploy-password.
 #   3. Check the stand-ins were not called.
 #   4. Run deploy in human mode; check it says both settings are missing.
-#   5. Check both runs say how to set them with config: the first JSON error's hint, and the
-#      human output for each.
-# bats test_tags=req:GEN-13, req:SET-10-LNX, gap, id:L0109
+#   5. Check both runs say how to set them with config: the JSON hints, and the human output
+#      for each.
+# bats test_tags=req:GEN-13, req:SET-10-LNX, id:L0109
 @test "deploy with no device set names the settings, and copies nothing" {
 	aa build >/dev/null
 	drop_setting deploy-ip deploy-password
@@ -225,8 +223,7 @@ path_with_only() {
 	PATH="$STAND_INS" run aa deploy
 	assert_output --partial "Missing config field deploy-ip"
 	assert_output --partial "Missing config field deploy-password"
-	# The gap: last, so the checks above hold while it is open.
-	jq -e '.errors[0].hint // "" | test("analog-attach config deploy-ip")' <<<"$json" >/dev/null ||
+	jq -e '.hints | any(test("analog-attach config deploy-ip"))' <<<"$json" >/dev/null ||
 		fail "no hint saying how to set deploy-ip in: $json"
 	assert_output --partial "analog-attach config deploy-ip"
 	assert_output --partial "analog-attach config deploy-password"

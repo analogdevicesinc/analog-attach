@@ -32,11 +32,16 @@ export interface ListDevicesResponse extends BaseListDevicesResponse {
     names: string[];
 }
 
-/** `list property <path>`: the names of what the node's binding allows. */
+/**
+ * `list property <path>`: the names of what the node's binding allows. Without a path: the
+ * overlay's nodes, by label-first path, and no `properties`.
+ */
 export interface ListPropertyNamesResponse extends CommonResponse {
-    /** Each property's name, then the regex of each property pattern and child-node pattern. */
+    /** Each property's name, then the regex of each property pattern and child-node pattern; or each node's path. */
     names: string[];
-    /** @deprecated The same entries with their marks (`compatible (set, required)`), kept for one release. */
+    /** The binding's named properties, with their types and marks. */
+    properties?: Pick<PropertyDescription, "name" | "type" | "display" | "required" | "set">[];
+    /** @deprecated The same entries with their marks (`compatible (set, required)`), or a node's compatible, kept for one release. */
     suggestions: Suggestion[];
 }
 

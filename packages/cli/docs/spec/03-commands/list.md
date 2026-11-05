@@ -14,7 +14,7 @@ linux backend`).
 
 ```
 analog-attach [--json] list devices [<filter>]
-analog-attach [--json] list property <path> [<property>]
+analog-attach [--json] list property [<path> [<property>]]
 analog-attach [--json] list value <path> <property> [<member>]
 analog-attach [--json] list parent <compatible>
 analog-attach [--json] list overlay <compatible>
@@ -30,7 +30,7 @@ kind:
 ```
 list-args       = list-devices / list-property / list-value / list-parent / list-overlay
 list-devices    = %s"devices" [ B element ]                    ; filter
-list-property   = %s"property" B element [ B element ]        ; path, property
+list-property   = %s"property" [ B element [ B element ] ]    ; path, property
 list-value      = %s"value" B element B element [ B element ] ; path, property, member
 list-parent     = %s"parent" B compatible
 list-overlay    = %s"overlay" B compatible
@@ -75,10 +75,9 @@ there. (Open issue L-1.)
 
 **LIST-005** If a kind is missing a required argument, then the CLI shall
 report an input error (COM-031) before loading the workspace, in both modes:
-`Missing: path (list property <path> [property])` for `list property`
-(`<path>` and `[property]` literal), and GRM-004's `Expected argument for
-<name>` for the others, one line per missing argument (`list value` alone
-gives `Expected argument for path` and `Expected argument for property`).
+GRM-004's `Expected argument for <name>`, one line per missing argument
+(`list value` alone gives `Expected argument for path` and `Expected argument
+for property`). `list property` has no required argument (LIST-037).
 
 **LIST-009** If `list value` is given a member, then the CLI shall report the
 input error `A member is not supported by the linux backend: <member>`
@@ -90,7 +89,7 @@ and report problems with them per COM-071 and COM-072:
 | Kind | Needs |
 |---|---|
 | `devices` | bindings |
-| `property` | bindings, base, overlay |
+| `property` | bindings, base, overlay; base, overlay without a path (LIST-037) |
 | `value` | base, overlay; bindings when they load (LIST-074) |
 | `parent` | bindings, base |
 | `overlay` | bindings, base |
@@ -112,12 +111,16 @@ that one device (LIST-012): `list devices ad7124-8` describes
 
 **LIST-011** Otherwise the CLI shall list every compatible of the compat index
 that contains the filter as a substring, or every compatible when there is no
-filter, in the compat index's order. In human mode it shall write one per line,
-and nothing when none match. In JSON mode it shall respond `{"ok": true,
-"message": "Found <n> devices", "severity": "info", "devices": [{ key }…],
-"names": [...]}`, `key` being the compatible and `names` the same keys
-(deprecated). A filter that matches nothing isn't a refusal. (Open issue
-L-2.)
+filter, grouped by category: ordered by category, then by compatible. A
+compatible's category is its binding's folder under
+`Documentation/devicetree/bindings/` (`iio/adc`), or the binding's file name
+without `.yaml` for one directly under it (`trivial-devices`). In human mode
+it shall write one line per compatible, `<compatible>  <category>`, the
+compatibles padded to the longest, and nothing when none match. In JSON mode
+it shall respond `{"ok": true, "message": "Found <n> devices", "severity":
+"info", "devices": [{ key, tag }…], "names": [...]}`, `key` being the
+compatible, `tag` its category and `names` the same keys in the same order
+(deprecated). A filter that matches nothing isn't a refusal.
 
 **LIST-012** The description of a device, in human mode, shall be these
 lines:
@@ -181,6 +184,8 @@ child-node patterns.
 **LIST-033** A property's entry shall be its name, followed by ` (<marks>)`
 when it has marks: `set` when the merged node has it, `required` when the
 narrowed binding requires it, joined by `, ` (`compatible (set, required)`).
+Its type is the populated type of `list property <path> <property>` (LIST-054),
+written as LIST-052 writes it (`number[]`, `number[2]`).
 
 **LIST-034** A property pattern's entry shall be `<names> (pattern <regex>)`
 or `<names> (pattern <regex>; set: <set>)`, where `<set>` lists the node's
@@ -196,15 +201,30 @@ pattern matches joined by `, `, or `none`. `<names>` is as in LIST-034.
 Example: `channel@0 … channel@15 (child node ^channel@([0-9]|1[0-5])$;
 present: channel@0)`.
 
-**LIST-036** In human mode the CLI shall write one entry per line. In JSON mode
-it shall respond `{"ok": true, "message": <m>, "severity": "info", "names":
-[...], "suggestions": [...]}` (`04-protocol/list-property.schema.json`):
-`names` has one string per entry, the property's name or the pattern's
-regex; `suggestions` (deprecated) has one suggestion per entry: for a
+**LIST-036** In human mode the CLI shall write one entry per line: for a
+property `<name>  <marks>  <type>`, the name and the marks (`(set, required)`,
+or nothing) padded to their longest and the type last; for a pattern its entry.
+In JSON mode it shall respond `{"ok": true, "message": <m>, "severity": "info",
+"names": [...], "properties": [...], "suggestions": [...]}`
+(`04-protocol/list-property.schema.json`): `names` has one string per entry,
+the property's name or the pattern's regex; `properties` has one `{ name,
+type, display, required, set }` per property, `display` being its type
+written out; `suggestions` (deprecated) has one suggestion per entry: for a
 property `{ value: <name> }`, plus `display_string: <entry>` when it has
 marks; for a pattern `{ value: <regex>, display_string: <entry> }`. `<m>` is `Found <n> properties`, followed by `,
 <p> property pattern(s)` when there are property patterns and ` and <c> child
 node pattern(s)` when there are child-node patterns.
+
+**LIST-037** Without a path, the CLI shall list the nodes of the overlay's
+`__overlay__` bodies, depth first in file order, each once (a node two
+fragments write is one): its first label, or its parent's path, `/` and its
+name (`ad7124_8`, `ad7124_8/channel@0`, `spi0/dac@1`; under a `target-path`
+the path itself, `/vdd`). It loads the base and the overlay, not the bindings.
+In human mode it shall write one path per line, and nothing when there is none.
+In JSON mode it shall respond `{"ok": true, "message": "<n> node[s]",
+"severity": "info", "names": [...], "suggestions": [{ value, display_string? }…]}`,
+`display_string` being the node's first compatible when it has one (as the
+noos backend does, LIST-520).
 
 ## 6. `list property <path> <property>`
 
@@ -503,18 +523,14 @@ not found: &spi0` where every other command says `Use the bare form: spi0`
 property, where GRM-030 would refuse it. The completion of `&spi0/` is the
 exception: it offers the base's children (`05-completion.md` CO-12).
 
-**L-2. `list devices` doesn't sort.** The names come in the compat index's
-order, that of their bindings' `$id` in `validation.json` (COM-110), not
-alphabetically.
-
 **L-3. A multi-line description is indented on its first line only** in
 `list devices <compatible>`, and one that ends in a newline leaves an empty
 line before `binding:` (`list devices adi,ad7124-8`). A fix would be to indent
 every line of the trimmed text.
 
 **L-4. Two type notations.** `list devices` writes arrays as `number[]` and
-`list property` as `number[2]` / `number[]`: the same property shows
-different types. In `list devices`' JSON the `display` of `diff-channels` is
+`list property` (a node's listing and one property alike) as `number[2]` /
+`number[]`: the same property shows different types. In `list devices`' JSON the `display` of `diff-channels` is
 `number[]` while its `type` has `min_items` and `max_items` 2.
 
 **L-5. `list property <path> <property>` in JSON loses information.** Human
@@ -566,11 +582,15 @@ spi1  /soc/spi@7e215080
 …
 spi6  /soc/spi@7e204c00
 
+$ analog-attach list property
+adc
+adc/channel@0
+
 $ analog-attach list property adc
-compatible (set, required)
-reg (set, required)
-interrupts (required)
-interrupt-parent
+compatible        (set, required)  enum(adi,ad7124-4 | adi,ad7124-8)
+reg               (set, required)  number[]
+interrupts        (required)       (number, enum(IRQ_TYPE_NONE | …))[2]
+interrupt-parent                   enum(gpio | gicv2 | aon_intr)
 …
 channel@0 … channel@15 (child node ^channel@([0-9]|1[0-5])$; present: channel@0)
 

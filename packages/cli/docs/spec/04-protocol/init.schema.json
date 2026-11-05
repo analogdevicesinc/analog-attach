@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "init.schema.json",
   "title": "init response",
-  "description": "Standard output of init in JSON mode (INIT-040): the workfile created or kept, or the refusal of INIT-019. Configuration errors (INIT-001) go to standard error (config-error.schema.json). $defs/base is InitResponse (overview 2.1).",
+  "description": "Standard output of init in JSON mode (INIT-040): the workfile created or kept, or the refusal of INIT-019. Configuration errors (INIT-001) are a refusal too (common.schema.json#/$defs/config-refusal). $defs/base is InitResponse (overview 2.1).",
   "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
   "$defs": {
     "base": {
@@ -15,7 +15,7 @@
       }
     },
     "linux": {
-      "oneOf": [{ "$ref": "#/$defs/linux-ready" }, { "$ref": "common.schema.json#/$defs/refusal" }]
+      "oneOf": [{ "$ref": "#/$defs/linux-ready" }, { "$ref": "common.schema.json#/$defs/refusal" }, { "$ref": "common.schema.json#/$defs/config-refusal" }]
     },
     "linux-ready": {
       "allOf": [{ "$ref": "#/$defs/base" }],

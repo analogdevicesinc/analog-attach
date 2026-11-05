@@ -211,7 +211,7 @@ with_devices() {
 	run grep -c 'ad7124_8: adc@2 {' "$WORKFILE"
 	assert_output 1
 	run_json read ad7124_8 reg
-	assert_json '.value' 2
+	assert_json '.value[0]' 2
 }
 
 # Description: a new name with @ changes the unit address and sets reg to match.
@@ -228,7 +228,7 @@ with_devices() {
 	run grep -c 'ad7124_8: adc@3 {' "$WORKFILE"
 	assert_output 1
 	run_json read ad7124_8 reg
-	assert_json '.value' 3
+	assert_json '.value[0]' 3
 }
 
 # Description: in human mode, rename to a new unit address notes the new reg before saying what it
@@ -256,7 +256,7 @@ with_devices() {
 	assert_success
 	assert_line "reg first cell set to 10"
 	run_json read ad7124_8/channel@10 reg
-	assert_json '.value' 10
+	assert_json '.value[0]' 10
 }
 
 # Description: rename warns when the new address clashes with a sibling on the bus.

@@ -9,12 +9,13 @@ setup() {
 	new_project linux
 }
 
-# `run_config_error <words>`: run_json for a configuration error, which is JSON on standard
-# error (exit 2): $output is that JSON.
+# `run_config_error <words>`: run_json for a configuration error, a refusal with its errors and
+# hints (COM-071): exit 0, nothing on standard error, .ok false.
 run_config_error() {
 	run_json "$@"
-	assert_failure 2
-	output=$stderr
+	assert_success
+	[ -z "$stderr" ] || fail "standard error: $stderr"
+	assert_json '.ok' false
 }
 
 # The empty overlay init writes.
@@ -125,7 +126,7 @@ EMPTY_OVERLAY=$'/dts-v1/;\n/plugin/;\n\n/ {\n};'
 # settings, pointing to config and the guided setup.
 # Steps:
 #   1. Drop the linux and devicetree settings.
-#   2. Run init, with --json; check it fails with exit 2 and JSON on standard error.
+#   2. Run init, with --json; check it is refused, with the errors in the result.
 #   3. Check the errors name linux and devicetree, the first says linux is missing, and the
 #      hint points to the guided setup and config linux and config devicetree.
 #   4. Check no workfile was created.
@@ -224,7 +225,7 @@ EMPTY_OVERLAY=$'/dts-v1/;\n/plugin/;\n\n/ {\n};'
 # them, and creates nothing.
 # Steps:
 #   1. Remove the project's binding caches.
-#   2. Run init, with --json; check it fails with exit 2 and the errors name compat-index and
+#   2. Run init, with --json; check it is refused and the errors name compat-index and
 #      validation.json.
 #   3. Check the hint points to config --reload, and no workfile was created.
 #   4. Run init in human mode; check it points to config --reload too.
@@ -242,7 +243,7 @@ EMPTY_OVERLAY=$'/dts-v1/;\n/plugin/;\n\n/ {\n};'
 # Description: init with one binding cache missing names that cache and where it was looked for.
 # Steps:
 #   1. Remove validation.json from the project's caches.
-#   2. Run init, with --json; check it fails with exit 2.
+#   2. Run init, with --json; check it is refused.
 #   3. Check the only error is on validation.json and says it is not found in the project's
 #      linux state directory.
 # bats test_tags=req:INIT-06, id:L0186

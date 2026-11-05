@@ -560,10 +560,10 @@ $ cat .analog-attach/config.json
 
 ```
 $ analog-attach --json config --reload          # linux not set
-{"errors":[{"field":"linux","kind":"missing","message":"Missing config field linux",
+{"ok":false,"message":"Missing config field linux","severity":"error",
+ "errors":[{"field":"linux","kind":"missing","message":"Missing config field linux",
  "description":"Path to Linux kernel source tree (setting it builds the binding caches)"}],
  "hints":["Run 'analog-attach' on a terminal, or 'analog-attach config linux <path>', to set up a workspace."]}
-                                                   (stderr, exit 2)
 ```
 
 ```

@@ -31,6 +31,13 @@ export interface ConfigEnum {
     options: (string | number)[];
 }
 
+/** A command whose workspace doesn't load (COM-071): a refusal that names each problem. */
+export interface ConfigRefusal extends CommonResponse {
+    ok: false;
+    errors: { field: string; kind: "missing" | "invalid" | "unknown"; message: string; description?: string }[];
+    hints: string[];
+}
+
 export interface ToolConfigResponse extends CommonResponse {
     configs: Config[];
 }
@@ -104,25 +111,25 @@ export interface ReadProperty extends Property {
 }
 
 /**
- * A node as the base and the overlay together have it. `origin` says which
- * has it: "base" (the overlay doesn't change it), "overlay" (the overlay adds
- * it) or "both". A child the overlay doesn't reach is a base node given by its
- * name and labels only, with no properties or children: `read` on its path
- * shows the rest.
+ * A node as the base and the overlay together have it. `origin` is "internal"
+ * when the overlay adds or changes it, "external" when only the base has it.
+ * A child the overlay doesn't reach is a base node given by its name and
+ * labels only, with no properties or children: `read` on its path shows the
+ * rest.
  */
 export interface ReadNode extends Omit<Node, "properties" | "children"> {
     properties: ReadProperty[];
     children: ReadNode[];
-    origin: "base" | "overlay" | "both";
+    origin: "internal" | "external";
 }
 
 /**
  * `read` without a path: the overlay's fragments' content as written, under `/`.
- * Every node is the workfile's (`origin: "overlay"`), its values unmarked.
+ * Every node is the workfile's (`origin: "internal"`), its values unmarked.
  */
 export interface OverlayNode extends Omit<Node, "children"> {
     children: OverlayNode[];
-    origin: "overlay";
+    origin: "internal";
 }
 
 /** One property read on its own: what the binding says of it, when the node has a binding. */
