@@ -653,11 +653,34 @@ conforming to `add.schema.json#/$defs/noos`, `severity` `info`:
 | `key` | `<device>` as given |
 | `path` | `[<name>]` |
 | `missing_required` | §12.5: the open items of the nodes `add` made (the new node, the `--as` nodes, the eval board's, and those bootstrap created); `[]` where bootstrap is off |
+| `wiring` | ADD-527: the buses bootstrap wired; `[]` when it wired none, or where bootstrap is off |
+| `chip_selects` | ADD-527: how each SPI device's chip-select is driven; `[]` when none |
 
 `<what>` is the schema, or `<schema>, for driver <driver>` for a driver or
 an eval board. `<n>` counts the stored nodes bootstrap created. `<state>` is
 `the workfile is valid`, or `<e> problem[s] left - run: analog-attach
 validate`, `<e>` the errors of VALIDATE-500.
+
+**ADD-527** `wiring` and `chip_selects` shall be the report's wiring (ADD-525's
+`Wire <part> to <board> over <bus>:` and `Chip-select for <device>:` blocks) as
+data, so that a tool can relay it without reading the text
+(`add.schema.json#/$defs/noos-wiring`):
+
+- `wiring`: one entry per bus, `{ part, device, interface, peripheral?,
+  connections, problems, board_pins?, chip_select_options? }`. `part` is the
+  eval board (or the driver, for a bare part), `device` the bus device node,
+  `interface` `spi` or `i2c`, `peripheral` the board bus when its lines agree
+  on one. Each connection is `{ role, from: { connector, pin }, to: <board pin> }`:
+  the eval board's pin and the board pin it goes to. A bare part has no
+  connections; `board_pins` (`{ signal, at: <board pin> }`) say where its
+  bus is on the board, and `chip_select_options` (`{ at: <board pin>, gpio? }`)
+  the free pins that could carry its chip-select.
+- `chip_selects`: `{ device, kind: "native", peripheral, native_cs, at }`,
+  `{ device, kind: "gpio", gpio: { port, number }, at, pin_node? }` (the GPIO
+  pin node bootstrap made), or `{ device, kind: "unwired", reason }`.
+- A board pin is `{ connector, pin, chip_pin? }`: the header position, and the
+  chip pin name the board prints next to it when the pinout gives one, as
+  human mode writes `J9 pin 5 (P2_0)`.
 
 **ADD-524** While in human mode, the CLI shall write to standard output the
 lines `Added '<name>' (<what>)`, `Added '<side>' on the same chip` for each
