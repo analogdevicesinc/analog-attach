@@ -2,14 +2,9 @@ import { PropertyFixup } from "../FixupWalker.js";
 import { DT_TYPE } from "../RefResolver.js";
 import { cell_range } from "../PropertyTypes.js";
 import { ARRAY_SUFFIX, MATRIX_SUFFIX } from "./unit_suffix.js";
+import { is_schema, Schema } from "../Schema.js";
 
 const NOT_THE_DEFINITION = new Set(["if", "not", "select", "then", "else"]);
-
-type Schema = Record<string, unknown>;
-
-function is_schema(value: unknown): value is Schema {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** The cell schemas of `items` (one schema for every value, or one per position). */
 function cells_of(items: unknown): Schema[] {

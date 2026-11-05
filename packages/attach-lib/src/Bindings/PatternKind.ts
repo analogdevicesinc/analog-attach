@@ -1,3 +1,4 @@
+import { Schema } from "./Schema.js";
 /**
  * Whether a patternProperties entry describes child nodes: an object schema
  * (inline, or in a oneOf / anyOf / allOf / then / else), or a unit address in
@@ -16,7 +17,7 @@ export function is_object_schema(schema: unknown): boolean {
     if (typeof schema !== 'object' || schema === null) {
         return false;
     }
-    const object = schema as Record<string, unknown>;
+    const object = schema as Schema;
     if (object["type"] === "object" || "properties" in object || "patternProperties" in object) {
         return true;
     }

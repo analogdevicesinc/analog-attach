@@ -1,4 +1,5 @@
 import { NodeFixup } from "../FixupWalker.js";
+import { Schema } from "../Schema.js";
 
 /** Conditions only match: what the fixup adds to a node must not become something they require. */
 const CONDITION_KEYS = new Set(["if", "not", "select"]);
@@ -6,10 +7,10 @@ const CONDITION_KEYS = new Set(["if", "not", "select"]);
 const PINCTRL = /^pinctrl-[0-9]/;
 
 /** Whether an `allOf` entry of `schema` (a `$ref`'d schema, at any depth, not an `if`) names `name`. */
-function named_in_entries(schema: Record<string, unknown>, name: string): boolean {
+function named_in_entries(schema: Schema, name: string): boolean {
     const entries = Array.isArray(schema["allOf"]) ? schema["allOf"] as unknown[] : [];
     return entries.some(entry => typeof entry === "object" && entry !== null && !("if" in entry)
-        && (Object.hasOwn((entry as Record<string, unknown>)["properties"] ?? {}, name) || named_in_entries(entry as Record<string, unknown>, name)));
+        && (Object.hasOwn((entry as Schema)["properties"] ?? {}, name) || named_in_entries(entry as Schema, name)));
 }
 
 /**
@@ -27,8 +28,8 @@ export const fixup_node_properties: NodeFixup = (schema, path) => {
     if (!("additionalProperties" in schema) && !("unevaluatedProperties" in schema)) { return; }
     if (schema["additionalProperties"] === true || schema["unevaluatedProperties"] === true) { return; }
 
-    const properties = (schema["properties"] ??= {}) as Record<string, unknown>;
-    const patterns = schema["patternProperties"] as Record<string, unknown> | undefined;
+    const properties = (schema["properties"] ??= {}) as Schema;
+    const patterns = schema["patternProperties"] as Schema | undefined;
     if ([...Object.keys(properties), ...Object.keys(patterns ?? {})].some(key => PINCTRL.test(key))) { return; }
 
     if (!named_in_entries(schema, "pinctrl-names")) { properties["pinctrl-names"] ??= true; }
@@ -39,7 +40,7 @@ if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
 
-    const fixup = (schema: Record<string, unknown>, path: string[] = []) => {
+    const fixup = (schema: Schema, path: string[] = []) => {
         fixup_node_properties(schema, path);
         return schema;
     };

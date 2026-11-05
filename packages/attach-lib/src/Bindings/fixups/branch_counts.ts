@@ -1,10 +1,5 @@
-import { FixupContext, PropertySchema } from "../FixupWalker.js";
-
-type Schema = Record<string, unknown>;
-
-function is_schema(value: unknown): value is Schema {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import { FixupContext } from "../FixupWalker.js";
+import { is_schema, Schema, PropertySchema } from "../Schema.js";
 
 /** The `keyword` bound a branch holds a value to: its own, and those of its `allOf` entries, the tightest by `pick`. */
 function own_bound(branch: Schema, keyword: string, pick: (...bounds: number[]) => number): number | undefined {

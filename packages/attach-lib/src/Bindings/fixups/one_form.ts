@@ -1,11 +1,6 @@
-import { FixupContext, PropertySchema } from "../FixupWalker.js";
+import { FixupContext } from "../FixupWalker.js";
 import { DT_TYPE } from "../RefResolver.js";
-
-type Schema = Record<string, unknown>;
-
-function is_schema(value: unknown): value is Schema {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import { is_schema, Schema, PropertySchema } from "../Schema.js";
 
 const is_deprecated = (branch: Schema): boolean => branch["deprecated"] === true;
 

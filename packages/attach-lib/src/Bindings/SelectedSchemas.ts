@@ -5,11 +5,10 @@ import { parse } from "yaml";
 import { Result } from "../result.js";
 import { SchemaContext } from "./Context.js";
 import { apply_JSONSchema_fixups } from "./JSONSchemaFixups.js";
-import { is_plain_object } from "./ObjectUtilities.js";
 import { is_object_schema } from "./PatternKind.js";
 import { merge_definitions } from "./RedefinitionMerger.js";
 import { dereference, DT_TYPE } from "./RefResolver.js";
-import { DtBindingSchema } from "./Schema.js";
+import { DtBindingSchema, is_schema, Schema } from "./Schema.js";
 
 /**
  * The definitions in the schemas dt-validate applies to every node, in the order of their files: by property name, and
@@ -18,9 +17,9 @@ import { DtBindingSchema } from "./Schema.js";
 export type SelectedDefinitions = { properties: Map<string, unknown[]>; patterns: Map<string, unknown[]> };
 
 function add_definitions(definitions: Map<string, unknown[]>, table: unknown, skip: (key: string, definition: unknown) => boolean = () => false): void {
-    if (!is_plain_object(table)) { return; }
+    if (!is_schema(table)) { return; }
     for (const [key, definition] of Object.entries(table)) {
-        if (!is_plain_object(definition) || skip(key, definition)) { continue; }
+        if (!is_schema(definition) || skip(key, definition)) { continue; }
         definitions.set(key, [...(definitions.get(key) ?? []), definition]);
     }
 }
@@ -49,7 +48,7 @@ function selected_files(directory: string): string[] {
     return [...schema_files(directory)].filter(file => {
         try {
             const text = fs.readFileSync(file, "utf8");
-            return SELECT_TRUE.test(text) && (parse(text) as Record<string, unknown> | null)?.["select"] === true;
+            return SELECT_TRUE.test(text) && (parse(text) as Schema | null)?.["select"] === true;
         } catch {
             return false;
         }
@@ -91,19 +90,17 @@ export function selected_definitions(ctx: SchemaContext): Promise<SelectedDefini
     return loading;
 }
 
-type Schema = Record<string, unknown>;
-
 /**
  * `selected` without the `oneOf` / `anyOf` that only says which types the value can be, when `type` (the node's) is one
  * of them: clock.yaml's `clock-frequency` is a uint32 or a uint64, and a binding that types it a uint32 has chosen.
  */
 function without_alternatives(selected: unknown, type: unknown): unknown {
-    if (!is_plain_object(selected) || typeof type !== "string") { return selected; }
+    if (!is_schema(selected) || typeof type !== "string") { return selected; }
 
     const result: Schema = { ...selected };
     for (const key of ["oneOf", "anyOf"]) {
         const branches = selected[key];
-        const types = Array.isArray(branches) ? branches.map(branch => is_plain_object(branch) ? branch[DT_TYPE] : undefined) : [];
+        const types = Array.isArray(branches) ? branches.map(branch => is_schema(branch) ? branch[DT_TYPE] : undefined) : [];
         if (types.length > 0 && types.every(branch => typeof branch === "string") && types.includes(type)) { delete result[key]; }
     }
     return result;
@@ -113,7 +110,7 @@ function without_alternatives(selected: unknown, type: unknown): unknown {
 function merge_property(definition: unknown, everywhere: unknown[] | undefined): unknown {
     // A child node of the name (a `clocks` container, `cpus`) is no property
     if (everywhere === undefined || is_object_schema(definition)) { return definition; }
-    const type = is_plain_object(definition) ? definition[DT_TYPE] : undefined;
+    const type = is_schema(definition) ? definition[DT_TYPE] : undefined;
     return merge_definitions([definition, ...everywhere.map(other => without_alternatives(structuredClone(other), type))]);
 }
 
@@ -129,21 +126,21 @@ export function merge_selected(binding: DtBindingSchema, selected: SelectedDefin
     const merge_node = (node: Schema): Schema => {
         const result: Schema = { ...node };
 
-        if (is_plain_object(node["properties"])) {
+        if (is_schema(node["properties"])) {
             result["properties"] = Object.fromEntries(Object.entries(node["properties"]).map(([name, definition]) => {
                 const merged = merge_property(definition, selected.properties.get(name));
-                return [name, is_plain_object(merged) ? merge_node(merged) : merged];
+                return [name, is_schema(merged) ? merge_node(merged) : merged];
             }));
         }
-        if (is_plain_object(node["patternProperties"])) {
+        if (is_schema(node["patternProperties"])) {
             // A pattern of the same key: what a binding names `^pinctrl-[0-9]+$` is a pinctrl-N, nothing else is
             result["patternProperties"] = Object.fromEntries(Object.entries(node["patternProperties"]).map(([pattern, child]) => {
                 const merged = merge_property(child, selected.patterns.get(pattern));
-                return [pattern, is_plain_object(merged) ? merge_node(merged) : merged];
+                return [pattern, is_schema(merged) ? merge_node(merged) : merged];
             }));
         }
         if (Array.isArray(node["allOf"])) {
-            result["allOf"] = node["allOf"].map(entry => is_plain_object(entry) && !("if" in entry) ? merge_node(entry) : entry);
+            result["allOf"] = node["allOf"].map(entry => is_schema(entry) && !("if" in entry) ? merge_node(entry) : entry);
         }
         return result;
     };

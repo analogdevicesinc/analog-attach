@@ -1,4 +1,5 @@
-import { FixupContext, PropertySchema } from "../FixupWalker.js";
+import { FixupContext } from "../FixupWalker.js";
+import { PropertySchema } from "../Schema.js";
 
 /**
  * dt-schema's `schemas/dt-core.yaml` types every `.*-names$` property as

@@ -2,7 +2,7 @@
 import { FileInfo, getJsonSchemaRefParserDefaultOptions, JSONSchema, Plugin, ResolverError } from "@apidevtools/json-schema-ref-parser";
 import { Result } from "../result.js";
 import { SchemaContext, SearchPath } from "./Context.js";
-import { DtBindingSchema, isDtBindingSchema } from "./Schema.js";
+import { DtBindingSchema, isDtBindingSchema, Schema } from "./Schema.js";
 import { RefResolvedBinding } from "./UtilityTypes.js";
 import { walk_node_schema } from "./FixupWalker.js";
 import { fixup_own_counts } from "./fixups/items_size.js";
@@ -158,12 +158,12 @@ function drop_self_references(content: Buffer): Buffer {
 
     const walk = (node: unknown, location: string[]): void => {
         if (typeof node !== "object" || node === null) { return; }
-        const reference = (node as Record<string, unknown>).$ref;
+        const reference = (node as Schema).$ref;
 
         if (typeof reference === "string" && reference.startsWith("#")) {
             const target = reference.slice(1).split("/").slice(1).map((token) => token.replaceAll("~1", "/").replaceAll("~0", "~"));
             if (target.every((token, index) => location[index] === token)) {
-                delete (node as Record<string, unknown>).$ref;
+                delete (node as Schema).$ref;
             }
         }
 
@@ -176,11 +176,11 @@ function drop_self_references(content: Buffer): Buffer {
 
 /** `types.yaml` with every definition carrying its own name under `DT_TYPE`. */
 function tag_types(content: Buffer): Buffer {
-    const document = parse(content.toString("utf8")) as { definitions?: Record<string, unknown> };
+    const document = parse(content.toString("utf8")) as { definitions?: Schema };
 
     for (const [name, definition] of Object.entries(document.definitions ?? {})) {
         if (typeof definition === "object" && definition !== null) {
-            (definition as Record<string, unknown>)[DT_TYPE] = name;
+            (definition as Schema)[DT_TYPE] = name;
         }
     }
 

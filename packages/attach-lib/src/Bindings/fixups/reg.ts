@@ -1,14 +1,11 @@
-import { FixupContext, PropertySchema } from "../FixupWalker.js";
+import { FixupContext } from "../FixupWalker.js";
+import { is_schema, PropertySchema, Schema } from "../Schema.js";
 
 // dt-schema: `fixups.py:_extract_single_schemas`
 const SINGLE_VALUE_KEYWORDS = new Set(["const", "enum", "pattern", "minimum", "maximum", "multipleOf"]);
 
-function is_schema(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 /** dt-schema `lib.py:_is_int_schema`: a `const`, `enum`, `minimum` or `maximum` of numbers. */
-function is_int_schema(schema: unknown): schema is Record<string, unknown> {
+function is_int_schema(schema: unknown): schema is Schema {
     return is_schema(schema) && ["const", "enum", "minimum", "maximum"].some(keyword => {
         if (!(keyword in schema)) { return false; }
         const value = schema[keyword];
@@ -17,8 +14,8 @@ function is_int_schema(schema: unknown): schema is Record<string, unknown> {
 }
 
 /** The keywords of `schema` that constrain one value, taken out of it. */
-function extract_single(schema: Record<string, unknown>): Record<string, unknown> {
-    const single: Record<string, unknown> = {};
+function extract_single(schema: Schema): Schema {
+    const single: Schema = {};
 
     for (const key of Object.keys(schema)) {
         if (SINGLE_VALUE_KEYWORDS.has(key)) {

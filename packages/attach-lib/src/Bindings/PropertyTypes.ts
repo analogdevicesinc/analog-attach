@@ -21,12 +21,6 @@ export type PropertyTypes = {
 
 export const NO_PROPERTY_TYPES: PropertyTypes = { names: new Map(), patterns: [] };
 
-type Schema = Record<string, unknown>;
-
-function is_schema(value: unknown): value is Schema {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 // dt-schema: `validator.py:type_re`
 const TYPE_NAME = /(address|flag|u?int(8|16|32|64)(-(array|matrix))?|string(-array)?|phandle(-array)?)/;
 
@@ -240,6 +234,7 @@ export function cell_range(type: PropertyType): { minimum: bigint, maximum: bigi
 }
 
 import { tmpdir as _tmpdir } from "node:os";
+import { is_schema, Schema } from "./Schema.js";
 
 if (import.meta.vitest) {
 
