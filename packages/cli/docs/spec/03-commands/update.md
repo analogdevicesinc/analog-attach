@@ -53,11 +53,7 @@ an input error when it fails. It shall not apply GRM-030 to `<property>`
 (Open issue U-5).
 
 **UPDATE-003** If the target node exists in neither the overlay nor the base,
-then the CLI shall refuse with `Not found: <path>`. When the text after the
-last `/` of `<path>` names no node but the text before it does, the message is
-`Not found: <path> (the property is a separate argument: <path> <property>)`,
-where the first `<path>` is the placeholder and `<path> <property>` after
-`argument: ` is literal.
+then the CLI shall refuse with the message of `read.md` READ-021.
 
 ## 5. What `update` does
 

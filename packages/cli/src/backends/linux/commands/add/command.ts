@@ -18,11 +18,11 @@ import {
 import { answer, cancelled, command, input_error, PromptCancelled, refuse, type AddArguments, type InteractiveSession } from "../../../../interface/backend-interface";
 import { load_workspace, type Bindings } from "../../config/workspace";
 import type { Settings } from "../../config/settings";
-import { bus_kind, find_binding, invalid_node_name_message, parse_node_path, resolve_path, type BusKind } from "../../utilities";
+import { bus_kind, find_binding, invalid_node_name_message, node_children, parse_node_path, resolve_path, type BusKind } from "../../utilities";
 import type { AddResponse } from "../../protocol/types";
 import { describe_missing, missing_lines, missing_required_of, type NewNode } from "../../missing-required";
 import { ask_for_missing } from "../../missing-interview";
-import { node_children } from "../list/suggest";
+import { unknown_compatible_message } from "../list/data";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 import { reference_lines, unique_references } from "../../unresolved";
 import { binding_examples, bus_example_values, copy_example_node, device_matcher, find_examples, pick_example, type ExampleMatch, type ExampleNote } from "./example";
@@ -123,7 +123,7 @@ Use 'list devices' to find compatible strings, 'list parent' to find valid buses
         const { settings, overlay: workfile } = workspace;
 
         const binding_path = await find_binding(workspace.bindings, compatible);
-        if (binding_path === undefined) { return refuse(`Failed to find binding for ${compatible}`); }
+        if (binding_path === undefined) { return refuse(unknown_compatible_message(workspace.bindings, compatible, session.program)); }
 
         // Only a run that may ask gets a prompter: not --json, --quiet or a run off a terminal.
         const asking: InteractiveSession | undefined = quiet || session.prompter === undefined ? undefined : session as InteractiveSession;

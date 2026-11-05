@@ -164,20 +164,18 @@ bad_channel() {
 	[ "$error_line" -lt "$warning_line" ] || fail "the error comes after the warning: $output"
 }
 
-# Gap: with errors there is no summary line (open issue V-8): the output ends with the last
-# diagnostic.
 # Description: with errors, validate ends its output with a line saying how many errors there
 # are.
 # Steps:
 #   1. Add adi,adxl345 under spi0, without interrupts.
 #   2. Run validate in human mode; check it succeeds.
 #   3. Check the last line is an unindented summary with a count of errors.
-# bats test_tags=req:VALIDATE-02, gap, id:L0342
+# bats test_tags=req:VALIDATE-02, id:L0342
 @test "with errors, the result ends saying how many there are" {
 	aa add adi,adxl345 --parent spi0 >/dev/null 2>&1
 	run aa validate
 	assert_success
-	[[ "${lines[-1]}" =~ ^[^\ ].*[0-9]+\ error ]] || fail "no summary: ${lines[-1]}"
+	[[ "${lines[-1]}" =~ ^([^\ ].*\ )?[0-9]+\ error ]] || fail "no summary: ${lines[-1]}"
 }
 
 # Description: validate decodes the overlay's references with the cells of the base's nodes:

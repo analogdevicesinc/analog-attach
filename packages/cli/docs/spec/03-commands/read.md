@@ -75,11 +75,21 @@ R-1.)
 overlay's node when the overlay has one, else to the base's.
 
 **READ-021** If `<path>` names no node of the merged tree, then the CLI shall
-refuse with `Not found: <path>`. When `<path>` contains `/` and the part
-before its last `/` names a node, the message is `Not found: <path> (the
-property is a separate argument: <path> <property>)`, where the first
-`<path>` is the placeholder and `<path> <property>` after `argument: ` is
-literal.
+refuse with `Not found: <path>`, followed by the first that applies:
+
+| Case | Follows `Not found: <path>` |
+|---|---|
+| The part before the last `/` names a node that has a property named as the last segment (`ad7124_8/reg`) | ` (the property is a separate argument: <path> <property>)`, `<path> <property>` literal |
+| A shorter prefix of `<path>` (up to a `/`) names a node, the longest such `<prefix>` as written, and it has children | `. <prefix> has: <children>`: the names of its children in the merged tree, the closest to the segment after `<prefix>` first (`02-common.md` COM-140), then the rest in tree order, separated by `, `; after ten, `, … (<n> more)` |
+| That prefix has no children | `. <prefix> has no child nodes` |
+| No prefix names a node, and labels of the base or the overlay are close to the first segment | `. Did you mean <close>?` (COM-140) |
+| Otherwise | nothing |
+
+`read i2c_arm/adi,adxl345@1` with only `adi,adxl345@0` there gives `Not found:
+i2c_arm/adi,adxl345@1. i2c_arm has: adi,adxl345@0`; `read spi9` gives `Not
+found: spi9. Did you mean spi0, spi1, …?`. Where the command looks among the
+overlay's nodes only (`delete`, `move`, `rename`), a `<path>` that names a
+base node gives `Not found: <path>` alone.
 
 **READ-022** When no `<property>` is given, the CLI shall show the merged
 node: its labels, its key, every property with its source, and its children.
@@ -325,11 +335,6 @@ which node each one is added to, and properties the overlay sets on base nodes
 
 **R-4. Large cells lose precision in JSON.** Cell values are converted to JSON
 numbers, so a 64-bit value above 2^53 is rounded.
-
-**R-5. The "separate argument" hint misfires.** `read adc/channel@0` on a node
-without that child says `Not found: adc/channel@0 (the property is a separate
-argument: <path> <property>)`, because `adc` resolves. The same message is
-used by `delete`, `move`, `rename` and `update`.
 
 **R-6. An unknown chip lists no chips without module repositories.** With
 `capi-path` set and `module-paths` unset, a workfile for `testsoc` gives

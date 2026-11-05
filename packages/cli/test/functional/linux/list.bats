@@ -508,19 +508,20 @@ with_adc() {
 	assert_json '[.suggestions[].value] | join(" ")' /
 }
 
-# Description: list parent of a compatible with no binding says no binding was found.
+# Description: list parent of a compatible with no binding says it is unknown.
 # Steps:
 #   1. Run list parent adi,no-such-part, with --json.
-#   2. Check it succeeds, says no binding was found and has no suggestions.
-#   3. Run it as text; check it says it failed to find a binding.
+#   2. Check it succeeds, says the compatible is unknown and has no suggestions.
+#   3. Run it as text; check it says the same, pointing to list devices.
 # bats test_tags=req:LIST-09, id:L0213
 @test "list parent of a compatible no binding has says so" {
 	run_json list parent adi,no-such-part
 	assert_success
-	assert_json '.message' "No binding found for adi,no-such-part"
+	assert_json '.message | startswith("Unknown compatible '"'"'adi,no-such-part'"'"'.")' true
 	assert_json '.suggestions | length' 0
 	run aa list parent adi,no-such-part
-	assert_output "Failed to find binding for adi,no-such-part"
+	assert_output --partial "Unknown compatible 'adi,no-such-part'."
+	assert_output --partial "See: analog-attach list devices"
 }
 
 # --- list overlay ---

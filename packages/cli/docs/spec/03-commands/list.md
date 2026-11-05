@@ -321,10 +321,11 @@ L-10.)
 
 The linux backend's own command (`04-protocol/list-parent.schema.json`).
 
-**LIST-090** If no binding has the compatible, then the CLI shall write
-`Failed to find binding for <compatible>` in human mode, and respond `{"ok":
-true, "message": "No binding found for <compatible>", "severity": "warn",
-"suggestions": []}` in JSON mode (open issue L-6). If the binding doesn't parse,
+**LIST-090** If no binding has the compatible, then the CLI shall write the
+message of `add.md` ADD-013 (`Unknown compatible '<compatible>'.[ Did you
+mean <close>?] See: analog-attach list devices`) in human mode, and respond `{"ok": true,
+"message": <that message>, "severity": "warn", "suggestions": []}` in JSON
+mode (open issue L-6). If the binding doesn't parse,
 then the CLI shall refuse with `Failed to parse binding <file>`.
 
 **LIST-091** The CLI shall list the valid parents from the base only, in this
@@ -520,9 +521,9 @@ different types. In `list devices`' JSON the `display` of `diff-channels` is
 mode shows `const`, `min` and `max`; the JSON `property` has `required`,
 `set` and `default` (LIST-054), but no const or range.
 
-**L-6. `list parent` with an unknown compatible isn't a refusal in JSON.** It
-is `ok: true` with severity `warn` (COM-050 says `info`), while human mode
-says `Failed to find binding`, the wording of a refusal.
+**L-6. `list parent` with an unknown compatible isn't a refusal.** It is `ok:
+true` with severity `warn` (COM-050 says `info`), while `add` refuses the same
+compatible with the same message (ADD-013).
 
 **L-7. Vendor SPI properties come back after narrowing.** `list property` of
 a node under `brcm,bcm2835-spi` lists `pl022,*`, `cdns,*`, `fsl,*`,

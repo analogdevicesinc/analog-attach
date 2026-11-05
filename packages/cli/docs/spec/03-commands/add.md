@@ -74,7 +74,10 @@ read (the file doesn't exist) or parsed, then the CLI shall report it per
 COM-071 or COM-072 and add nothing. `add` never creates the workfile.
 
 **ADD-013** If no binding has `<compatible>` in its `compatible` list, then the
-CLI shall refuse with `Failed to find binding for <compatible>`.
+CLI shall refuse with `Unknown compatible '<compatible>'.[ Did you mean
+<close>?] See: analog-attach list devices`, `<close>` the compatibles of the
+compat index closest to `<compatible>` (`02-common.md` COM-140), as the noos
+backend words an unknown schema (ADD-502).
 
 ## 6. Parent
 
