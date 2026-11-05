@@ -116,6 +116,15 @@ export function node_name_of(path: string): string {
     return path.slice(path.lastIndexOf("/") + 1);
 }
 
+/** Every node of the tree under `root` (at `path`) with its path, depth-first, `root` first. */
+export function* walk_nodes(root: DTNode, path: string): Generator<LocatedNode> {
+    yield { node: root, path };
+    for (const child of root.children) {
+        const name = get_full_node_name(child);
+        yield* walk_nodes(child, path === "/" ? `/${name}` : `${path}/${name}`);
+    }
+}
+
 export function patch_node(base: DTNode, patch: DTNode): DTNode {
     return {
         ...base,

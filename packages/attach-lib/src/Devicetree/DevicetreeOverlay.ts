@@ -16,9 +16,9 @@ import {
 
 import { Result } from "../result";
 import { DeviceTree } from "./Devicetree";
-import { FoundNodeResult, TraversalOrder } from "./Types";
+import { FoundNodeResult } from "./Types";
 import { Stream } from "./Stream";
-import { type LocatedNode, type NodeTarget, normalize_target, patch_node, parent_path as access_parent_path } from "./Access";
+import { type LocatedNode, type NodeTarget, normalize_target, patch_node, parent_path as access_parent_path, walk_nodes } from "./Access";
 
 /** The path `relative` names below the node at `root`. */
 function path_below(root: string, relative: string[]): string {
@@ -353,38 +353,8 @@ export class DeviceTreeOverlay {
         }
     }
 
-    public as_stream(order: TraversalOrder = "DFS"): Stream<LocatedNode> {
-        return new Stream(this.as_generator(this.overlay.root, "/", order));
-    }
-
-    private *as_generator(root: DTNode, currentPath: string, order: TraversalOrder): Generator<LocatedNode> {
-        if (order === "DFS") {
-            yield { node: root, path: currentPath };
-
-            for (const child of root.children) {
-                const childPath = currentPath === "/"
-                    ? `/${get_full_node_name(child)}`
-                    : `${currentPath}/${get_full_node_name(child)}`;
-
-                yield* this.as_generator(child, childPath, order);
-            }
-        } else {
-            const queue: [DTNode, string][] = [[root, currentPath]];
-
-            while (queue.length > 0) {
-                const [node, nodePath] = queue.shift()!;
-
-                yield { node, path: nodePath };
-
-                for (const child of node.children) {
-                    const childPath = nodePath === "/"
-                        ? `/${get_full_node_name(child)}`
-                        : `${nodePath}/${get_full_node_name(child)}`;
-
-                    queue.push([child, childPath]);
-                }
-            }
-        }
+    public as_stream(): Stream<LocatedNode> {
+        return new Stream(walk_nodes(this.overlay.root, "/"));
     }
 
     public get_fragments(): DTNode[] {

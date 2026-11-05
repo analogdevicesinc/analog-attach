@@ -1,8 +1,6 @@
 import { Bits, CellArrayElement, DTCellArray, DTNode } from "./Parser";
 import { Labeled, MakeArray, is_array, is_labeled, make_array, make_labeled } from "./TypeUtilities";
 
-export type TraversalOrder = "DFS" | "BFS";
-
 export type UnitAddr = { value: bigint; repr: "hex" | "dec" };
 
 export type FoundNodeResult = {
