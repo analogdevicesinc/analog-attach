@@ -19,6 +19,7 @@ export {
     is_open,
     is_open_list,
     list_cell,
+    matrix_cell,
     type AttachType,
     type Cell,
     type EnumOption,

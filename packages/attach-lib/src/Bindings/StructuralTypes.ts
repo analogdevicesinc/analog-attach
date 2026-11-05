@@ -57,3 +57,10 @@ export function is_open(type: AttachType): boolean {
 export function list_cell(list: List): Cell | undefined {
     return Array.isArray(list.item) ? undefined : list.item;
 }
+
+/** The cell of a matrix of one row of one cell (a `-microvolt` property), undefined for any other matrix. */
+export function matrix_cell(matrix: Variant<"matrix">): Cell | undefined {
+    const [row, ...others] = matrix.rows;
+    if (matrix.maxItems !== 1 || row === undefined || others.length > 0 || row.maxItems !== 1) { return undefined; }
+    return list_cell(row);
+}
