@@ -411,8 +411,10 @@ All overlay writes go through the `Workfile` from `load_workspace`. The printer 
 - Labels that exist in the base tree or overlay (bare or `&label`) → phandle references (`&label`).
 - Unknown words in a cell context → **rejected** with a clear error message.
 
-The binding gives only a shape hint (`flag` / `strings` / `cells` / undefined) and never causes a
-rejection.
+The binding gives only a shape hint (`flag` / `strings` / `cells` / undefined) and the width of
+its cells (`cell_bits`: the `typeSize` of a list, a scalar or a matrix's rows, else 32). Cells of
+another width are written `/bits/ <n> <…>` (`PropertyBuilder.build_cell_array(bits)`), and a label
+among them is its one rejection: dtc only takes a reference in a 32-bit cell (UPDATE-035).
 
 A value count outside the binding's minItems/maxItems is written with a warning (`count_warning`
 in `item-count.ts`). The same bounds show in the type (`number[2]`, protocol `min_items` /

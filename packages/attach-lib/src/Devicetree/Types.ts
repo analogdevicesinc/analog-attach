@@ -230,7 +230,8 @@ export function upcast_to_LabeledTaggedCellValue_LabeledArray(input: CellEntry |
     return input;
 }
 
-export function make_cell_array(values: LabeledTaggedCellValue_LabeledArray): DTCellArray {
+/** A `<…>` cell array of `bit_width`-bit cells (`/bits/ 64 <…>`; 32, dtc's default, is written without). */
+export function make_cell_array(values: LabeledTaggedCellValue_LabeledArray, bit_width: Bits = Bits.b32): DTCellArray {
 
     // eslint-disable-next-line unicorn/consistent-function-scoping
     const tagged_to_element = (entry: LabeledTaggedCellValue): CellArrayElement => {
@@ -272,7 +273,7 @@ export function make_cell_array(values: LabeledTaggedCellValue_LabeledArray): DT
     return {
         kind: "array",
         labels: values.labels,
-        bit_width: Bits.b32,
+        bit_width,
         elements: values.payload.map((v) => tagged_to_element(v)),
     };
 }

@@ -383,6 +383,33 @@ with_channel() {
 	assert_output --partial 'rdy-gpios = <&gpio 25 1>, <&gpio 26 0>;'
 }
 
+# Description: a property whose binding gives it 64-bit cells is written with /bits/ 64, so dtc
+# doesn't truncate it, and a label is refused there, as dtc only takes a reference in a 32-bit
+# cell.
+# Steps:
+#   1. Make the overlay, add an ADF4371 on spi0 (label adf4371) and its child channel@0.
+#   2. Set adi,power-up-frequency 8000000000 on channel@0 (a uint64) and check it succeeds.
+#   3. Check the overlay has adi,power-up-frequency = /bits/ 64 <8000000000>.
+#   4. Snapshot the workfile, run update adf4371/channel@0 adi,power-up-frequency gpio, with
+#      --json, and check it is refused (exit 0, .ok false) with the 64-bit message.
+#   5. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-07, id:L0354
+@test "update writes a 64-bit property with /bits/ 64 and refuses a label in it" {
+	with_overlay
+	aa add adi,adf4371 --parent spi0 >/dev/null 2>&1 || fail "add adi,adf4371 failed"
+	aa update adf4371 channel@0 >/dev/null 2>&1 || fail "update adf4371 channel@0 failed"
+	run aa update adf4371/channel@0 adi,power-up-frequency 8000000000
+	assert_success
+	run cat "$WORKFILE"
+	assert_output --partial 'adi,power-up-frequency = /bits/ 64 <8000000000>;'
+	snapshot
+	run_json update adf4371/channel@0 adi,power-up-frequency gpio
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' "'gpio' is a label, and adi,power-up-frequency holds 64-bit cells: dtc only takes a reference in a 32-bit cell"
+	assert_unchanged
+}
+
 # Description: update naming a child node that does not exist creates it, with its reg and
 # address cells, and lists its missing required properties.
 # Steps:
