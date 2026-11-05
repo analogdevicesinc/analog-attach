@@ -55,7 +55,7 @@ export async function resolve_target_binding(
     bindings: ConfigResult<Bindings>,
 ): Promise<TargetBinding> {
     const target = resolve_write_target(node_identifier, overlay, base_dt);
-    const { binding_node, binding_parent, parent_name, parent_compatibles } = target;
+    const { binding_node, binding_parent, parent_name, parent_compatibles, parent_full_name } = target;
     if (!bindings.ok) {
         return { target, binding: { error: bindings.errors.map(error => error.message).join("; ") } };
     }
@@ -64,7 +64,7 @@ export async function resolve_target_binding(
     }
     // Phandle enums are filled from the tree with the overlay applied, so they name its nodes too.
     const context = overlay.merged_tree() ?? base_dt;
-    return { target, binding: await resolve_node_binding(binding_node, binding_parent, parent_name, context, bindings.value, undefined, parent_compatibles) };
+    return { target, binding: await resolve_node_binding(binding_node, binding_parent, parent_name, context, bindings.value, undefined, { compatibles: parent_compatibles, full_name: parent_full_name }) };
 }
 
 /**
