@@ -329,7 +329,8 @@ with_adc() {
 # Steps:
 #   1. Make an overlay with an AD7124-8 on spi1.
 #   2. Run list value ad7124_8 spi-rx-bus-width; check it succeeds and lists 0 and 8.
-#   3. Run it with --json; check the suggestions are 0 1 2 4 8.
+#   3. Run it with --json; check the suggestions are 1 0 2 4 8, the binding's default (1) first
+#      and marked.
 # bats test_tags=req:LIST-08, id:L0204
 @test "list value gives the options of an enum" {
 	with_adc
@@ -338,12 +339,10 @@ with_adc() {
 	assert_line --regexp $'^0\t'
 	assert_line --regexp $'^8\t'
 	run_json list value ad7124_8 spi-rx-bus-width
-	assert_json '[.suggestions[].value] | join(" ")' "0 1 2 4 8"
+	assert_json '[.suggestions[].value] | join(" ")' "1 0 2 4 8"
+	assert_json '.suggestions[0].display_string' "1 — the binding's default"
 }
 
-# Gap: the suggestions keep the enum's order (vref vref2 refout-avss avdd) and none is marked
-# as the default, though the processed schema has default refout-avss (the integer enums of
-# L0352 and ad4130's reference-select do get theirs first).
 # Description: list value puts the default of an enum first and marks it as the binding's
 # default, when the default is not the enum's first option.
 # Steps:
@@ -351,7 +350,7 @@ with_adc() {
 #   2. Run list value ad7173_8/channel@0 adi,reference-select, with --json.
 #   3. Check it succeeds and offers vref, vref2, refout-avss and avdd.
 #   4. Check the first is refout-avss, marked as the binding's default.
-# bats test_tags=req:LIST-08, gap, id:L0205
+# bats test_tags=req:LIST-08, id:L0205
 @test "list value gives the default of an enum first" {
 	with_overlay
 	aa add adi,ad7173-8 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad7173-8 failed"
@@ -359,13 +358,10 @@ with_adc() {
 	run_json list value ad7173_8/channel@0 adi,reference-select
 	assert_success
 	assert_json '[.suggestions[].value] | sort | join(" ")' "avdd refout-avss vref vref2"
-	# The gap: last, so the checks above hold while it is open.
 	assert_json '.suggestions[0].value' refout-avss
 	assert_json ".suggestions[0].display_string | test(\"the binding's default\")" true
 }
 
-# Gap: "No values for adi,internal-ref-microvolt": a -microvolt property is a matrix in the
-# processed schema, its enum two levels down, and the binding layer doesn't reach it.
 # Description: list value offers the options of an enum that the processed schema nests in a
 # matrix (a -microvolt property), the binding's default first.
 # Steps:
@@ -373,7 +369,7 @@ with_adc() {
 #   2. Run list value ad7949 adi,internal-ref-microvolt, with --json.
 #   3. Check it succeeds and offers 4096000 then 2500000, the first marked as the binding's
 #      default.
-# bats test_tags=req:LIST-08, gap, id:L0351
+# bats test_tags=req:LIST-08, id:L0351
 @test "list value offers the enum of a -microvolt property" {
 	with_overlay
 	aa add adi,ad7949 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad7949 failed"

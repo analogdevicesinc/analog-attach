@@ -6,6 +6,7 @@
 import {
     AttachEnumType,
     list_cell,
+    matrix_cell,
     DeviceTree,
     DeviceTreeOverlay,
     IntelligenceStack,
@@ -14,6 +15,7 @@ import {
     get_full_node_name,
     placement_from_overlay,
     type AttachType,
+    type Cell,
     type DTNode,
     type PatternPropertyRule,
     type PropertyPatternRule,
@@ -346,9 +348,25 @@ export function property_info(
     };
 }
 
+/**
+ * The one cell every value of a property is: a scalar's, a list's single `item`, a one-cell matrix's when it is an enum
+ * (`-microvolt`). The number cell of a one-cell matrix (`reg`) only holds its type's range.
+ */
+function property_cell(type: AttachType): Cell | undefined {
+    switch (type._t) {
+        case "scalar": { return type.cell; }
+        case "list": { return list_cell(type); }
+        case "matrix": {
+            const cell = matrix_cell(type);
+            return cell?._t === "enum" ? cell : undefined;
+        }
+        default: { return undefined; }
+    }
+}
+
 /** What a binding says about the values of a property: a const, a default, a range, the nodes a phandle can name. */
 export function type_constraints(type: AttachType): { const?: bigint | string; default?: bigint | string; minimum?: bigint; maximum?: bigint; phandle_options?: string[] } {
-    const cell = type._t === "scalar" ? type.cell : (type._t === "list" ? list_cell(type) : undefined);
+    const cell = property_cell(type);
     if (cell === undefined || cell._t === "string" || cell._t === "any") { return {}; }
     const own_default = type._t === "scalar" ? type.default : cell.default;
     if (cell._t === "number") {
@@ -750,5 +768,14 @@ if (import.meta.vitest) {
         test("returns addition when no existing note", () => {
             expect(combine_notes(undefined, "not defined by binding")).toBe("not defined by binding");
         });
+    });
+
+    const one_cell = (cell: Cell): AttachType => ({ _t: "matrix", minItems: 1, maxItems: 1, rows: [{ _t: "list", item: cell, minItems: 1, maxItems: 1 }] });
+    test("type_constraints — a one-cell matrix gives the default of its enum, not its number's type range", () => {
+        // ad7949's adi,internal-ref-microvolt
+        expect(type_constraints(one_cell({ _t: "enum", enum: [2_500_000n, 4_096_000n], enum_type: AttachEnumType.NUMBER, default: 4_096_000n })))
+            .toStrictEqual({ default: 4_096_000n });
+        // a reg of one address
+        expect(type_constraints(one_cell({ _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn }))).toStrictEqual({});
     });
 }
