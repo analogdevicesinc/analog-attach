@@ -35,7 +35,7 @@ GRM-072).
 | Base target | A target node that the base has, whether or not the overlay already changes it. |
 | Overlay node | A target node that only the overlay has (the overlay adds it). |
 | Definition | What the target node's binding says about `<property>`: by name, else by a property pattern of the binding. |
-| Shape hint | What the definition gives the value: `flag`, `strings` (a string or list of strings, string enums included), `cells` (numbers, references, matrices), or none (no binding, no definition, or an untyped one). The hint shapes the value and never refuses it, except for `flag` (UPDATE-030). |
+| Shape hint | What the definition gives the value: `flag`, `strings` (a string or list of strings, string enums included), `cells` (numbers, references, matrices), or none (no binding, no definition, or an untyped one). The hint shapes the value and never refuses it, except for `flag` (UPDATE-030): what the definition doesn't allow is written with a warning (UPDATE-015, UPDATE-040, UPDATE-041). |
 | Merged node | The target node as the base and the overlay together have it. |
 
 ## 3. Resources
@@ -89,7 +89,7 @@ binding, and then go on:
 | The binding's `if`/`then` branches can't be resolved | `Property <property> written without schema validation: failed to narrow binding` |
 | The binding doesn't define the property | `Property <property> not defined by <compatible> binding; written without schema validation`, or `… not defined by pattern "<pattern>" of <compatible>; …` for a child node matched by its parent's pattern |
 
-These lines don't make the response a warning (UPDATE-091).
+These lines make the response a warning (UPDATE-100).
 
 ## 6. Setting
 
@@ -107,7 +107,8 @@ cells (GRM-070 to GRM-072). This section says what each cell becomes.
 **UPDATE-030** If the shape hint is `flag` and a value is given, then the CLI
 shall refuse with ``<property> is a flag: `update <path> ` sets it, `delete
 <path> ` clears it`` (sic, Open issue U-2). Only the first `<property>` is a
-placeholder: both `<path>` are literal.
+placeholder: both `<path>` are literal. It is the one value the definition
+refuses rather than warns about.
 
 **UPDATE-031** Where the shape hint is `strings`, the CLI shall write each
 whitespace-separated word of the joined value as a string, `,` included: one
@@ -172,7 +173,7 @@ cells: dtc only takes a reference in a 32-bit cell`. Without a definition, or
 with one that gives no size, cells are 32 bits, written `<…>`. The add
 interview and `list value`'s check (LIST-073) write a value the same way.
 
-### 6.3 Value count
+### 6.3 Value count and bounds
 
 **UPDATE-040** When the definition bounds the number of values (minItems /
 maxItems of a value array, or of a specifier list whose entries have a known
@@ -182,6 +183,20 @@ warning `warning: <property> takes <bound>, got <count>`. `<bound>` is
 `<n> value` or `<n> values` for a fixed count, `<min> to <max> values`, or
 `at least <min> values`. `<count>` counts every cell and every string. Lists
 whose entries name a phandle (`clocks`, `dmas`, `*-gpios`) have no bounds.
+
+**UPDATE-041** When the definition bounds a written value, and the value is
+outside it, the CLI shall write the value and give the warning `warning:
+<property> takes <bound>, got <value>`, for the first such value. A number
+cell is bounded by its minimum and maximum (`<bound>` `<min> to <max>`, `at
+least <min>` or `at most <max>`; a `uint32` is `0 to 4294967295`), a number
+or a string by the options of its enum (`one of <option>, <option>…`, for
+example `warning: status takes one of okay, disabled, reserved, fail,
+fail-needs-probe, got bogus`). Each value is held to the cell of its position:
+a scalar's, a list's (one for every value, or one per position), the single
+row of a matrix. Labels, paths, expressions, macro enums and lists whose
+entries name a phandle aren't checked. Every node a binding closes (with
+`additionalProperties` or `unevaluatedProperties`) defines `status`, with
+dt-core's options, and `pinctrl-names` and `pinctrl-<n>`.
 
 ### 6.4 Where the value goes
 
@@ -282,15 +297,17 @@ In both cases `interrupts` is still written.
 any, on its own line.
 
 **UPDATE-091** In both modes, the CLI shall write the diagnostics and warnings
-of UPDATE-015, UPDATE-040, UPDATE-073 to UPDATE-075 and UPDATE-082 to
-UPDATE-083 to standard error, before the report (COM-021, COM-022).
+of UPDATE-015, UPDATE-040, UPDATE-041, UPDATE-073 to UPDATE-075 and
+UPDATE-082 to UPDATE-083 to standard error, before the report (COM-021,
+COM-022).
 
 **UPDATE-100** While in JSON mode, on a set the CLI shall respond `{ "ok":
 true, "message": <report>, "severity": <severity> }`, conforming to
 `04-protocol/update.schema.json#/$defs/set`. `<report>` is the report,
 followed by `; ` and the detail of UPDATE-081 when there is one. `<severity>`
-is `"warn"` when a warning of UPDATE-040, UPDATE-075, UPDATE-082 or UPDATE-083
-was given, and `"info"` otherwise.
+is `"warn"` when a diagnostic of UPDATE-015 or a warning of UPDATE-040,
+UPDATE-041, UPDATE-075, UPDATE-082 or UPDATE-083 was given, and `"info"`
+otherwise.
 
 ## 7. Reading
 
@@ -492,8 +509,11 @@ UPDATE-034 step 4 and is written `&/soc`, which the reparse check refuses.
 refused as unknown (`update adc interrupt-parent '&{/soc}'`), and with no
 hint it is written as the string `"&{/soc}"` (UPDATE-033).
 
-**U-7. Numbers aren't range-checked.** `99999999999999999999` is written as a
-cell as is. dtc fails on it later.
+**U-7. Numbers aren't range-checked without a definition.**
+`99999999999999999999` is written as a cell as is when the property has no
+definition, with only UPDATE-015's line; dtc fails on it later. With a
+definition it gets UPDATE-041's warning (`takes 0 to 4294967295`) and is
+written too.
 
 **U-8. No implicit interrupt-parent on a base node the overlay doesn't
 change yet.** UPDATE-080 needs the node to be in the overlay before the
@@ -576,6 +596,12 @@ Set interrupt-parent = <&gicv2> on /soc/spi@7e204000/adi,ad5592r@3 (inherited fr
 $ analog-attach update adc/channel@1 diff-channels 1
 warning: diff-channels takes 2 values, got 1
 Set diff-channels on adc/channel@1
+```
+
+```
+$ analog-attach update adc/channel@1 reg 20
+warning: reg takes 0 to 15, got 20
+Set reg on adc/channel@1; renamed to channel@20
 ```
 
 ```

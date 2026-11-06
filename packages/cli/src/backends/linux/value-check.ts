@@ -2,7 +2,10 @@ import {
     AttachEnumType,
     INTERRUPT_MACROS,
     GPIO_MACROS,
+    is_dt_flag,
+    type AttachType,
     type Cell,
+    type DTProperty,
     type List,
     type ResolvedProperty,
 } from "attach-lib";
@@ -204,6 +207,76 @@ export function check_value(parsed: ParsedInputValue, property: string, definiti
     }
 }
 
+/** A written value the binding can bound: a number cell or a string; a label, a path or an expression is undefined. */
+type Written = bigint | string | undefined;
+
+function written_values(property: DTProperty): Written[] {
+    if (is_dt_flag(property.value)) { return []; }
+    return property.value.flatMap((value): Written[] => {
+        switch (value.kind) {
+            case "string": { return [value.value]; }
+            case "array": { return value.elements.map(element => element.kind === "number" ? element.value : undefined); }
+            default: { return [undefined]; }
+        }
+    });
+}
+
+function has_phandle(item: Cell | Cell[]): boolean {
+    return (Array.isArray(item) ? item : [item]).some(cell => cell._t === "enum" && cell.enum_type === AttachEnumType.PHANDLE);
+}
+
+/**
+ * The cell each written value is held to, by position: a scalar's, a list's (one for all, or one per position), the
+ * one row of a matrix. None for a list whose entries name a phandle, since each has as many cells as its provider.
+ */
+function cell_at(type: AttachType, index: number): Cell | undefined {
+    switch (type._t) {
+        case "scalar": { return index === 0 ? type.cell : undefined; }
+        case "list": {
+            if (has_phandle(type.item)) { return undefined; }
+            return Array.isArray(type.item) ? type.item[index] : type.item;
+        }
+        case "matrix": {
+            const [row, ...others] = type.rows;
+            if (row === undefined || others.length > 0 || has_phandle(row.item)) { return undefined; }
+            return Array.isArray(row.item) ? row.item[index % row.item.length] : row.item;
+        }
+        default: { return undefined; }
+    }
+}
+
+/** What `cell` takes when `value` is outside it (`0 to 15`, `one of 0, 1, 3`), else undefined. Macros aren't checked. */
+function outside(value: bigint | string, cell: Cell): string | undefined {
+    if (cell._t === "number" && typeof value === "bigint") {
+        const { minimum, maximum } = cell;
+        if ((minimum === undefined || value >= minimum) && (maximum === undefined || value <= maximum)) { return undefined; }
+        if (minimum === undefined) { return `at most ${maximum}`; }
+        return maximum === undefined ? `at least ${minimum}` : `${minimum} to ${maximum}`;
+    }
+    if (cell._t !== "enum") { return undefined; }
+    const numbers = cell.enum_type === AttachEnumType.NUMBER && typeof value === "bigint";
+    const strings = cell.enum_type === AttachEnumType.STRING && typeof value === "string";
+    if (!numbers && !strings) { return undefined; }
+    const listed = cell.enum.some(option => (typeof option === "bigint" || typeof option === "number") && typeof value === "bigint"
+        ? BigInt(option) === value
+        : option === value);
+    return listed ? undefined : `one of ${cell.enum.map(String).join(", ")}`;
+}
+
+/**
+ * The warning for the first written value outside what the binding allows (a number above its maximum, a value
+ * that is no option of its enum), undefined when every value fits or the binding doesn't bound it (UPDATE-041).
+ */
+export function value_warning(property: string, type: AttachType, written: DTProperty): string | undefined {
+    for (const [index, value] of written_values(written).entries()) {
+        if (value === undefined) { continue; }
+        const cell = cell_at(type, index);
+        const takes = cell === undefined ? undefined : outside(value, cell);
+        if (takes !== undefined) { return `warning: ${property} takes ${takes}, got ${String(value)}`; }
+    }
+    return undefined;
+}
+
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
 
@@ -262,5 +335,38 @@ if (import.meta.vitest) {
         expect(check_value(3n, "adi,mode", mode)).toBe("Values for property adi,mode are: [1,2]");
         const fixed: ResolvedProperty = { key: "adi,fixed", value: { _t: "scalar", cell: { _t: "enum", enum: [3n], enum_type: AttachEnumType.NUMBER }, default: 3n } };
         expect(check_value(4n, "adi,fixed", fixed)).toBe("Value for property adi,fixed is: 3");
+    });
+
+    const written = async (source: string): Promise<DTProperty> => {
+        const { DeviceTree } = await import("attach-lib");
+        const tree = DeviceTree.new_from_string(`/dts-v1/;\n/ { ${source} };`);
+        if (typeof tree === "string") { throw new TypeError(tree); }
+        const found = tree.node_at("/")?.properties[0];
+        if (found === undefined) { throw new TypeError(source); }
+        return found;
+    };
+
+    test("value_warning — a number outside its bounds, a value outside its enum; the first one", async () => {
+        const channel_reg: AttachType = { _t: "matrix", minItems: 1, maxItems: 1, rows: [{ _t: "list", item: { _t: "number", minimum: 0n, maximum: 15n }, minItems: 1, maxItems: 1 }] };
+        expect(value_warning("reg", channel_reg, await written("reg = <20>;"))).toBe("warning: reg takes 0 to 15, got 20");
+        expect(value_warning("reg", channel_reg, await written("reg = <15>;"))).toBeUndefined();
+        const reference: AttachType = { _t: "scalar", cell: { _t: "enum", enum: [0n, 1n, 3n], enum_type: AttachEnumType.NUMBER } };
+        expect(value_warning("adi,reference-select", reference, await written("adi,reference-select = <2>;")))
+            .toBe("warning: adi,reference-select takes one of 0, 1, 3, got 2");
+        const status: AttachType = { _t: "list", item: { _t: "enum", enum: ["okay", "disabled"], enum_type: AttachEnumType.STRING }, minItems: 1, maxItems: 1 };
+        expect(value_warning("status", status, await written(`status = "okay";`))).toBeUndefined();
+        expect(value_warning("status", status, await written(`status = "bogus";`))).toBe("warning: status takes one of okay, disabled, got bogus");
+        const pair: AttachType = { _t: "list", item: [{ _t: "number", maximum: 7n }, { _t: "number", minimum: 2n }] };
+        expect(value_warning("pair", pair, await written("pair = <9 0>;"))).toBe("warning: pair takes at most 7, got 9");
+        expect(value_warning("pair", pair, await written("pair = <1 0>;"))).toBe("warning: pair takes at least 2, got 0");
+    });
+
+    test("value_warning — labels, macros and phandle lists aren't checked", async () => {
+        const gpios: AttachType = { _t: "list", item: { _t: "enum", enum: ["gpio"], enum_type: AttachEnumType.PHANDLE } };
+        expect(value_warning("rdy-gpios", gpios, await written("rdy-gpios = <&gpio 99 1>;"))).toBeUndefined();
+        const flags: AttachType = { _t: "scalar", cell: { _t: "enum", enum: ["GPIO_ACTIVE_HIGH"], enum_type: AttachEnumType.MACRO } };
+        expect(value_warning("flags", flags, await written("flags = <5>;"))).toBeUndefined();
+        const numbers: AttachType = { _t: "list", item: { _t: "number", maximum: 3n } };
+        expect(value_warning("n", numbers, await written("n = <&n>;"))).toBeUndefined();
     });
 }
