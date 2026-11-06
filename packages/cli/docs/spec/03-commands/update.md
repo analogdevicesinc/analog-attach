@@ -323,7 +323,8 @@ description, allowed values, suggestions and providers to add follow it
 (READ-032). With `--quiet`, the DTS line is all.
 
 **UPDATE-112** While in JSON mode, the CLI shall respond with the property
-object of `04-protocol/read.schema.json#/$defs/read-property`: `kind`,
+object of `04-protocol/read.schema.json#/$defs/read-property`: `ok`,
+`message` and `severity` as read gives them (`read.md` READ-012), `kind`,
 `key`, `type`, `value`, `source` (`base` or `overlay`), and, without
 `--quiet`, `description` when the binding gives one and `suggestions` (`{
 values, can_create }`, READ-035) when there are any.
@@ -339,7 +340,7 @@ Applies when `<property>` contains `@`.
 the overlay adds it, changes it, or only the base has it, and no value is
 given, the CLI shall show the child as `read <path>/<property>` shows it
 (`read.md` READ-022 to READ-026, `--quiet` included). In JSON mode that is
-read's node (`04-protocol/read.schema.json#/$defs/read-node`).
+read's node (`04-protocol/read.schema.json#/$defs/read-node-answer`).
 
 **UPDATE-121** When the merged node has a child named `<property>` and values
 are given, the CLI shall refuse with UPDATE-122's message and write nothing.
@@ -628,7 +629,8 @@ $ analog-attach --json update adc reg 0
 
 ```
 $ analog-attach --json update adc spi-max-frequency
-{"kind":"property","key":"spi-max-frequency","type":{"kind":"number","subtype":"int"},
+{"ok":true,"message":"Read spi-max-frequency of adc","severity":"info",
+ "kind":"property","key":"spi-max-frequency","type":{"kind":"number","subtype":"int"},
  "value":1000000,"source":"overlay","description":"Maximum SPI clocking speed of the device in Hz."}
 ```
 

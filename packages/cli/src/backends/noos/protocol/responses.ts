@@ -67,7 +67,8 @@ export interface ReadProperty extends BaseReadProperty {
     suggestions: { values: Suggestion[]; can_create: Suggestion[] };
 }
 
-export type ReadResponse = Node | ReadProperty;
+/** The node or the property, with `ok`, `message` and `severity` alongside (GEN-08). */
+export type ReadResponse = CommonResponse & (Node | ReadProperty);
 
 /** `tag` groups entries for display; `key` is what `add` takes. */
 export interface Device {

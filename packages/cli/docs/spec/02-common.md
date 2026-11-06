@@ -57,8 +57,6 @@ Exceptions:
 
 | Command | Differs from | How | Issue |
 |---|---|---|---|
-| `read`, and `update` when it reads | COM-050 | its response is the node or property itself, with no `ok`, `message` or `severity` (`read.md` READ-011, READ-024, READ-035; `update.md` UPDATE-112) | C-7 |
-| `validate` | COM-020, COM-050 | its response has no `ok`, `message` or `severity` | `validate.md` V-4 |
 | `config` | COM-040, COM-072 | a problem with a settings file is an input error on standard error with status 2, not a refusal (`config.md` CONFIG-102, CONFIG-118); a value it can't store is a refusal (COM-043) | — |
 
 ## 3. Input errors
@@ -131,13 +129,16 @@ respond with an object whose `ok` is `true`, and exit with status 0. Its
 `severity` is `"info"`, or `"warn"` where the command's chapter says so: the
 `delete` preview, a `rename`, `update`, `move` or `import` that warned, and
 `list parent` for a compatible with no binding; where the backend is noos,
-the `delete` preview and a `build` that left no ELF. (Exceptions in §2.)
+the `delete` preview and a `build` that left no ELF; `validate`'s is taken
+from its findings (`validate.md` VALIDATE-021). The fields sit alongside the
+command's own: `read` gives the node or property with them (`read.md`
+READ-012). (Exceptions in §2.)
 
 **COM-051** While in JSON mode, a refusal (COM-040), a success whose
-`severity` is `"warn"` (COM-050), and each finding of `validate` shall carry
-`error_type`: one of the fixed list of error types (GEN-17; the Error types
-tab of the requirements workbook, `src/interface/error-types.ts`), the same
-in every ecosystem, so that scripts and the UI can tell the cases apart; the
+`severity` is `"warn"` (COM-050) other than `validate`'s, and each finding of
+`validate` shall carry `error_type`: one of the fixed list of error types
+(GEN-17; the Error types tab of the requirements workbook,
+`src/interface/error-types.ts`), the same in every ecosystem, so that scripts and the UI can tell the cases apart; the
 message says which case it is. Where the backend is linux, the field is
 optional until its backend sets it; where it is noos, and for the front end's
 own commands (`config`, `skill`, `completion`, the setup run), it is always
@@ -687,14 +688,8 @@ goes through `preprocess-command` but the workfile doesn't (COM-100), so a
 workfile with `#include <dt-bindings/…>` or a macro doesn't load. Every write
 reprints the file from the tree (COM-103), dropping comments a user added.
 
-**C-7. Read responses aren't CommonResponses.** `read` (READ-011, READ-024,
-READ-035 in `read.md`) and `update <path> <property>` when it reads
-(`update.md` UPDATE-112) respond with the node or property itself:
-`analog-attach --json read spi0 status` gives
-`{"kind":"property","key":"status",…}`, with no `ok`, `message` or
-`severity`, so a client must tell them from a refusal by shape (COM-050). A
-fix would be to wrap them: `{"ok": true, "message": …, "severity": "info",
-"node": …}` or `"property": …`.
+**C-7.** *Fixed.* (Read responses had no `ok`, `message` or `severity`; they
+now carry them alongside the node or property, READ-012.)
 
 **C-8. `read` loads the workspace before checking its arguments.** It calls
 the loader first and applies GRM-020 to GRM-023 and GRM-030 after (COM-030).

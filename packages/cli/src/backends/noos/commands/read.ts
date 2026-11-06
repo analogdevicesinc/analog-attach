@@ -5,7 +5,7 @@ import {
     type PropertySuggestions,
     type Ruleset
 } from "attach-no-os-lib";
-import { answer, command, type Outcome, type ReadArguments, type Session } from "../../../interface/backend-interface";
+import { answer, command, read_header, type Outcome, type ReadArguments, type Session } from "../../../interface/backend-interface";
 import {
     column_width,
     format_node_list,
@@ -60,7 +60,7 @@ export function read_target(session: Session, quiet: boolean, node?: string, pro
         const text = quiet
             ? Object.keys(minimal.symbols).join("\n")
             : format_workfile(minimal.platform, minimal.board) + format_node_list(minimal, "Nodes:");
-        return answer(() => to_protocol_root(root, minimal, workfile), text);
+        return answer(() => ({ ...read_header("Read the workfile"), ...to_protocol_root(root, minimal, workfile) }), text);
     }
 
     // read <node>
@@ -72,7 +72,7 @@ export function read_target(session: Session, quiet: boolean, node?: string, pro
 
         const text = quiet ? format_node_values(found.value) : format_node_summary(node, found.value);
         const origin = node_origin(context.value.workfile, node);
-        return answer(() => to_protocol_node(node, found.value, origin), text);
+        return answer(() => ({ ...read_header(`Read ${node}`), ...to_protocol_node(node, found.value, origin) }), text);
     }
 
     // read <node> <property>
@@ -98,7 +98,8 @@ export function read_target(session: Session, quiet: boolean, node?: string, pro
 
     const details: PropertySuggestions = suggestions.ok ? suggestions.value : {};
     // The same lists the text shows under Suggestions and Can create.
-    const response = (): ReadProperty => ({
+    const response = (): ReadResponse => ({
+        ...read_header(`Read ${property} of ${node}`),
         ...to_protocol_property(shown),
         ...schema_details(shown),
         suggestions: {

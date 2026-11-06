@@ -94,13 +94,14 @@ array`. A dt-validate that exits with status 0 without writing `error.json`
 gets the read error (`ENOENT: no such file or directory, open '<file>'`), not
 its standard error.
 
-**VALIDATE-013** A tool failure (VALIDATE-010, VALIDATE-012) shall be one
-error without a path. Human mode writes `dtc error:` or `dt-validate error:` on
-a line, then the tool's standard error as it is, then a newline: the tool's
-own final newline leaves an empty line at the end. The unreadable-output
-message is written alone, as one line. JSON mode gives the standard error
-unchanged, final newline included, and responds `{ "errors": [{ "kind":
-"generic", "path": [], "message": <text> }], "warnings": [] }`.
+**VALIDATE-013** A tool failure (VALIDATE-010, VALIDATE-012) shall be a
+refusal (`02-common.md` COM-040). Human mode writes `dtc error:` or
+`dt-validate error:` on a line, then the tool's standard error as it is, then
+a newline: the tool's own final newline leaves an empty line at the end. The
+unreadable-output message is written alone, as one line. JSON mode gives the
+standard error unchanged, final newline included, as the message: `{ "ok":
+false, "message": <text>, "severity": "error", "error_type": "tool-failed"
+}`.
 
 ### 5.1 With `--full`
 
@@ -157,8 +158,11 @@ VALIDATE-046).
 ### 6.1 JSON output
 
 **VALIDATE-021** While in JSON mode, the CLI shall respond per
-`04-protocol/validate.schema.json`: `{ "errors": [...], "warnings": [...] }`,
-each entry `{ "kind": "generic", "path": <segments>, "message": <text> }`.
+`04-protocol/validate.schema.json`: `{ "ok": true, "message": "<n> error(s),
+<m> warning(s)", "severity": <severity>, "errors": [...], "warnings": [...]
+}`, `<severity>` being `"error"` when there are errors, else `"warn"` when
+there are warnings, else `"info"` (`02-common.md` COM-050), and each entry `{
+"kind": "generic", "path": <segments>, "message": <text> }`.
 A diagnostic of level `warning` goes to `warnings`, any other to `errors`, both
 in the order of VALIDATE-020.
 
@@ -327,8 +331,8 @@ error per node of the loop), a node that references itself, each property
 (a required value left empty, a value the schema doesn't allow, a reference
 to a node the workfile doesn't have or of the wrong schema or capability, a
 union member), and the chip selects of the SPI devices. It shall respond
-`{ "errors": [...], "warnings": [...] }`
-(`04-protocol/validate.schema.json#/$defs/noos`), each entry `{ "kind":
+`{ "ok": true, "message": …, "severity": …, "errors": [...], "warnings": [...]
+}` as VALIDATE-021 has it (`04-protocol/validate.schema.json#/$defs/noos`), each entry `{ "kind":
 "generic", "path": <segments>, "message": <text> }`, `path` the node, the
 property and, in a union, the member (`["tp3_ip", "comm_init", "spi_dev"]`),
 in that order. Nothing is run and nothing is written.
@@ -373,9 +377,9 @@ fragment without an `interrupt-parent` label a controller with
 `#interrupt-cells = <1>`, so a correct two-cell `interrupts` (inherited from
 `gpio`) is reported as `too long`.
 
-**V-4. The response isn't a CommonResponse.** It has no `ok`, `message` or
-`severity` (COM-050). A tool failure (VALIDATE-013) is an error with `path:
-[]`, the same as a dt-validate diagnostic without a node.
+**V-4.** *Fixed.* (The response had no `ok`, `message` or `severity`, and a
+tool failure was an error with `path: []`. The response now carries them
+(VALIDATE-021), and a tool failure is a refusal (VALIDATE-013).)
 
 **V-5. Exit status 0 with errors.** `validate` can't fail a script or a CI
 step (VALIDATE-027).
@@ -457,8 +461,11 @@ i2c_arm/temp@53:
 
 ```
 $ analog-attach --json validate
-{"errors":[],"warnings":[{"kind":"generic","path":["node0","u@48","reg"],"message":"address 0x48 is already used by t@48"}]}
+{"ok":true,"message":"0 error(s), 1 warning(s)","severity":"warn","errors":[],
+ "warnings":[{"kind":"generic","path":["node0","u@48","reg"],"message":"address 0x48 is already used by t@48"}]}
 ```
+
+(Wrapped here; the CLI writes one line.)
 
 ```
 $ analog-attach validate
@@ -500,7 +507,10 @@ $ analog-attach validate
 
 ```
 $ analog-attach --json validate
-{"errors":[],"warnings":[{"kind":"generic","path":["testpart_cfg","calib"],"message":"Required property has no value; the driver may need it"}]}
+{"ok":true,"message":"0 error(s), 1 warning(s)","severity":"warn","errors":[],
+ "warnings":[{"kind":"generic","path":["testpart_cfg","calib"],"message":"Required property has no value; the driver may need it"}]}
 ```
+
+(Wrapped here; the CLI writes one line.)
 
 (`calib` a required raw value of the schema.)

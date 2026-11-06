@@ -69,6 +69,14 @@ other root nodes (`__overrides__`) are left out. Their properties have no
 `source`; the root and every node have `origin` `"internal"`. (Open issue
 R-1.)
 
+**READ-012** While in JSON mode, the response of READ-011, READ-024 and
+READ-035 (and where the backend is noos, of READ-500, READ-501 and READ-503)
+shall also have, alongside the node's or property's own fields, `"ok": true`,
+`"severity": "info"` and a `message` saying what was read: `Read the
+workfile` without a path, `Read <path>` for a node and `Read <property> of
+<path>` for a property, `<path>` as given (`02-common.md` COM-050). The
+nodes inside it don't have them.
+
 ## 6. A node
 
 **READ-020** The CLI shall resolve `<path>` per GRM-025 to GRM-027: to the
@@ -115,7 +123,7 @@ follows the line of a property whose source is `base`. A collapsed child is
 one line: `<labels><key> { … };   // base`.
 
 **READ-024** While in JSON mode, the CLI shall respond with the node per
-READ-052 (schema `read.schema.json#/$defs/read-node`).
+READ-052 (schema `read.schema.json#/$defs/read-node-answer`).
 
 **READ-025** Where the bindings load, `--quiet` isn't given and the node's
 binding is found, the CLI shall give the node's missing required properties
@@ -405,17 +413,20 @@ compatible = "brcm,bcm2835-spi";   // base
 
 ```
 $ analog-attach --json read adc/channel@0
-{"kind":"node","key":"channel@0","properties":[{"kind":"property","key":"reg",
+{"ok":true,"message":"Read adc/channel@0","severity":"info",
+ "kind":"node","key":"channel@0","properties":[{"kind":"property","key":"reg",
  "type":{"kind":"number","subtype":"int"},"value":0,"source":"overlay"}],
  "children":[],"alias":[],"origin":"internal"}
 ```
 
 ```
 $ analog-attach --json read --quiet adc/channel@0 adi,reference-select
-{"kind":"property","key":"adi,reference-select","type":{"kind":"number","subtype":"int"},
+{"ok":true,"message":"Read adi,reference-select of adc/channel@0","severity":"info",
+ "kind":"property","key":"adi,reference-select","type":{"kind":"number","subtype":"int"},
  "value":0,"source":"overlay"}
 $ analog-attach --json read adc/channel@0 adi,reference-select
-{"kind":"property","key":"adi,reference-select","type":{"kind":"enum","options":[{"value":0},
+{"ok":true,"message":"Read adi,reference-select of adc/channel@0","severity":"info",
+ "kind":"property","key":"adi,reference-select","type":{"kind":"enum","options":[{"value":0},
  {"value":1},{"value":3}]},"value":0,"source":"overlay","description":"Select the reference …",
  "required":false,"definition":"adi,ad7124.yaml","suggestions":{"values":[{"value":"0",
  "display_string":"0"},{"value":"1","display_string":"1"},{"value":"3","display_string":"3"}]}}
@@ -475,12 +486,13 @@ comm_init
 
 ```
 $ analog-attach --json read testpart_ip comm_init
-{"kind":"property","key":"comm_init","type":{"kind":"tuple","items":[{"kind":"enum","options":[
+{"ok":true,"message":"Read comm_init of testpart_ip","severity":"info",
+ "kind":"property","key":"comm_init","type":{"kind":"tuple","items":[{"kind":"enum","options":[
  {"value":"spi_dev","display_string":"spi_dev (test_spi_device)"},{"value":"i2c_dev","display_string":"i2c_dev (test_i2c_device)"}]},
  {"kind":"string"}]},"value":["spi_dev","testpart_spi_dev"],
  "suggestions":{"values":[{"value":"spi_dev"},{"value":"i2c_dev"}],"can_create":[]}}
 $ analog-attach --json read testpart_ops
-{"kind":"node","key":"testpart_ops","properties":[
+{"ok":true,"message":"Read testpart_ops","severity":"info","kind":"node","key":"testpart_ops","properties":[
  {"kind":"property","key":"$compatible","type":{"kind":"string"},"value":"testpart_ops"},
  {"kind":"property","key":"$symbol","type":{"kind":"string"},"value":"testpart_ops"},
  {"kind":"property","key":"$provides","type":{"kind":"string"},"value":"test_sensor_ops"}],

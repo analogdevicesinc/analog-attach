@@ -381,8 +381,6 @@ checksum() {
 	assert_json '.severity' warn
 }
 
-# Gap: read, update when it reads, and validate answer the node, the property or the
-# diagnostics alone, with no ok, message or severity (02-common.md C-7).
 # Description: read, update when it only reads, and validate also answer with ok, message and
 # severity.
 # Steps:
@@ -390,7 +388,7 @@ checksum() {
 #   2. Run read, read adxl345, read adxl345 compatible, update adxl345 compatible and validate,
 #      each with --json.
 #   3. Check each result has ok, message and severity.
-# bats test_tags=req:GEN-08, gap, id:L0138
+# bats test_tags=req:GEN-08, id:L0138
 @test "reading and validating say ok, with a message and a severity, too" {
 	with_accel
 	local words
