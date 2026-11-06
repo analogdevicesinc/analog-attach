@@ -164,6 +164,41 @@ function print_label_fragment(target: string, children: DTNode[], properties: DT
     return out;
 }
 
+/** What one fragment writes, as a block of a full devicetree. */
+export interface FullDtsBlock {
+    /** `&label`, `&{/path}`, or `/` for the root. */
+    reference: string;
+    /** The fragment's `__overlay__`: its labels, properties and children. */
+    body: DTNode;
+}
+
+/**
+ * Print a full devicetree that includes the base file `include` and writes the
+ * blocks over it, as a kernel board file does (`#include "board.dtsi"`, then
+ * `&spi0 { … }`). dtc takes one label before a reference (`bus: &spi0 { … }`),
+ * so a body's other labels get an empty block each.
+ */
+export function print_full_dts(include: string, blocks: readonly FullDtsBlock[]): string {
+    const indent = "\t";
+    const out: string[] = ["/dts-v1/;\n", `#include "${include}"\n`];
+    for (const { reference, body } of blocks) {
+        const [first, ...others] = body.labels;
+        let block = `\n${first === undefined ? "" : `${first}: `}${reference} {\n`;
+        for (const property of body.properties) {
+            block += print_property(property, indent, 1);
+        }
+        for (const child of body.children) {
+            block += print_node(child, indent, 1, reference);
+        }
+        block += "};\n";
+        for (const label of others) {
+            block += `\n${label}: ${reference} {\n};\n`;
+        }
+        out.push(block);
+    }
+    return out.join("");
+}
+
 function serialize_metadata(metadata: DTMetadata): string {
     return `/*\n${DTS_METADATA_HEADER}\n---\n${stringify_as_yaml(metadata)}\n...\n*/`;
 }
