@@ -46,8 +46,10 @@ settings (.analog-attach/config.json)  ->  workfile (workfile.json)  ->  generat
   command prints one JSON object.
 - **Exit 0 means the command ran, not that it worked.** Read `ok`:
   - `ok: false` is a refusal: show the user `message`, and act on `error_type` (see "Errors").
-  - `read`, `update` with no value (which reads), and `validate` answer without `ok` when they
-    work: the node or property itself, or `{ errors, warnings }`, an empty `errors` being valid.
+  - `read`, and `update` with no value (which reads), give the node or property itself next to
+    `ok`, `message` and `severity`.
+  - `validate` is `ok: true` whatever it finds: the findings are in `errors` and `warnings`, an
+    empty `errors` being valid, and `severity` is the worst of them.
 - **Exit 2 means the command line can't be run:** an unknown command, flag or setting, or a
   missing or extra argument. The reason is on stderr, as text. Fix the command; don't retry it as
   is.

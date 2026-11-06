@@ -74,6 +74,23 @@ export function answer<R>(response: Lazy<R>, text: string | Render): Outcome<R> 
     return { kind: "answer", response, text: typeof text === "string" ? () => text : text };
 }
 
+/** What `read`, and `update` when it reads, say above the node or property (GEN-08). */
+export function read_header(message: string): CommonResponse {
+    return { ok: true, message, severity: "info" };
+}
+
+/**
+ * What `validate` says above its findings (GEN-08): `ok` whatever they are, a message that
+ * counts them, and the worst one's severity. The findings carry their own `error_type`.
+ */
+export function validation_header(errors: number, warnings: number): CommonResponse {
+    return {
+        ok: true,
+        message: `${errors} error(s), ${warnings} warning(s)`,
+        severity: errors > 0 ? "error" : (warnings > 0 ? "warn" : "info"),
+    };
+}
+
 /**
  * The command ran and says no: `ok: false`, severity `error` unless told, the message as the
  * text unless told, and `type` as the response's `error_type` (GEN-17). `type` is optional

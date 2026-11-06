@@ -15,14 +15,15 @@ setup() {
 # Steps:
 #   1. Create the workfile on each backend and add a device (with_conformity_devices).
 #   2. Run, with --json, update pin number on noos and update adxl345 reg on linux.
-#   3. Check both succeed with kind property and the fields every property read has:
-#      key, type, value, required, definition, suggestions.
+#   3. Check both succeed with ok true, severity info, kind property and the fields every property
+#      read has: message, key, type, value, required, definition, suggestions.
 # bats test_tags=conformity, req:UPDATE-03, req:GEN-08, id:C0019
 @test "update with no value shows the property alike on both backends" {
 	with_conformity_devices
 	conform update pin number -- update adxl345 reg
 	assert_same_status 0
-	assert_same '[has("kind", "key", "type", "value", "required", "definition", "suggestions")] | all' true
+	assert_same '{ok, severity}' '{"ok":true,"severity":"info"}'
+	assert_same '[has("message", "kind", "key", "type", "value", "required", "definition", "suggestions")] | all' true
 	assert_same '.kind' '"property"'
 }
 

@@ -21,7 +21,7 @@ import type { ErrorType } from "./error-types";
 
 export type Severity = "info" | "warn" | "error";
 
-/** In every response except `read` and `validate`. `ok: false` is a refusal: the command ran and said no (exit 0, D-06). */
+/** In every response, `read` and `validate` included (GEN-08). `ok: false` is a refusal: the command ran and said no (exit 0, D-06). */
 export interface CommonResponse {
     ok: boolean;
     message: string;
@@ -109,7 +109,8 @@ export interface ReadProperty extends Property {
     suggestions?: PropertySuggestions;
 }
 
-export type ReadResponse = Node | ReadProperty;
+/** The node or the property, with `ok`, `message` and `severity` alongside its fields at the top (GEN-08). */
+export type ReadResponse = CommonResponse & (Node | ReadProperty);
 
 /**
  * ALIGN: Linux answers `{ linux, devicetree, overlay, created }`, no-OS `{ path }`. The base
@@ -227,8 +228,12 @@ export interface ValidationFinding {
     error_type?: ErrorType;
 }
 
-/** No `ok`: an empty `errors` is the success. */
-export interface ValidationResponse {
+/**
+ * `ok: true` whatever the findings; `severity` is the worst of them (`error`, `warn`, or
+ * `info` with none) and `message` counts them (`validation_header`). A tool that failed
+ * is a refusal instead.
+ */
+export interface ValidationResponse extends CommonResponse {
     errors: ValidationFinding[];
     warnings: ValidationFinding[];
 }

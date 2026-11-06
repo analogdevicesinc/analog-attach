@@ -509,7 +509,7 @@ analog-attach validate
 analog-attach validate --full
 ```
 
-`--json` gives `errors` and `warnings` arrays (each `{ kind, path, message }`, `path` a list of segments under the fragment, `["node0", "adi,ad7124-8@0", "reg"]`; dt-validate messages start with `.analog-attach/linux/temp.dtb:`); an empty `errors` array means validation passed, and warnings may still be present (including the `reg` clashes above). The `--full` findings have absolute paths (`["soc", "spi@7e204000", "status"]`).
+`--json` gives `ok: true` whatever it finds, `severity` the worst finding (`error`, `warn` or `info`), and `errors` and `warnings` arrays (each `{ kind, path, message }`, `path` a list of segments under the fragment, `["node0", "adi,ad7124-8@0", "reg"]`; dt-validate messages start with `.analog-attach/linux/temp.dtb:`); an empty `errors` array means validation passed, and warnings may still be present (including the `reg` clashes above). The `--full` findings have absolute paths (`["soc", "spi@7e204000", "status"]`). A dtc or dt-validate failure is a refusal instead (`ok: false`, `error_type: "tool-failed"`).
 
 **Output in human mode**:
 ```

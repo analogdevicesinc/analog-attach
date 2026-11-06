@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { DeviceTreeOverlay, creatable_providers, get_full_node_name, is_dt_flag, print_property, type DTNode, type DTProperty } from "attach-lib";
 
-import { answer, command, refuse, type Outcome, type Session } from "../../../../interface/backend-interface";
+import { answer, command, read_header, refuse, type Outcome, type Session } from "../../../../interface/backend-interface";
 import { load_workspace, optional_bindings, type Bindings } from "../../config/workspace";
 import type { ConfigResult } from "../../config/settings";
 import { bigIntReplacer, resolve_node_identifier, not_found_message, parse_target } from "../../utilities";
@@ -55,7 +55,7 @@ export async function read_target(
     if (property === undefined) {
         const read = read_node(overlay, node_path);
         const missing = json || binding === undefined ? [] : node_missing_required(binding, overlay, node_path);
-        return answer<ReadResponse>(() => protocol_node(read), () => [...node_lines(read), ...format_missing(missing)].join("\n"));
+        return answer<ReadResponse>(() => ({ ...read_header(`Read ${path_string}`), ...protocol_node(read) }), () => [...node_lines(read), ...format_missing(missing)].join("\n"));
     }
 
     const details = target === undefined || base === undefined
@@ -67,6 +67,7 @@ export async function read_target(
 
     const source = property_source(overlay, node_path, property.name);
     const response = (): ReadResponse => ({
+        ...read_header(`Read ${property.name} of ${path_string}`),
         ...with_binding_type(convert_property(property), info),
         source,
         ...(info?.description === undefined ? {} : { description: info.description }),
@@ -290,7 +291,7 @@ suggestions; a node with the required properties it still lacks.`,
         const { workspace } = loaded;
         const { tree: overlay } = workspace.overlay;
         if (arguments_.path === undefined) {
-            return answer<ReadResponse>(() => overlay_root(overlay), () => workspace.overlay.print());
+            return answer<ReadResponse>(() => ({ ...read_header("Read the workfile"), ...overlay_root(overlay) }), () => workspace.overlay.print());
         }
 
         const target = parse_target(arguments_.path, arguments_.property, { path: "required", property: "optional" });

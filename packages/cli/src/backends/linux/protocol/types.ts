@@ -147,7 +147,8 @@ export interface ReadPropertyDetails extends ReadProperty {
     suggestions?: PropertySuggestions;
 }
 
-export type ReadResponse = ReadNode | OverlayNode | ReadPropertyDetails;
+/** The node or the property, with `ok`, `message` and `severity` alongside (GEN-08). */
+export type ReadResponse = CommonResponse & (ReadNode | OverlayNode | ReadPropertyDetails);
 
 export interface DeletePreview extends CommonResponse {
     node_count: number;
@@ -163,7 +164,7 @@ export interface ValidationError {
     message: string;
 }
 
-export interface ValidationResponse {
+export interface ValidationResponse extends CommonResponse {
     errors: ValidationError[];
     warnings: ValidationError[];
     /** With `--full`: the merged tree's findings on what the overlay doesn't touch, left out. */

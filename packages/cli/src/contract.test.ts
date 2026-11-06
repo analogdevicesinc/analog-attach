@@ -526,7 +526,7 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
 
     { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools(); } },
     { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools({ diagnostics: DIAGNOSTIC }); } },
-    { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools({ fail: true }); } },
+    { route: "validate", argv: ["validate"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); } },
     { route: "validate", argv: ["validate"], shape: "config-refusal" },
     {
         route: "validate", argv: ["validate", "--full"], shape: "answer",

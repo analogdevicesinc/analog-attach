@@ -29,28 +29,31 @@ setup() {
 # Steps:
 #   1. Create the workfile on each backend and add a device (with_conformity_devices).
 #   2. Run, with --json, read pin on noos and read adxl345 on linux.
-#   3. Check both succeed with the same fields, kind node, and the same types for key and origin.
+#   3. Check both succeed with the same fields, ok true and severity info, kind node, and the same
+#      types for message, key and origin.
 # bats test_tags=conformity, req:READ-02, req:GEN-08, id:C0017
 @test "read <node> gives the same fields on both backends" {
 	with_conformity_devices
 	conform read pin -- read adxl345
 	assert_same_status 0
 	assert_same 'keys'
+	assert_same '{ok, severity}' '{"ok":true,"severity":"info"}'
 	assert_same '.kind' '"node"'
-	assert_same '{key, origin} | shape'
+	assert_same '{message, key, origin} | shape'
 }
 
 # Description: read <node> <property> gives the property with the same fields on both backends.
 # Steps:
 #   1. Create the workfile on each backend and add a device (with_conformity_devices).
 #   2. Run, with --json, read pin number on noos and read adxl345 reg on linux.
-#   3. Check both succeed with kind property and the fields every property read has:
-#      key, type, value, required, definition, suggestions.
+#   3. Check both succeed with ok true, severity info, kind property and the fields every property
+#      read has: message, key, type, value, required, definition, suggestions.
 # bats test_tags=conformity, req:READ-03, req:GEN-08, id:C0018
 @test "read <node> <property> gives the same fields on both backends" {
 	with_conformity_devices
 	conform read pin number -- read adxl345 reg
 	assert_same_status 0
-	assert_same '[has("kind", "key", "type", "value", "required", "definition", "suggestions")] | all' true
+	assert_same '{ok, severity}' '{"ok":true,"severity":"info"}'
+	assert_same '[has("message", "kind", "key", "type", "value", "required", "definition", "suggestions")] | all' true
 	assert_same '.kind' '"property"'
 }

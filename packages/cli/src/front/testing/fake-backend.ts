@@ -128,7 +128,7 @@ export function create_fake_backend(options: FakeOptions = {}): { backend: Backe
             // answer, both sides lazy
             read: command({
                 run: () => Promise.resolve(answer(
-                    () => { counters.read_response += 1; return Promise.resolve({ kind: "node" as const, key: "/", properties: [], children: [], origin: "fake" }); },
+                    () => { counters.read_response += 1; return Promise.resolve({ ok: true, message: "Read the workfile", severity: "info" as const, kind: "node" as const, key: "/", properties: [], children: [], origin: "fake" }); },
                     style => { counters.read_render += 1; return style.bold("/ {}"); },
                 )),
             }),

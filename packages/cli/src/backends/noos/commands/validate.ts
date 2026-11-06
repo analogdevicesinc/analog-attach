@@ -1,5 +1,5 @@
 import { validate_workfile, type ValidationError } from "attach-no-os-lib";
-import { answer, command, type ValidateArguments } from "../../../interface/backend-interface";
+import { answer, command, validation_header, type ValidateArguments } from "../../../interface/backend-interface";
 import { load_context, refuse_error } from "./shared";
 import type { ValidationFinding, ValidationResponse } from "../protocol/responses";
 
@@ -26,6 +26,7 @@ export const validate = command<ValidateArguments, ValidationResponse>({
         const warnings = result.errors.filter(finding => finding.severity === "warning");
 
         const response: ValidationResponse = {
+            ...validation_header(errors.length, warnings.length),
             errors: errors.map(finding => to_protocol_error(finding)),
             warnings: warnings.map(finding => to_protocol_error(finding))
         };

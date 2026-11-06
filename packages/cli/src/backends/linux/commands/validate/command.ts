@@ -14,7 +14,7 @@ import * as os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
 
-import { answer, command, type FlagSpecs, type Outcome, type Session } from "../../../../interface/backend-interface";
+import { answer, command, refuse, validation_header, type FlagSpecs, type Outcome, type Session } from "../../../../interface/backend-interface";
 import { load_workspace, type Workspace } from "../../config/workspace";
 import { write_full_devicetree } from "../../full-devicetree";
 import { display_path } from "../../unresolved";
@@ -42,9 +42,9 @@ const TEMPLATE = `/dts-v1/;
 };
 `;
 
-/** A validation that stopped before dt-validate had its say: the tool's error, as the one error of the response. */
+/** A validation that stopped before dt-validate had its say: a refusal with the tool's error. */
 function tool_failure(message: string, text: string): Outcome<ValidationResponse> {
-    return answer({ errors: [{ kind: "generic", path: [], message }], warnings: [] } satisfies ValidationResponse, text);
+    return refuse(message, { type: "tool-failed", text });
 }
 
 const VALIDATE_FLAGS = {
@@ -551,7 +551,7 @@ function parse_dt_validate_output(diagnostics: DtValidateDiagnostic[]): Validati
         }
     }
 
-    return { errors, warnings };
+    return { ...validation_header(errors.length, warnings.length), errors, warnings };
 }
 
 if (import.meta.vitest) {
@@ -731,6 +731,7 @@ if (import.meta.vitest) {
             "No errors! (1 warning(s))",
         ]);
         expect(parse_dt_validate_output(diagnostics)).toEqual({
+            ok: true, message: "0 error(s), 1 warning(s)", severity: "warn",
             errors: [],
             warnings: [{
                 kind: "generic",
