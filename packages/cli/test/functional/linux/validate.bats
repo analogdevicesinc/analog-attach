@@ -197,16 +197,18 @@ bad_channel() {
 	assert_json '.errors[0].message | contains("is too long")' true
 }
 
-# Gap: only the nodes the overlay adds are checked (open issue V-9): a property it sets on a
-# base node (status on spi0) isn't, and the run says `No errors!`.
-# Description: validate also checks the properties the overlay sets on a base node.
+# Gap: validate has no --full flag (a usage error, exit 2); validate alone checks only the nodes
+# the overlay adds (open issue V-9).
+# Description: validate --full checks the overlay merged with the base device tree, so a property
+# the overlay sets on a base node is checked against that node's binding.
 # Steps:
 #   1. Update status of spi0 to bogus.
-#   2. Run validate, with --json; check it succeeds and reports at least one error on status.
+#   2. Run validate --full, with --json; check it succeeds and reports at least one error on
+#      status.
 # bats test_tags=req:VALIDATE-03-LNX, gap, id:L0344
-@test "validate checks what the overlay sets on a base node" {
+@test "validate --full checks what the overlay sets on a base node" {
 	aa update spi0 status bogus >/dev/null 2>&1
-	run_json validate
+	run_json validate --full
 	assert_success
 	assert_json '.errors | length > 0' true
 	assert_json '[.errors[].path[-1]] | index("status") != null' true
