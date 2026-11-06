@@ -410,15 +410,19 @@ const with_reference = (fixture: LinuxHarness): void => {
         + "\n&{/} {\n\tvref: vref {\n\t\tcompatible = \"regulator-fixed\";\n\t};\n};\n");
 };
 const with_spi1 = (fixture: LinuxHarness): void => { fs.writeFileSync(path.join(fixture.linux.base, "base.dts"), BASE_WITH_SPI1); };
-/** The deploy settings, and the .dtbo `build` would have written. */
-const deploy_settings = (fixture: LinuxHarness): void => {
+/** The workspace the harness configures, with `extra` settings on top. */
+const settings_with = (fixture: LinuxHarness, extra: Record<string, string>): void => {
+    const { linux } = fixture;
+    linux.write_settings({ "linux": linux.linux, "devicetree": path.join(linux.base, "base.dts"), "workfile": path.join(linux.project, "overlay.dtso"), ...extra });
+};
+/** Output full, preprocessed by a copy (the fixture's base has no includes). */
+const full_output = (fixture: LinuxHarness): void => { settings_with(fixture, { "output": "full", "preprocess-command": "cp {input} {output}" }); };
+/** The deploy settings, and the .dtbo (or with output full the .dtb) `build` would have written. */
+const deploy_settings = (fixture: LinuxHarness, output: "overlay" | "full" = "overlay"): void => {
     const { linux } = fixture;
     fs.mkdirSync(path.join(linux.project, "build"), { recursive: true });
-    fs.writeFileSync(path.join(linux.project, "build", "overlay.dtbo"), "");
-    linux.write_settings({
-        "linux": linux.linux, "devicetree": path.join(linux.base, "base.dts"), "workfile": path.join(linux.project, "overlay.dtso"),
-        "deploy-ip": "192.0.2.1", "deploy-user": "pi", "deploy-password": "secret",
-    });
+    fs.writeFileSync(path.join(linux.project, "build", output === "full" ? "overlay.dtb" : "overlay.dtbo"), "");
+    settings_with(fixture, { "deploy-ip": "192.0.2.1", "deploy-user": "pi", "deploy-password": "secret", output });
 };
 
 /** build-command and deploy-command set: the user's commands in place of dtc and scp. */
@@ -520,8 +524,11 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "build", argv: ["build"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); } },
     { route: "build", argv: ["build"], shape: "config-refusal" },
     { route: "build", argv: ["build"], shape: "answer", prepare: own_commands },
+    { route: "build", argv: ["build"], shape: "answer", prepare: fixture => { fixture.tools(); full_output(fixture); } },
+    { route: "build", argv: ["build"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); full_output(fixture); } },
 
     { route: "deploy", argv: ["deploy"], shape: "answer", prepare: fixture => { deploy_settings(fixture); fixture.sshpass(); } },
+    { route: "deploy", argv: ["deploy"], shape: "answer", prepare: fixture => { deploy_settings(fixture, "full"); fixture.sshpass(); } },
     { route: "deploy", argv: ["deploy"], shape: "refusal", prepare: fixture => { deploy_settings(fixture); fixture.sshpass({ fail: true }); } },
     { route: "deploy", argv: ["deploy"], shape: "config-refusal" },
     { route: "deploy", argv: ["deploy"], shape: "refusal", prepare: own_commands },

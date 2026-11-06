@@ -219,7 +219,8 @@ that gets them cannot fail because of the configuration.
   - `linux`, `devicetree`, `workfile` (the overlay), `overlay-syntax`, `preprocess-command`;
   - `interview` (`false`: `add` and `update <path> <child>` ask nothing on a terminal, the
     parent question included);
-  - `build-command`, `build-dir` (a string, `build` by default), `deploy-command`;
+  - `output` (`overlay`, the default, or `full`: see *Full devicetree*), `build-command`,
+    `build-dir` (a string, `build` by default), `deploy-command`;
   - `deploy-ip`, `deploy-user`, `deploy-password`.
 
   The front end stores and checks them, in the `linux` section of the settings files. `read_settings` gives them from `session.settings`, with
@@ -242,8 +243,8 @@ that gets them cannot fail because of the configuration.
   - `overlay`: a `Workfile` parsed against the base, with `print()` / `save()` honouring
     `overlay-syntax`.
   - `overlay_path`: the configured workfile's path, whether its file exists or not (`init`).
-  - `deploy`: the deploy fields plus the `.dtbo` from `derive_dtbo_path` (in the build folder,
-    named after the workfile).
+  - `deploy`: the deploy fields plus the file `build` wrote, from `derive_build_files` (in the
+    build folder, named after the workfile: the `.dtbo`, or the `.dtb` under `output` `full`).
 
   `build` and `deploy` with `build-command` / `deploy-command` set load only `overlay_path` and run
   the command with `run_shell` in the project root.
@@ -372,6 +373,19 @@ base-only nodes (`spi0`) are readable too.
 `update <path> <prop>` without a value decides between reading and setting a flag on the same
 merged node (`decide_update`). `delete`'s property positional completes only what the overlay
 sets, while read and update offer the merged node's.
+
+### Full devicetree
+
+With `output` `full`, `build` writes the base with the overlay applied instead of a `.dtbo`
+(`derive_build_files`: `build/<stem>.dts` and `.dtb`), for boards that boot one devicetree.
+- `write_full_devicetree` (`full-devicetree.ts`) prints it with the lib's
+  `DeviceTreeOverlay.print_full(include)`: an `#include` of the base (`include_path`, relative
+  when the two share a directory), then one `&label { … }` block per fragment. It then
+  preprocesses it with `preprocess-command` into `<state_dir>/build.preprocessed.dts`, which dtc
+  compiles.
+- `deploy` copies the `.dtb` to `/boot/devicetree.dtb` (`REMOTE_PATHS`).
+- `{output}` / `{dtbo}` of `build-command` / `deploy-command` name the `.dtb`; no `.dts` is
+  written for them.
 
 ### Bundled dt-schema and tools
 

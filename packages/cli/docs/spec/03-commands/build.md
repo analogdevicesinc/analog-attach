@@ -1,7 +1,9 @@
 # build
 
-Compiles the overlay into a binary `.dtbo`. A shared command: §2 to §4 as
-the linux backend does it (with the bundled dtc or the `build-command`
+Compiles the overlay into a binary `.dtbo`, or, where the `output` setting
+is `full`, writes the base devicetree with the overlay applied and compiles
+it into a `.dtb` (for boards that boot a full devicetree only). A shared
+command: §2 to §4 as the linux backend does it (with the bundled dtc or the `build-command`
 setting), §5 as the noos backend does it (the generated project, built with
 CMake or the `build-command` setting).
 
@@ -25,7 +27,8 @@ command takes no arguments or options.
 |---|---|
 | Overlay file | The file the `workfile` setting names, as it is on disk. |
 | Build folder | The `build-dir` setting: `build` in the directory that holds `.analog-attach/` when unset, a relative value resolved the same way (02-common.md §8.1). |
-| Output file | In the build folder, the overlay file's name with `.dtso` replaced by `.dtbo`, or with `.dtbo` appended when it doesn't end in `.dtso` (`overlay.dtso` → `<build folder>/overlay.dtbo`, `my.dts` → `<build folder>/my.dts.dtbo`). |
+| Output file | In the build folder, the overlay file's name with `.dtso` replaced by `.dtbo`, or with `.dtbo` appended when it doesn't end in `.dtso` (`overlay.dtso` → `<build folder>/overlay.dtbo`, `my.dts` → `<build folder>/my.dts.dtbo`). Where `output` is `full`, `.dtb` in place of `.dtbo` (`<build folder>/overlay.dtb`, `<build folder>/my.dts.dtb`). |
+| Full devicetree file | Where `output` is `full`: in the build folder, the overlay file's name with `.dtso` replaced by `.dts`, or with `.dts` appended (`<build folder>/overlay.dts`, `<build folder>/my.dts.dts`). |
 | Bundled dtc | The `dtc` binary in the installation's `bundled/tools/` (v1.8.1). |
 
 ## 3. Resources
@@ -43,12 +46,12 @@ COM-071 or COM-072 and compile nothing. A missing bundled tool is the problem
 <paths>" }`, with the hint `The analog-attach installation is incomplete;
 rebuild it (scripts/bundle-dt-schema.sh).`.
 
-**BUILD-002** The CLI shall run the shell command `"<dtc>" -@ -I dts -O dtb
+**BUILD-002** Where `output` is `overlay`, the CLI shall run the shell command `"<dtc>" -@ -I dts -O dtb
 -o "<output file>" "<overlay file>"`, `<dtc>` being the bundled dtc's
 absolute path. Each value is put in double quotes, so paths may contain
 spaces.
 
-**BUILD-003** The CLI shall compile the overlay file as it is on disk: it
+**BUILD-003** Where `output` is `overlay`, the CLI shall compile the overlay file as it is on disk: it
 doesn't run `preprocess-command`, merge in the base, or validate against the
 bindings. `-@` makes dtc emit `__symbols__` and `__fixups__`, so references to
 base labels are resolved when the overlay is applied.
@@ -68,13 +71,14 @@ true, "message": "Compiled overlay", "severity": "info", "path": <output
 file> }`, `path` being absolute.
 
 **BUILD-006** The CLI shall change no file other than the output file, the
-build folder and the scratch files of 02-common.md §8.2.
+full devicetree file, the build folder, and the scratch files of 02-common.md
+§8.2 and BUILD-014.
 
 **BUILD-007** When `build-command` is set (and not empty), the CLI shall run
 it instead of BUILD-002 to BUILD-006, with the shell, in the directory that
 holds `.analog-attach/`, after the progress line `Building <overlay file>
 with '<command>'`. `{workfile}` in it is the overlay file and `{output}` the
-output file, each in double quotes. It needs only `workfile` to be set
+output file (the `.dtb` where `output` is `full`), each in double quotes. It needs only `workfile` to be set
 (BUILD-001 with its problem alone); the file needn't exist, and nothing is
 loaded or created. The command's standard output and standard error go to
 standard error, line by line, as with noos's CMake (BUILD-511).
@@ -85,6 +89,54 @@ refuse with `Build failed with exit code <n>`. Otherwise it shall respond
 "severity": "info" }`, with `path` the output file when that exists, and
 write `Build completed successfully`, then an empty line and `  <output
 file>` when it exists, in human mode.
+
+### 4.1 Where `output` is `full`
+
+**BUILD-010** The CLI shall write the full devicetree file, creating the
+build folder when it doesn't exist and replacing any earlier file, before it
+compiles: `/dts-v1/;`, the line `#include "<base>"`, then for each fragment
+of the overlay with an `__overlay__`, in file order (the order dtc applies
+them in), an empty line and a block `<reference> {`, the body's properties
+and child nodes as the overlay is printed (one tab in), and `};`. `<base>` is
+the `devicetree` file relative to the full devicetree file's directory, where
+cpp looks first, or its absolute path when the two share no directory but
+the root. This is how a kernel board file is written (`#include
+"zynq-coraz7s.dtsi"`, then `&spi0 { … }`), and dtc applies the blocks over
+the base as the loader would apply the overlay.
+
+**BUILD-011** A block's `<reference>` shall be `&<label>` when the fragment
+targets a label the base has for the node it resolves to; `/` when it
+resolves to the root and its body has no label; and `&{<path>}` otherwise,
+`<path>` being where the target resolves to (a label the overlay defines
+resolves to where its node lands, 02-common.md §8.3), so a block may come
+before the one that defines its label. A label on the body goes before the
+reference (`<label>: <reference> {`); dtc takes one there, so each further
+label gets an empty block `<label>: <reference> {` `};` of its own.
+
+**BUILD-012** The CLI shall leave out `__dormant__` bodies and the root's
+nodes that aren't fragments (`__overrides__`), as the kernel's overlay apply
+does.
+
+**BUILD-013** If a fragment's target resolves to no node (it has none, or
+names a label neither the base nor the overlay has), then the CLI shall
+refuse with `Build failed: the target of <fragments> is in neither the base
+devicetree nor the overlay`, `<fragments>` being those fragments' names
+(`fragment@0`) joined by `, `, and write nothing.
+
+**BUILD-014** The CLI shall run `preprocess-command` on the full devicetree
+file as on the base (COM-091), with `{output}`
+`.analog-attach/linux/build.preprocessed.dts` and `{linux}` the `linux` field.
+If it exits with a non-zero status, then the CLI shall refuse with `Build
+failed: preprocessing <full devicetree file> failed:`, a newline and its
+standard error, trimmed. Otherwise it shall run BUILD-002's command with the
+preprocessed file as input, and BUILD-004 applies.
+
+**BUILD-015** When dtc succeeds, the CLI shall leave the output file as dtc
+wrote it. In human mode it writes `Build completed successfully`, an empty
+line, then `  <full devicetree file>` and `  <output file>`, one per line. In
+JSON mode it responds per `04-protocol/build.schema.json`: `{ "ok": true,
+"message": "Compiled devicetree", "severity": "info", "path": <output file>,
+"source": <full devicetree file> }`, both absolute.
 
 ## 5. Where the backend is noos
 
@@ -197,6 +249,11 @@ is, without a word: `build --clean` doesn't delete the build directory.
 where every other command says `Setting "capi-path" is not configured. Run:
 analog-attach config capi-path <value>` (`02-common.md` COM-512).
 
+**B-5. dtc's errors in a full build cite the preprocessed file.** dtc reads
+`build.preprocessed.dts`, which `-P` leaves without line markers, so an
+error's line is one of that file, not of the full devicetree file or the
+base.
+
 ## 7. Examples
 
 ```
@@ -204,6 +261,27 @@ $ analog-attach build
 Build completed successfully
 
   /work/build/ad7124-8.dtbo
+```
+
+Where `output` is `full`, on a Cora Z7S (`devicetree` the Linux tree's
+`zynq-coraz7s.dts`, the workspace beside the Linux tree):
+
+```
+$ analog-attach build
+Build completed successfully
+
+  /home/me/cora/build/adxl355.dts
+  /home/me/cora/build/adxl355.dtb
+$ cat build/adxl355.dts
+/dts-v1/;
+#include "../../linux/arch/arm/boot/dts/xilinx/zynq-coraz7s.dts"
+
+&spi0 {
+	adxl355: adi,adxl355@0 {
+		compatible = "adi,adxl355";
+		reg = <0>;
+	};
+};
 ```
 
 ```

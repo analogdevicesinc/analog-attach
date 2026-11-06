@@ -109,7 +109,7 @@ an unset setting; a path from the home directory is written with `~`, and a
 `default`, `local` or `global`, left out when unset. The description and the
 options are wrapped at 80 characters, the continuation lines under the
 first. The options are there for a setting that has them (`backend`,
-`overlay-syntax`; where the backend is noos, the booleans, `probe`, and
+`overlay-syntax`, `output`; where the backend is noos, the booleans, `probe`, and
 `target` as scanned, CONFIG-510). When the setting is required and unset, an
 empty line and its hint follow. On a terminal the key is bold and
 `(required)`, the source and `(not set)` dim.
@@ -273,7 +273,7 @@ the same key in another backend's section is not that setting.
 with `--global`, then what applies now: ` (still set in the <scope> config:
 <value>)` when the other file still sets it, else ` (default: <default>)` for
 a setting with a default (`overlay-syntax`, `preprocess-command`,
-`interview`, `build-dir`; where
+`interview`, `output`, `build-dir`; where
 the backend is noos, `workfile`, `bootstrap`, `interview`,
 `project-template`, `example`, `probe`), else `
 (not set)`: in JSON mode as a common object (`config.schema.json#/$defs/done`),
@@ -457,6 +457,7 @@ Global: ~/.config/analog-attach/config.json
     interview           true                                                     default
 
   Build
+    output              overlay                                                  default
     build-command       (not set)
     build-dir           build                                                    default
 
@@ -481,7 +482,7 @@ $ analog-attach --json config deploy-user
 
 ```
 $ analog-attach config nope
-Unknown config field: nope. Valid fields: backend, linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password.
+Unknown config field: nope. Valid fields: backend, linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, output, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password.
                                                    (stderr, exit 2)
 ```
 
@@ -521,8 +522,8 @@ Indexed 23309 compatibles from 5196 bindings and compiled binding schemas in 5.1
 ```
 $ analog-attach --json config            # the local file's linux section also has "bogus": "x"
 {"errors":[{"field":"linux.bogus","kind":"unknown","message":"~/work/.analog-attach/config.json: unknown key linux.bogus",
- "hint":"Remove unknown keys from ~/work/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password."}],
- "hints":["Remove unknown keys from ~/work/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password."]}
+ "hint":"Remove unknown keys from ~/work/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, output, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password."}],
+ "hints":["Remove unknown keys from ~/work/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, output, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password."]}
                                                    (stderr, exit 2)
 ```
 

@@ -296,8 +296,9 @@ them:
 | `overlay-syntax` | one of `fragment`, `label` | no | `fragment` | `Output syntax for the overlay file: fragment (default) or label (&spi0 { … })` |
 | `preprocess-command` | string | no | `cpp -nostdinc -undef -x assembler-with-cpp -P -I {linux}/include -o {output} {input}` | `C preprocessor command to resolve macros in the base devicetree; {input}/{output}/{linux} are substituted` |
 | `interview` | `true` or `false` | no | `true` | `On a terminal, ask for the parent of 'add' and for the required properties a new node lacks (true/false)` |
+| `output` | one of `overlay`, `full` | no | `overlay` | `What 'build' makes and 'deploy' copies: overlay (default, a .dtbo) or full (the base with the overlay applied, a .dts and its .dtb)` |
 | `build-command` | string | no | — | `Override the 'build' step with this command, run at the base of the project; {workfile}/{output} are substituted (unset: compile with the bundled dtc)` |
-| `build-dir` | string: a folder, relative to the directory that holds `.analog-attach/` unless absolute (`~` the home directory) | no | `build` | `Folder 'build' writes the .dtbo to and 'deploy' takes it from, relative to the project unless absolute` |
+| `build-dir` | string: a folder, relative to the directory that holds `.analog-attach/` unless absolute (`~` the home directory) | no | `build` | `Folder 'build' writes its output to and 'deploy' takes it from, relative to the project unless absolute` |
 | `deploy-command` | string | no | — | `Override the 'deploy' step with this command, run at the base of the project; {dtbo} is substituted (unset: copy over SSH and reboot)` |
 | `deploy-ip` | string | no | — | `IP address or hostname of the remote device to deploy to` |
 | `deploy-user` | string | no | — | `SSH username on the remote device` |
@@ -485,7 +486,9 @@ report `devicetree: <devicetree> does not parse after preprocessing: <error>`.
 **COM-096** The CLI shall preprocess the other devicetree sources it reads
 with the same command and `{linux}` always set: `import`'s overlay into
 `.analog-attach/linux/import.preprocessed.dts`, `add --template overlay:` into
-`.analog-attach/linux/overlay-template.preprocessed.dts`, and binding examples
+`.analog-attach/linux/overlay-template.preprocessed.dts`, `build`'s full devicetree
+(where `output` is `full`, build.md BUILD-014) into
+`.analog-attach/linux/build.preprocessed.dts`, and binding examples
 (`add --template example:`, the add fill-in) from `.analog-attach/linux/example.dts`
 into `.analog-attach/linux/example.preprocessed.dts`. Those failures are refusals of
 the command, not configuration errors.

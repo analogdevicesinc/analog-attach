@@ -202,3 +202,76 @@ duplicate_labels() {
 	assert_json '.message | startswith("Build failed:\n")' true
 	assert_json '.message | test("ERROR \\(duplicate_label\\)")' true
 }
+
+# Description: with output full, build writes the base devicetree with the overlay applied, as a
+# .dts in the build folder that includes the base and adds the overlay's nodes, and compiles it
+# into a .dtb: the base's nodes and the added one in one tree, with nothing left for a loader to
+# resolve.
+# Steps:
+#   1. Create the overlay with init, add adi,adxl345 under spi0, and set output to full.
+#   2. Run build, with --json; check it succeeds with Compiled devicetree, path the build
+#      folder's overlay.dtb and source its overlay.dts, and that no .dtbo was written.
+#   3. Check overlay.dts includes the base devicetree and has a &spi0 block with the adxl345.
+#   4. Decompile overlay.dtb with the bundled dtc; check it has the base's board compatible and
+#      the adxl345 compatible, and no __fixups__.
+# bats test_tags=req:BUILD-01, req:BUILD-01-LNX-FULL, req:SET-12-LNX, id:L0355
+@test "build with output full writes the base with the overlay applied, as a .dts and its .dtb" {
+	with_overlay
+	aa add adi,adxl345 --parent spi0 >/dev/null 2>&1 || fail "add adi,adxl345 failed"
+	aa config output full >/dev/null
+	run_json build
+	assert_success
+	assert_json '.ok' true
+	assert_json '.message' 'Compiled devicetree'
+	assert_json '.path' "$PROJECT/build/overlay.dtb"
+	assert_json '.source' "$PROJECT/build/overlay.dts"
+	[ ! -e "$PROJECT/build/overlay.dtbo" ]
+	run grep -c '^#include ".*bcm2711-rpi-4-b.dts"$' "$PROJECT/build/overlay.dts"
+	assert_output 1
+	run cat "$PROJECT/build/overlay.dts"
+	assert_line '&spi0 {'
+	assert_output --partial 'compatible = "adi,adxl345";'
+	[ "$(head -c 4 "$PROJECT/build/overlay.dtb" | od -An -tx1 | tr -d ' ')" = d00dfeed ]
+	run "$CLI_DIR/bundled/linux/tools/dtc" -I dtb -O dts "$PROJECT/build/overlay.dtb"
+	assert_output --partial '"raspberrypi,4-model-b"'
+	assert_output --partial 'compatible = "adi,adxl345";'
+	refute_output --partial '__fixups__'
+}
+
+# Description: with output full, build says in human mode which two files it wrote.
+# Steps:
+#   1. Create the overlay with init and set output to full.
+#   2. Run build; check it succeeds and prints Build completed successfully, then the absolute
+#      paths of overlay.dts and overlay.dtb in the build folder, one per line.
+# bats test_tags=req:BUILD-03, req:BUILD-01-LNX-FULL, id:L0356
+@test "build with output full names the .dts and the .dtb it wrote" {
+	with_overlay
+	aa config output full >/dev/null
+	run aa build
+	assert_success
+	assert_line --index 0 "Build completed successfully"
+	assert_line --index 1 "  $PROJECT/build/overlay.dts"
+	assert_line --index 2 "  $PROJECT/build/overlay.dtb"
+}
+
+# Description: with output full, a failed compile shows dtc's messages, says the build failed,
+# and writes no .dtb.
+# Steps:
+#   1. Create the overlay with init, replace it with one where two nodes share a label, and set
+#      output to full.
+#   2. Run build, with --json; check .ok is false, severity error, and the message starts with
+#      Build failed: and holds dtc's duplicate label error.
+#   3. Check no .dtb was written.
+# bats test_tags=req:BUILD-07, req:BUILD-01-LNX-FULL, id:L0357
+@test "with output full, a failed compile shows dtc's messages and says the build failed" {
+	with_overlay
+	duplicate_labels
+	aa config output full >/dev/null
+	run_json build
+	assert_success
+	assert_json '.ok' false
+	assert_json '.severity' error
+	assert_json '.message | startswith("Build failed:\n")' true
+	assert_json '.message | test("Duplicate label .x.")' true
+	[ ! -e "$PROJECT/build/overlay.dtb" ]
+}

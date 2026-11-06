@@ -137,8 +137,9 @@ analog-attach config --reload                 # rebuild the binding caches
 | `overlay-syntax` | No | Output syntax: `fragment` (default) or `label` (`&spi0 { }` style) |
 | `preprocess-command` | No | C preprocessor command that resolves `#include`s and macros in the base devicetree (default mirrors kbuild's `cpp` flags) |
 | `interview` | No | `true` (default) or `false`: whether `add`, and `update <path> <child>`, ask on a terminal (the parent and the missing required properties) |
-| `build-command` | No | Replaces `build`'s dtc step: run with the shell at the project root, `{workfile}` and `{output}` (the `.dtbo` path) substituted |
-| `build-dir` | No | Folder `build` writes the `.dtbo` to and `deploy` takes it from: `build` at the project root by default, relative to it unless absolute |
+| `output` | No | What `build` makes and `deploy` copies: `overlay` (default, a `.dtbo`) or `full` (the base with the overlay applied, a `.dts` and its `.dtb`, for boards that only boot a full devicetree, such as Zynq boards like the Cora Z7S) |
+| `build-command` | No | Replaces `build`'s dtc step: run with the shell at the project root, `{workfile}` and `{output}` (the `.dtbo` path, the `.dtb` with `output` `full`) substituted |
+| `build-dir` | No | Folder `build` writes its output to and `deploy` takes it from: `build` at the project root by default, relative to it unless absolute |
 | `deploy-command` | No | Replaces `deploy`'s scp and reboot: run with the shell at the project root, `{dtbo}` substituted |
 | `deploy-ip` | No | IP address or hostname of the remote device |
 | `deploy-user` | No | SSH username on the remote device |
@@ -657,6 +658,8 @@ analog-attach build
 
 **Output**: Writes the `.dtbo` in the `build-dir` folder (`build` at the project root by default; `overlay.dtso` → `build/overlay.dtbo`), where `deploy` picks it up: `Build completed successfully`, then the path on its own line (`--json`: `path`). Fails with an input error when `workfile` is unset or its file is missing; a dtc failure is `Build failed:` followed by dtc's output. With `build-command` set, that command runs instead (at the project root, its output on stderr); a non-zero exit is `Build failed with exit code <n>`.
 
+With `output` `full`, it instead writes `build/overlay.dts` (an `#include` of the base devicetree, then one `&label { … }` block per fragment of the overlay, as a kernel board file is written), preprocesses it with `preprocess-command` and compiles it into `build/overlay.dtb`: `Build completed successfully`, then both paths (`--json`: `path` the `.dtb`, `source` the `.dts`). The workfile stays the overlay: every other command edits it as before.
+
 ---
 
 ### 12. `deploy` - Deploy to Remote Device
@@ -670,7 +673,7 @@ analog-attach deploy
 
 **Requirements**: the `deploy-ip`, `deploy-user` and `deploy-password` config fields, the `.dtbo` that `build` wrote in `build-dir`, and `scp` and `sshpass` on PATH. Fails with an input error listing any unset field, a missing `.dtbo`, or a missing tool.
 
-**Behavior**: Copies the `.dtbo` to `/boot/overlays/` on the remote device, then always reboots it after a successful copy. With `deploy-command` set, that command runs instead (at the project root, `{dtbo}` the `.dtbo`'s path), and none of the deploy settings are needed; a non-zero exit is `Deploy failed with exit code <n>`.
+**Behavior**: Copies the `.dtbo` to `/boot/overlays/` on the remote device, then always reboots it after a successful copy. With `output` `full`, it copies the `.dtb` over `/boot/devicetree.dtb` instead (where U-Boot loads it on Kuiper's Zynq boards; no copy of the old one is kept). With `deploy-command` set, that command runs instead (at the project root, `{dtbo}` the `.dtbo`'s path, the `.dtb`'s with `output` `full`), and none of the deploy settings are needed; a non-zero exit is `Deploy failed with exit code <n>`.
 
 ---
 

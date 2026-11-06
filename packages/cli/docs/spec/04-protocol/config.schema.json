@@ -27,11 +27,11 @@
       "type": "object",
       "required": ["field_name", "category", "description", "type", "required", "default", "value", "source"],
       "properties": {
-        "field_name": { "type": "string", "description": "backend, or one of the backend's fields: linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password where the backend is linux; capi-path, module-paths, board, platform, workfile, bootstrap, interview, project-name, project-path, project-template, example, build-command, deploy-command, probe where it is noos (COM-500)." },
-        "category": { "type": "string", "description": "The group the human table lists it under: General for backend; Workspace and Deploy where the backend is linux; Sources, Target, Workfile, Project and Build where it is noos." },
+        "field_name": { "type": "string", "description": "backend, or one of the backend's fields: linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, output, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password where the backend is linux; capi-path, module-paths, board, platform, workfile, bootstrap, interview, project-name, project-path, project-template, example, build-command, deploy-command, probe where it is noos (COM-500)." },
+        "category": { "type": "string", "description": "The group the human table lists it under: General for backend; Workspace, Build and Deploy where the backend is linux; Sources, Target, Workfile, Project and Build where it is noos." },
         "description": { "type": "string" },
         "type": {
-          "description": "The kind; a setting with options gives them instead: a fixed list (overlay-syntax, probe; true and false for a noos bool), or the names the backend scans (noos board and platform, which are string when it finds none, CONFIG-510).",
+          "description": "The kind; a setting with options gives them instead: a fixed list (overlay-syntax, output, probe; true and false for a noos bool), or the names the backend scans (noos board and platform, which are string when it finds none, CONFIG-510).",
           "oneOf": [
             { "enum": ["path", "path_list", "string", "numeric", "bool"] },
             {

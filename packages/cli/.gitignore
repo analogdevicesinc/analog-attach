@@ -15,3 +15,5 @@ linux-adi.lock
 
 # The workspace of demo/typical-flow.sh
 demo/workspace/
+# The workspace of demo/full-devicetree.sh
+demo/full-devicetree-workspace/

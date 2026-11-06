@@ -24,6 +24,19 @@
           "unevaluatedProperties": false
         },
         {
+          "description": "Where output is full: the full devicetree written and compiled (BUILD-015).",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "required": ["path", "source"],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "const": "Compiled devicetree" },
+            "severity": { "const": "info" },
+            "path": { "type": "string", "pattern": "^/", "description": "The .dtb written, absolute." },
+            "source": { "type": "string", "pattern": "^/", "description": "The full devicetree source written, absolute." }
+          },
+          "unevaluatedProperties": false
+        },
+        {
           "description": "build-command ran in place of dtc (BUILD-008); path only when the .dtbo is where dtc would have written it.",
           "allOf": [{ "$ref": "#/$defs/base" }],
           "properties": {
@@ -34,7 +47,7 @@
           },
           "unevaluatedProperties": false
         },
-        { "$ref": "common.schema.json#/$defs/refusal", "description": "dtc failed: message is 'Build failed:', a newline and its standard error (BUILD-004); or build-command exited with a non-zero status: 'Build failed with exit code <n>' (BUILD-008)." },
+        { "$ref": "common.schema.json#/$defs/refusal", "description": "dtc failed: message is 'Build failed:', a newline and its standard error (BUILD-004); where output is full, 'Build failed: ' and why the full devicetree couldn't be written or preprocessed (BUILD-013, BUILD-014); or build-command exited with a non-zero status: 'Build failed with exit code <n>' (BUILD-008)." },
         { "$ref": "common.schema.json#/$defs/config-refusal" }
       ]
     },

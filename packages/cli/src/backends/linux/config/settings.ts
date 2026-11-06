@@ -13,6 +13,10 @@ export const DEFAULT_PREPROCESS_COMMAND = "cpp -nostdinc -undef -x assembler-wit
 export const OVERLAY_SYNTAXES = ["fragment", "label"] as const;
 export type OverlaySyntax = typeof OVERLAY_SYNTAXES[number];
 
+/** What `build` makes of the workfile: a `.dtbo`, or the base with the overlay applied (a `.dts` and its `.dtb`). */
+export const OUTPUTS = ["overlay", "full"] as const;
+export type Output = typeof OUTPUTS[number];
+
 /** The name hints use when no session is at hand (the specs' static hints): the front end's binary. */
 export const DEFAULT_PROGRAM = "analog-attach";
 
@@ -28,17 +32,19 @@ export interface Settings {
     deploy_password?: string;
     /** Whether `add` and a child's create ask on a terminal (`interview`). */
     interview: boolean;
+    /** What `build` makes and `deploy` copies (`output`). */
+    output: Output;
     /** Replaces `build`'s dtc step (`build-command`). */
     build_command?: string;
     /** Replaces `deploy`'s copy and reboot (`deploy-command`). */
     deploy_command?: string;
-    /** The folder `build` writes the `.dtbo` to and `deploy` takes it from, absolute. */
+    /** The folder `build` writes its output to and `deploy` takes it from, absolute. */
     build_dir: string;
 }
 
 export type SettingKey =
     | "linux" | "devicetree" | "workfile" | "overlay-syntax" | "preprocess-command" | "interview"
-    | "build-command" | "build-dir" | "deploy-command" | "deploy-ip" | "deploy-user" | "deploy-password";
+    | "output" | "build-command" | "build-dir" | "deploy-command" | "deploy-ip" | "deploy-user" | "deploy-password";
 
 /** The `Settings` field of each key. */
 export const SETTING_FIELDS: Readonly<Record<SettingKey, keyof Settings>> = {
@@ -48,6 +54,7 @@ export const SETTING_FIELDS: Readonly<Record<SettingKey, keyof Settings>> = {
     "overlay-syntax": "overlay_syntax",
     "preprocess-command": "preprocess_command",
     "interview": "interview",
+    "output": "output",
     "build-command": "build_command",
     "build-dir": "build_dir",
     "deploy-command": "deploy_command",
@@ -97,7 +104,7 @@ const WORKSPACE = "Workspace";
 const BUILD = "Build";
 const DEPLOY = "Deploy";
 
-/** Where `build` writes the `.dtbo` when `build-dir` is unset, relative to the project root (as the noos backend builds). */
+/** Where `build` writes its output when `build-dir` is unset, relative to the project root (as the noos backend builds). */
 export const DEFAULT_BUILD_DIR = "build";
 
 /** The specs the front end stores, lists and checks. Their hints name `program`. */
@@ -162,6 +169,15 @@ export function linux_settings(program: string = DEFAULT_PROGRAM): SettingSpec[]
             description: "On a terminal, ask for the parent of 'add' and for the required properties a new node lacks (true/false)",
         },
         {
+            key: "output",
+            category: BUILD,
+            type: "string",
+            options: OUTPUTS,
+            required: false,
+            default: "overlay",
+            description: "What 'build' makes and 'deploy' copies: overlay (default, a .dtbo) or full (the base with the overlay applied, a .dts and its .dtb)",
+        },
+        {
             key: "build-command",
             category: BUILD,
             type: "string",
@@ -174,7 +190,7 @@ export function linux_settings(program: string = DEFAULT_PROGRAM): SettingSpec[]
             type: "string",
             required: false,
             default: DEFAULT_BUILD_DIR,
-            description: "Folder 'build' writes the .dtbo to and 'deploy' takes it from, relative to the project unless absolute",
+            description: "Folder 'build' writes its output to and 'deploy' takes it from, relative to the project unless absolute",
         },
         {
             key: "deploy-command",
@@ -243,6 +259,7 @@ export function read_settings(view: Pick<SettingsView, "get">): Settings {
         overlay_syntax: (view.get("overlay-syntax") ?? "fragment") as OverlaySyntax,
         preprocess_command: view.get("preprocess-command") ?? DEFAULT_PREPROCESS_COMMAND,
         interview: view.get("interview") !== "false",
+        output: (view.get("output") ?? "overlay") as Output,
         build_dir: view.get("build-dir") ?? DEFAULT_BUILD_DIR,
     };
     const values = settings as unknown as Record<string, string | undefined>;
@@ -286,7 +303,7 @@ if (import.meta.vitest) {
         const values: Record<string, string> = { linux: "/l", workfile: "/w/o.dtso" };
         expect(read_settings({ get: key => values[key] })).toEqual({
             linux: "/l", workfile: "/w/o.dtso", overlay_syntax: "fragment", preprocess_command: DEFAULT_PREPROCESS_COMMAND,
-            interview: true, build_dir: DEFAULT_BUILD_DIR,
+            interview: true, output: "overlay", build_dir: DEFAULT_BUILD_DIR,
         });
     });
 

@@ -17,6 +17,7 @@ import {
     SETTING_FIELDS,
     type ConfigError,
     type OverlaySyntax,
+    type Output,
     type ConfigResult,
     type SettingKey,
     type Settings,
@@ -78,8 +79,9 @@ export interface DeployTarget {
     host: string;
     user: string;
     password: string;
-    /** Compiled overlay, derived from the overlay path. */
-    dtbo: string;
+    output: Output;
+    /** What `build` compiled from the workfile (`derive_build_files`): the `.dtbo`, or the `.dtb`. */
+    binary: string;
 }
 
 export interface Resources {
@@ -103,6 +105,24 @@ const bundle_hint = (program: string): string => `The ${program} installation is
 export function derive_dtbo_path(overlay: string, build_directory: string): string {
     const name = path.basename(overlay);
     return path.join(build_directory, name.endsWith(".dtso") ? `${name.slice(0, -".dtso".length)}.dtbo` : `${name}.dtbo`);
+}
+
+/** The files `build` writes from the workfile: the full devicetree source (output `full`), and the compiled one. */
+export interface BuildFiles {
+    source?: string;
+    binary: string;
+}
+
+/**
+ * The files `build` writes in `build_directory`, named after the overlay: `overlay.dtso` gives `overlay.dtbo`, or with
+ * output `full` `overlay.dts` and `overlay.dtb`; another name gets the extensions appended, so a `.dts` workfile is
+ * never written over.
+ */
+export function derive_build_files(overlay: string, output: Output, build_directory: string): BuildFiles {
+    if (output === "overlay") { return { binary: derive_dtbo_path(overlay, build_directory) }; }
+    const name = path.basename(overlay);
+    const stem = path.join(build_directory, name.endsWith(".dtso") ? name.slice(0, -".dtso".length) : name);
+    return { source: `${stem}.dts`, binary: `${stem}.dtb` };
 }
 
 /** The `build-dir` setting as a folder: relative to the project root unless absolute, `~` the home directory. */
@@ -276,9 +296,10 @@ function parse_deploy(settings: Settings, program: string): ConfigResult<DeployT
         return { ok: false, errors: failures(host, user, password, overlay) };
     }
 
-    const dtbo = derive_dtbo_path(overlay.value, settings.build_dir);
-    if (!fs.existsSync(dtbo)) {
-        return fail({ field: "workfile", kind: "missing", message: `Compiled overlay ${dtbo} not found`, hint: "Run 'build' first." });
+    const { binary } = derive_build_files(overlay.value, settings.output, settings.build_dir);
+    if (!fs.existsSync(binary)) {
+        const what = settings.output === "full" ? "devicetree" : "overlay";
+        return fail({ field: "workfile", kind: "missing", message: `Compiled ${what} ${binary} not found`, hint: "Run 'build' first." });
     }
 
     const missing = ["scp", "sshpass"].filter(tool => !is_tool_available(`which ${tool}`));
@@ -286,7 +307,7 @@ function parse_deploy(settings: Settings, program: string): ConfigResult<DeployT
         return fail({ field: "deploy", kind: "missing", message: `${missing.join(", ")} not found on PATH (needed to deploy)` });
     }
 
-    return { ok: true, value: { host: host.value, user: user.value, password: password.value, dtbo } };
+    return { ok: true, value: { host: host.value, user: user.value, password: password.value, output: settings.output, binary } };
 }
 
 /**
