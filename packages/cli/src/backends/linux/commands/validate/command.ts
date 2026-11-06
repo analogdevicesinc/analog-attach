@@ -14,11 +14,14 @@ import * as os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
 
-import { answer, command, type Outcome } from "../../../../interface/backend-interface";
-import { load_workspace } from "../../config/workspace";
+import { answer, command, type FlagSpecs, type Outcome, type Session } from "../../../../interface/backend-interface";
+import { load_workspace, type Workspace } from "../../config/workspace";
+import { write_full_devicetree } from "../../full-devicetree";
+import { display_path } from "../../unresolved";
 import { is_tool_available } from "../../utilities";
 import type { ValidationResponse, ValidationError } from "../../protocol/types";
 import { reg_warnings, type RegWarning } from "../../reg-conflicts";
+import { is_touched, touched_by } from "./touched";
 
 const TEMPLATE = `/dts-v1/;
 /plugin/;
@@ -44,64 +47,139 @@ function tool_failure(message: string, text: string): Outcome<ValidationResponse
     return answer({ errors: [{ kind: "generic", path: [], message }], warnings: [] } satisfies ValidationResponse, text);
 }
 
-export const validate = command<Record<never, never>, ValidationResponse>({
+const VALIDATE_FLAGS = {
+    full: { kind: "boolean", brief: "Also check the overlay merged with the base devicetree" },
+} as const satisfies FlagSpecs;
+
+/**
+ * What the full devicetree gets after the overlay's blocks for dt-validate:
+ * dt-schema's gpio fixup crashes on a Raspberry Pi's `/aliases`, and
+ * `/__overrides__` refers to it, so neither is checked.
+ */
+const FULL_EPILOGUE = "\n/ {\n\t/delete-node/ aliases;\n\t/delete-node/ __overrides__;\n};\n";
+
+type Checked = Workspace<"bindings" | "tools" | "base" | "overlay">;
+
+export const validate = command<Record<never, never>, ValidationResponse, typeof VALIDATE_FLAGS>({
+    flags: VALIDATE_FLAGS,
     docs: {
         brief: "Validate the overlay against its bindings",
-        full: "Runs dt-validate on the overlay merged with the base device tree.",
-        examples: ["validate", "--json validate"],
+        full: "Runs dt-validate on the nodes the overlay writes. With --full, also on the base devicetree with the overlay applied, reporting what the overlay adds or sets and counting the base's own findings.",
+        examples: ["validate", "validate --full", "--json validate"],
     },
-    async run(_arguments, _flags, session) {
+    async run(_arguments, flags, session) {
         const loaded = load_workspace(session, ["bindings", "tools", "base", "overlay"]);
         if (!loaded.ok) { return loaded.outcome; }
         const { workspace } = loaded;
-        const { dtc, dt_validate: dtValidate } = workspace.tools;
         const overlay = workspace.overlay.tree;
-        const output = build_validation_dts(overlay);
-
         const work_directory = session.state_dir;
         fs.mkdirSync(work_directory, { recursive: true });
-        const validation_json_path = workspace.bindings.processed_schema;
         const temporary_dts = path.join(work_directory, 'temp.dts');
-        const temporary_dtb = path.join(work_directory, 'temp.dtb');
-        const error_json = path.join(work_directory, 'error.json');
+        fs.writeFileSync(temporary_dts, build_validation_dts(overlay));
 
-        fs.writeFileSync(temporary_dts, output);
-
-        let dtc_error: string | undefined;
-        try {
-            execSync(`"${dtc}" -I dts -O dtb -o "${temporary_dtb}" "${temporary_dts}"`, { stdio: 'pipe' });
-        } catch (error: any) {
-            dtc_error = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
-        }
-        if (dtc_error !== undefined) { return tool_failure(dtc_error, `dtc error:\n${dtc_error}`); }
-
-        // Delete stale error.json so a dt-validate crash isn't hidden by an old file.
-        if (fs.existsSync(error_json)) { fs.unlinkSync(error_json); }
-
-        // dt-validate exits non-zero when there are validation errors — that is not a tool failure.
-        // We always read error.json; only fall back to stderr if the file wasn't written.
-        let tool_error: string | undefined;
-        try {
-            execSync(`"${dtValidate}" -s "${validation_json_path}" "${temporary_dtb}" --json-output "${error_json}"`, { stdio: 'pipe' });
-        } catch (error: any) {
-            const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
-            if (!fs.existsSync(error_json)) {
-                tool_error = stderr;
-            }
-        }
-        if (tool_error !== undefined) { return tool_failure(tool_error, `dt-validate error:\n${tool_error}`); }
-
-        const diagnostics = read_dt_validate_diagnostics(error_json);
-        if ('error' in diagnostics) { return tool_failure(diagnostics.error, diagnostics.error); }
+        const diagnostics = check(workspace, temporary_dts, path.join(work_directory, 'temp.dtb'), path.join(work_directory, 'error.json'));
+        if (!Array.isArray(diagnostics)) { return diagnostics; }
 
         // dt-validate checks each node on its own; sibling reg clashes are checked here.
-        const all = [...diagnostics, ...reg_diagnostics(overlay, reg_warnings(overlay))];
+        const reg = reg_diagnostics(overlay, reg_warnings(overlay));
+        if (flags.full !== true) {
+            const all = [...diagnostics, ...reg];
+            return answer(
+                () => parse_dt_validate_output(all),
+                () => format_validation_report(all, fragment_display_targets(overlay)).join("\n"),
+            );
+        }
+
+        const full = check_full(workspace, session, diagnostics);
+        if (!("kept" in full)) { return full; }
+        const all = [...diagnostics, ...full.kept, ...reg];
         return answer(
-            () => parse_dt_validate_output(all),
-            () => format_validation_report(all, fragment_display_targets(overlay)).join("\n"),
+            () => ({ ...parse_dt_validate_output(all), base_findings: full.base }),
+            () => [
+                ...format_validation_report(all, fragment_display_targets(overlay)),
+                ...(full.base > 0 ? [`${full.base} more finding(s) in the base devicetree`] : []),
+            ].join("\n"),
         );
     },
 });
+
+/**
+ * Compile `input` with dtc into `dtb` and run dt-validate on it into
+ * `error_json`: its diagnostics, or the tool failure to answer with.
+ */
+function check(workspace: Checked, input: string, dtb: string, error_json: string): DtValidateDiagnostic[] | Outcome<ValidationResponse> {
+    const { dtc, dt_validate } = workspace.tools;
+    let dtc_error: string | undefined;
+    try {
+        execSync(`"${dtc}" -I dts -O dtb -o "${dtb}" "${input}"`, { stdio: 'pipe' });
+    } catch (error: any) {
+        dtc_error = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
+    }
+    if (dtc_error !== undefined) { return tool_failure(dtc_error, `dtc error:\n${dtc_error}`); }
+
+    // Delete stale error.json so a dt-validate crash isn't hidden by an old file.
+    if (fs.existsSync(error_json)) { fs.unlinkSync(error_json); }
+
+    // dt-validate exits non-zero when there are validation errors — that is not a tool failure.
+    // We always read error.json; only fall back to stderr if the file wasn't written.
+    let tool_error: string | undefined;
+    try {
+        execSync(`"${dt_validate}" -s "${workspace.bindings.processed_schema}" "${dtb}" --json-output "${error_json}"`, { stdio: 'pipe' });
+    } catch (error: any) {
+        const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
+        if (!fs.existsSync(error_json)) {
+            tool_error = stderr;
+        }
+    }
+    if (tool_error !== undefined) { return tool_failure(tool_error, `dt-validate error:\n${tool_error}`); }
+
+    const diagnostics = read_dt_validate_diagnostics(error_json);
+    return 'error' in diagnostics ? tool_failure(diagnostics.error, diagnostics.error) : diagnostics;
+}
+
+/**
+ * `--full`: dt-validate on the base with the overlay applied. Its findings on
+ * what the overlay touches (`touched_by`) are kept, label-first, unless the
+ * overlay's own run already has them (same node, property and message); the
+ * others are counted as the base's.
+ */
+function check_full(workspace: Checked, session: Session, checked: DtValidateDiagnostic[]): { kept: DtValidateDiagnostic[]; base: number } | Outcome<ValidationResponse> {
+    const directory = session.state_dir;
+    const preprocessed = path.join(directory, "full.preprocessed.dts");
+    const problem = write_full_devicetree(workspace, path.join(directory, "full.dts"), preprocessed, FULL_EPILOGUE);
+    if (problem !== undefined) {
+        const message = `full devicetree not written: ${problem}`;
+        return tool_failure(message, message);
+    }
+    const diagnostics = check(workspace, preprocessed, path.join(directory, "full.dtb"), path.join(directory, "full-error.json"));
+    if (!Array.isArray(diagnostics)) { return diagnostics; }
+
+    const overlay = workspace.overlay.tree;
+    const touched = touched_by(overlay);
+    const labels = overlay.all_labels();
+    const seen = new Set(checked.map(d => finding_key(absolute_node(overlay, d.node ?? ""), d)));
+    const kept: DtValidateDiagnostic[] = [];
+    let base = 0;
+    for (const d of diagnostics) {
+        if (d.node === undefined || d.node === "" || !is_touched(touched, d.node)) { base++; continue; }
+        if (!seen.has(finding_key(d.node, d))) { kept.push({ ...d, display: display_path(d.node, labels) }); }
+    }
+    return { kept, base };
+}
+
+function finding_key(node: string, d: DtValidateDiagnostic): string {
+    return [node, (d.property_path ?? []).map(String).join("/"), d.message ?? ""].join("\n");
+}
+
+/** A validation-tree path (`/node<N>/…`) as the absolute path it stands for; any other path as it is. */
+function absolute_node(overlay: DeviceTreeOverlay, node: string): string {
+    const match = /^\/node(\d+)(.*)$/.exec(node);
+    const fragment = match === null ? undefined : overlay.get_fragments()[Number(match[1])];
+    const root = fragment === undefined ? undefined : overlay.get_fragment_root_path(fragment);
+    if (match === null || root === undefined) { return node; }
+    const rest = match[2] ?? "";
+    return root === "/" ? (rest === "" ? "/" : rest) : root + rest;
+}
 
 /**
  * Build the stand-in tree dt-validate checks: one `nodeN` per fragment holding
@@ -293,6 +371,8 @@ interface DtValidateDiagnostic {
     message?: string;
     note?: string;
     context?: unknown[];
+    /** How human output names the node, when not by `display_node` (a `--full` finding: label-first). */
+    display?: string;
 }
 
 export function read_dt_validate_diagnostics(error_json: string): DtValidateDiagnostic[] | { error: string } {
@@ -376,7 +456,7 @@ export function format_validation_report(diagnostics: DtValidateDiagnostic[], ta
 
     const grouped = new Map<string, DtValidateDiagnostic[]>();
     for (const d of [...errors, ...warnings]) {
-        const key = display_node(d.node!, targets);
+        const key = d.display ?? display_node(d.node!, targets);
         const group = grouped.get(key);
         if (group === undefined) { grouped.set(key, [d]); }
         else { group.push(d); }

@@ -497,16 +497,19 @@ analog-attach move imu1 spi1
 
 **Syntax**:
 ```bash
-analog-attach validate
+analog-attach validate [--full]
 ```
 
 Validates the overlay against device bindings using `dt-validate`, then checks enabled siblings for clashing `reg` (a taken SPI chip select or I2C address, overlapping MMIO ranges) and reports them as warnings on `reg`. Clashes only within the base tree are left out. Errors and warnings are grouped by fragment target in human mode. An empty result prints `No errors!`; otherwise the output ends with `<n> error(s), <m> warning(s)` (or `No errors! (<m> warning(s))`).
 
+Without `--full` only the nodes the overlay writes are checked: a property it sets on a base node (`status`, `pinctrl-0`, `cs-gpios` on `spi0`) is not. `validate --full` also checks the base devicetree with the overlay applied (as `build` writes it with `output` `full`, whatever `output` is), and reports its findings on the nodes the overlay adds and the base nodes it sets properties on, label-first (`spi0`). Such a base node brings its own findings too (the RPi 4's spi0 `dmas`). The base's other findings are only counted: `<n> more finding(s) in the base devicetree` (`--json`: `base_findings`). It runs dt-validate on the whole tree, so it takes a few seconds.
+
 ```bash
 analog-attach validate
+analog-attach validate --full
 ```
 
-`--json` gives `errors` and `warnings` arrays (each `{ kind, path, message }`, `path` a list of segments under the fragment, `["node0", "adi,ad7124-8@0", "reg"]`; dt-validate messages start with `.analog-attach/linux/temp.dtb:`); an empty `errors` array means validation passed, and warnings may still be present (including the `reg` clashes above).
+`--json` gives `errors` and `warnings` arrays (each `{ kind, path, message }`, `path` a list of segments under the fragment, `["node0", "adi,ad7124-8@0", "reg"]`; dt-validate messages start with `.analog-attach/linux/temp.dtb:`); an empty `errors` array means validation passed, and warnings may still be present (including the `reg` clashes above). The `--full` findings have absolute paths (`["soc", "spi@7e204000", "status"]`).
 
 **Output in human mode**:
 ```

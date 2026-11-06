@@ -90,7 +90,7 @@ list-kind       = %s"devices" [ B element ]                   ; [filter]
                 / %s"parent" B compatible                     ; linux
                 / %s"overlay" B compatible                    ; linux
 
-validate        = %s"validate"
+validate        = %s"validate" [ B %s"--full" ]   ; --full: linux
 build           = %s"build" *( B build-option )
 build-option    = %s"--clean"                   ; noos
 deploy          = %s"deploy" *( B deploy-option )

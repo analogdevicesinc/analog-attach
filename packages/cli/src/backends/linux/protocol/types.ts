@@ -166,6 +166,8 @@ export interface ValidationError {
 export interface ValidationResponse {
     errors: ValidationError[];
     warnings: ValidationError[];
+    /** With `--full`: the merged tree's findings on what the overlay doesn't touch, left out. */
+    base_findings?: number;
 }
 
 export interface ListOverlayResponse extends CommonResponse {
