@@ -10,7 +10,7 @@ import {
     type UnresolvedReference,
 } from "attach-lib";
 
-import { answer, command, refuse, type ImportArguments } from "../../../../interface/backend-interface";
+import { answer, command, refuse, warned, type ImportArguments } from "../../../../interface/backend-interface";
 import { load_workspace } from "../../config/workspace";
 import { board_fit } from "../../board-fit";
 import { overlay_index, scan_overlay, type OverlayIndex } from "../../overlay-index";
@@ -45,19 +45,19 @@ is kept as it is (config workfile <file> switches back).`,
         const previous = session.settings.get("workfile");
 
         const found = locate_overlay(linux, name, session.cwd);
-        if (found.kind !== "found") { return refuse(lookup_failure(found, name, linux)); }
+        if (found.kind !== "found") { return refuse(lookup_failure(found, name, linux), { type: found.kind === "none" ? "not-found" : "ambiguous" }); }
         const source = found.file;
 
         const preprocessed = preprocess_overlay(source, workspace.settings.preprocess_command, linux, path.join(session.state_dir, "import.preprocessed.dts"));
-        if (!preprocessed.ok) { return refuse(preprocessed.error); }
+        if (!preprocessed.ok) { return refuse(preprocessed.error, { type: "tool-failed" }); }
         const { text } = preprocessed;
         const imported = import_overlay(text, workspace.base.tree);
-        if (typeof imported === "string") { return refuse(`${source} does not parse after preprocessing: ${imported}`); }
+        if (typeof imported === "string") { return refuse(`${source} does not parse after preprocessing: ${imported}`, { type: "parse-error" }); }
 
         const workfile = workfile_from_overlay(next_workfile_name(overlay_stem(source), session.cwd), imported.tree, workspace.settings.overlay_syntax, session.cwd);
         workfile.save();
         const written = await session.settings.set("workfile", workfile.path);
-        if (!written.ok) { return refuse(`Imported ${source} into ${workfile.path}, but it is not the configured workfile: ${written.message}`); }
+        if (!written.ok) { return refuse(`Imported ${source} into ${workfile.path}, but it is not the configured workfile: ${written.message}`, { type: "write-failed" }); }
 
         const root = workspace.base.tree.node_at("/");
         const board = scan_overlay(text).board ?? [];
@@ -68,17 +68,16 @@ is kept as it is (config workfile <file> switches back).`,
         const [message = "", ...switched] = import_message(shown, workfile.path, previous);
 
         // The fit and the unresolved targets and references are warnings, on stderr in every mode (and in the JSON).
-        const warning_lines = [
-            ...(fit.fit === "incompatible" ? board_lines(board, base_board) : []),
-            ...import_warning_lines(warnings, imported.tree.all_labels()),
-        ];
+        const board_warning = fit.fit === "incompatible" ? board_lines(board, base_board) : [];
+        const reference_warning = import_warning_lines(warnings, imported.tree.all_labels());
+        const warning_lines = [...board_warning, ...reference_warning];
         for (const line of warning_lines) { session.warn(line); }
 
         return answer<ImportResponse>(
             {
                 ok: true,
                 message,
-                severity: warning_lines.length > 0 ? "warn" : "info",
+                ...warned(board_warning.length > 0 ? "unresolved" : (reference_warning.length > 0 ? "bad-reference" : undefined)),
                 path: workfile.path,
                 source,
                 ...(previous === undefined ? {} : { replaced: previous }),

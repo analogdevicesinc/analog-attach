@@ -92,7 +92,8 @@ asks, for example a compatible with no binding, or a parent that doesn't
 exist.
 
 **COM-040** While in JSON mode, when a command refuses, the CLI shall respond
-`{"ok": false, "message": <why>, "severity": "error"}` and exit with status 0.
+`{"ok": false, "message": <why>, "severity": "error", "error_type": <type>}`
+(COM-051) and exit with status 0.
 
 **COM-041** While in human mode, when a command refuses, the CLI shall write
 the reason to standard output and exit with status 0. (Open issue C-1.)
@@ -138,11 +139,40 @@ READ-012). (Exceptions in §2.)
 `severity` is `"warn"` (COM-050) other than `validate`'s, and each finding of
 `validate` shall carry `error_type`: one of the fixed list of error types
 (GEN-17; the Error types tab of the requirements workbook,
-`src/interface/error-types.ts`), the same in every ecosystem, so that scripts and the UI can tell the cases apart; the
-message says which case it is. Where the backend is linux, the field is
-optional until its backend sets it; where it is noos, and for the front end's
-own commands (`config`, `skill`, `completion`, the setup run), it is always
-there. Input errors (§3) don't carry it yet: they are text on standard error.
+`src/interface/error-types.ts`), the same in every ecosystem, so that
+scripts and the UI can tell the cases apart; the message says which case it
+is. A success whose `severity` is `"info"` has none. Input errors (§3) don't
+carry it yet: they are text on standard error.
+
+**COM-052** Where the backend is linux, the error type shall be the one this
+table gives for the case; a success that warned more than once carries the
+type of its first warning.
+
+| Case | `error_type` |
+|---|---|
+| A node, property, parent, overlay, example or template node named that isn't there | `not-found` |
+| Several overlays have the name given (`import`, `add --template overlay:`) | `ambiguous` |
+| A compatible with no binding (`add`; `list parent`, a warning; `list property` / `list value` on a node without one) | `unknown-device-type` |
+| A node of the base devicetree, or the root, that `delete`, `move` or `rename` can't change | `read-only` |
+| A node name or label that isn't allowed | `invalid-name` |
+| A name or label already taken under the parent, or a `reg` update whose new name is | `name-taken` |
+| A value `update` can't build (a value for a flag, an unknown word, a value for a child node) | `invalid-value` |
+| A `move` the binding doesn't allow, or into the node itself; an update that would leave an overlay that doesn't parse | `edit-refused` |
+| `--name` with a copied template | `conflicting-flags` |
+| dtc, dt-validate, dt-mk-schema, `preprocess-command`, `build-command`, `deploy-command` or scp that fails; an example that doesn't compile | `tool-failed` |
+| An overlay that doesn't parse after preprocessing | `parse-error` |
+| A full devicetree whose fragment targets are in neither the base nor the overlay (`build`, `validate --full`) | `bad-reference` |
+| A workfile `init` or `import` can't create or configure | `write-failed` |
+| A binding a node's data can't narrow (`list property <path> <property>`) | `definition-error` |
+| The `delete` preview | `needs-force` |
+| A property `update` writes that the binding doesn't define, or without one | `unchecked` |
+| A value, count or interrupt-parent's cell count the binding doesn't allow (`update`, a warning) | `out-of-range` |
+| An address clash (`update … reg`, `rename`) | `resource-conflict` |
+| An overlay `import` takes for another board | `unresolved` |
+| Targets or references an imported overlay leaves unresolved | `bad-reference` |
+| A configuration problem (COM-071) | its first problem's (COM-071) |
+
+`validate`'s findings carry theirs per `validate.md` VALIDATE-029.
 
 ## 6. Cancellation
 
@@ -193,12 +223,20 @@ resources that don't depend on each other.
 CLI shall refuse (COM-040) with status 0: one line on standard output
 conforming to `04-protocol/common.schema.json#/$defs/config-refusal`, with
 `ok` false, `message` the problems' messages joined by `; `, `severity`
-`error`, and `errors` and `hints`.
+`error`, `error_type` the first problem's, and `errors` and `hints`.
 
-`errors` has one entry per problem (its `field`, `kind`, `message` and, when
-it has one, `description`), and `hints` has the distinct hints of those
-problems in the order the problems were found, the setup hints of several
-fields merged into one (§8.1).
+`errors` has one entry per problem (its `field`, `kind`, `error_type`,
+`message` and, when it has one, `description`), and `hints` has the distinct
+hints of those problems in the order the problems were found, the setup hints
+of several fields merged into one (§8.1). A problem's `error_type` is
+`missing-setting` for a setting with no value; `workfile-missing` for a
+workfile that doesn't exist; `invalid-source` for a `linux` that isn't a Linux
+tree; `parse-error` for a base or workfile that doesn't parse; `tool-missing`
+for a `preprocess-command`, scp or sshpass not on PATH; `tool-failed` for a
+base whose preprocessing fails; `install-incomplete` for the bundled dt-schema
+or tools missing; `cache-missing` for a binding cache missing (§8.4);
+`not-generated` for a `deploy` whose build output is missing; and
+`invalid-setting` for any other value a setting can't take.
 
 **COM-072** While in human mode, if workspace loading finds exactly one
 problem, then the CLI shall write `<message>` (or `<message> — <description>`
@@ -728,7 +766,7 @@ refusal (COM-511), as a Linux configuration error is (COM-071, COM-072), but
 only the first problem is reported, and without `errors`, `hints` or the
 field's hint. `analog-attach --json read` with only `backend` and `capi-path`
 set gives `{"ok":false,"message":"No workfile at '…/workfile.json'.
-…","severity":"error"}`. A fix would be to load the no-OS settings and
+…","severity":"error","error_type":"workfile-missing"}`. A fix would be to load the no-OS settings and
 workfile through the workspace loader, as the Linux backend does.
 
 **C-13. A generic fallback can map to an arbitrary binding.** A compatible

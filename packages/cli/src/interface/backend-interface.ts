@@ -74,6 +74,14 @@ export function answer<R>(response: Lazy<R>, text: string | Render): Outcome<R> 
     return { kind: "answer", response, text: typeof text === "string" ? () => text : text };
 }
 
+/**
+ * The severity of a success: `warn` with the first warning's type (GEN-17) when it warned,
+ * `info` otherwise.
+ */
+export function warned(warning: ErrorType | undefined): Pick<CommonResponse, "severity" | "error_type"> {
+    return warning === undefined ? { severity: "info" } : { severity: "warn", error_type: warning };
+}
+
 /** What `read`, and `update` when it reads, say above the node or property (GEN-08). */
 export function read_header(message: string): CommonResponse {
     return { ok: true, message, severity: "info" };
@@ -93,12 +101,11 @@ export function validation_header(errors: number, warnings: number): CommonRespo
 
 /**
  * The command ran and says no: `ok: false`, severity `error` unless told, the message as the
- * text unless told, and `type` as the response's `error_type` (GEN-17). `type` is optional
- * while the Linux backend doesn't give one; the noos backend and the front end always do.
+ * text unless told, and `type` as the response's `error_type` (GEN-17).
  */
-export function refuse(message: string, options: { type?: ErrorType; severity?: Severity; text?: string | Render } = {}): Outcome<never> {
+export function refuse(message: string, options: { type: ErrorType; severity?: Severity; text?: string | Render }): Outcome<never> {
     const { type, severity = "error", text = message } = options;
-    const response = { ok: false as const, message, severity, ...(type === undefined ? {} : { error_type: type }) };
+    const response = { ok: false as const, message, severity, error_type: type };
     return { kind: "refused", response, text: typeof text === "string" ? () => text : text };
 }
 

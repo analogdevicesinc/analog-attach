@@ -404,14 +404,13 @@ checksum() {
 # Steps:
 #   1. Make an overlay with an ADXL345 on i2c1.
 #   2. Add an unknown compatible, with --json.
-#   3. Check it is refused (.ok false) and the result has a non-empty error type.
-# bats test_tags=req:GEN-17, gap, id:L0139
+#   3. Check it is refused (.ok false) with the error type unknown-device-type.
+# bats test_tags=req:GEN-17, id:L0139
 @test "an error carries a type from the fixed list" {
-	# Gap: a refusal has ok, message and severity only; there is no error type field.
 	with_accel
 	run_json add adi,nosuchdevice
 	assert_json '.ok' false
-	assert_json '(.type // .error_type // .kind // "") | length > 0' true
+	assert_json '.error_type' unknown-device-type
 }
 
 # --- GEN-09: exit status -----------------------------------------------------------------

@@ -75,6 +75,7 @@ Help users locate appropriate `.dts` files when needed — they're typically in 
 - `--json` (anywhere on the command line) prints one compact JSON line on stdout.
 - Notes and warnings go to **stderr in every mode**, never into the JSON: `Parent: spi (use --parent …)`, reg clashes, value-count warnings, a property the binding doesn't define, `import`'s board and reference warnings. Read both streams.
 - A refusal (node not found, a duplicate, an unknown word in a value) exits 0, with `ok: false` under `--json`. Check `ok`, not the exit code.
+- A refusal, and an answer with `severity: "warn"`, carry `error_type`: which case it is (`not-found`, `name-taken`, `read-only`, `invalid-value`, `tool-failed`, `missing-setting`, `cache-missing`, `unchecked`, `out-of-range`, `resource-conflict`, `needs-force`, …). Act on it rather than on the message's wording: `cache-missing` → `config --reload`, `needs-force` → re-run with `--force` once the user agrees, `missing-setting` → set what `hints` names.
 - Exit code 2 is an input error, its message on stderr, in both modes:
   - a malformed path or property (`empty segment in path: spi0//x`)
   - a missing argument (`Missing: path`) or an unknown flag
@@ -509,7 +510,7 @@ analog-attach validate
 analog-attach validate --full
 ```
 
-`--json` gives `ok: true` whatever it finds, `severity` the worst finding (`error`, `warn` or `info`), and `errors` and `warnings` arrays (each `{ kind, path, message }`, `path` a list of segments under the fragment, `["node0", "adi,ad7124-8@0", "reg"]`; dt-validate messages start with `.analog-attach/linux/temp.dtb:`); an empty `errors` array means validation passed, and warnings may still be present (including the `reg` clashes above). The `--full` findings have absolute paths (`["soc", "spi@7e204000", "status"]`). A dtc or dt-validate failure is a refusal instead (`ok: false`, `error_type: "tool-failed"`).
+`--json` gives `ok: true` whatever it finds, `severity` the worst finding (`error`, `warn` or `info`), and `errors` and `warnings` arrays (each `{ kind, path, message, error_type }`, `error_type` being `missing-required`, `out-of-range` or, for a reg clash, `resource-conflict`; `path` a list of segments under the fragment, `["node0", "adi,ad7124-8@0", "reg"]`; dt-validate messages start with `.analog-attach/linux/temp.dtb:`); an empty `errors` array means validation passed, and warnings may still be present (including the `reg` clashes above). The `--full` findings have absolute paths (`["soc", "spi@7e204000", "status"]`). A dtc or dt-validate failure is a refusal instead (`ok: false`, `error_type: "tool-failed"`).
 
 **Output in human mode**:
 ```

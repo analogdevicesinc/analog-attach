@@ -52,7 +52,7 @@ node: two spaces and its path from its fragment's target, segments joined by
 
 **DELETE-012** While in JSON mode, the preview of DELETE-010 shall be a
 `DeletePreview` (`04-protocol/delete.schema.json#/$defs/linux-subtree-preview`): `ok` `true`, `severity`
-`"warn"`, `message` as in DELETE-011, `node_count`, `property_count`, and
+`"warn"`, `error_type` `needs-force`, `message` as in DELETE-011, `node_count`, `property_count`, and
 `paths`, an array of the counted nodes' paths from their fragment's target
 (`[["adi,ad7124-8@2"], ["adi,ad7124-8@2", "channel@0"]]`).
 
@@ -98,7 +98,7 @@ from the node, starting with `<key>` (`paths`, starting with `[<key>]`).
 added node, refers to the node or to one of its descendants (`<&label …>`,
 `= &label`, `&{/path}`), and `--force` isn't given, the CLI shall write
 nothing and answer with a preview, as the noos backend does (DELETE-501):
-`severity` `warn`, `message` `'<path>' is referenced by <n> propert(y|ies);
+`severity` `warn`, `error_type` `needs-force`, `message` `'<path>' is referenced by <n> propert(y|ies);
 deleting it would clear (that reference|those references). Re-run with
 --force.`, `node_count` the node and its descendants, `property_count` `<n>`,
 and `paths` `[<path>]` followed by `[<owner>, <property>]` per referencing
@@ -272,7 +272,7 @@ Deleted adc from /work/ad7124-8.dtso
 
 ```
 $ analog-attach --json delete adc
-{"ok":true,"message":"Would delete 2 node(s) and 7 property(ies)","severity":"warn",
+{"ok":true,"message":"Would delete 2 node(s) and 7 property(ies)","severity":"warn","error_type":"needs-force",
  "node_count":2,"property_count":7,"paths":[["adi,ad7124-8@2"],["adi,ad7124-8@2","channel@0"]]}
 $ analog-attach --json delete adc --force
 {"ok":true,"message":"Deleted adc","severity":"info"}
@@ -296,7 +296,7 @@ testpart_spi_dev: referenced by
 Nothing was changed. Re-run with --force to delete the node and clear those references.
 $ analog-attach --json delete testpart_spi_dev
 {"ok":true,"message":"'testpart_spi_dev' is referenced by 1 property; deleting it would clear that reference. Re-run with --force.",
- "severity":"warn","node_count":1,"property_count":1,"paths":[["testpart_spi_dev"],["testpart_ip","comm_init"]]}
+ "severity":"warn","error_type":"needs-force","node_count":1,"property_count":1,"paths":[["testpart_spi_dev"],["testpart_ip","comm_init"]]}
 $ analog-attach --json delete testpart_spi_dev --force
 {"ok":true,"message":"Deleted 'testpart_spi_dev' and cleared 1 reference to it","severity":"info"}
 ```

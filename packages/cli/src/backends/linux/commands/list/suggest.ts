@@ -24,6 +24,7 @@ import {
     type ValueSuggestion,
 } from "attach-lib";
 
+import type { ErrorType } from "../../../../interface/error-types";
 import type { Bindings } from "../../config/workspace";
 import type { ConfigResult } from "../../config/settings";
 import { format_suggestion, build_raw_property, cell_bits, shape_hint, parse_value } from "../../property-value";
@@ -310,13 +311,13 @@ export function property_info(
     binding: NodeBinding,
     binding_node: DTNode,
     property_name: string,
-): { ok: true; info: PropertyInfo } | { ok: false; message: string } {
+): { ok: true; info: PropertyInfo } | { ok: false; message: string; type: ErrorType } {
     const result = binding.narrow_and_populate(binding_node);
     if (result === undefined) {
         const message = binding.origin.kind === "compatible"
             ? `Failed to narrow binding for ${binding.origin.compatible}`
             : `Failed to validate against pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
-        return { ok: false, message };
+        return { ok: false, message, type: "definition-error" };
     }
 
     const property_definition = find_property_definition(binding, result.properties, property_name);
@@ -324,7 +325,7 @@ export function property_info(
         const origin_desc = binding.origin.kind === "compatible"
             ? `${binding.origin.compatible} binding`
             : `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
-        return { ok: false, message: `Property ${property_name} not found in ${origin_desc}` };
+        return { ok: false, message: `Property ${property_name} not found in ${origin_desc}`, type: "not-found" };
     }
 
     const constraints = type_constraints(property_definition.value);

@@ -214,7 +214,7 @@ Run 'build' first.
 
 ```
 $ analog-attach --json deploy
-{"ok":false,"message":"Deploy failed (scp):\nssh: Could not resolve hostname host.invalid: Name or service not known\r\nscp: Connection closed\r\n","severity":"error"}
+{"ok":false,"message":"Deploy failed (scp):\nssh: Could not resolve hostname host.invalid: Name or service not known\r\nscp: Connection closed\r\n","severity":"error","error_type":"tool-failed"}
 ```
 
 Where the backend is noos (a stand-in capi whose `flash` target echoes the

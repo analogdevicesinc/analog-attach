@@ -162,7 +162,8 @@ VALIDATE-046).
 <m> warning(s)", "severity": <severity>, "errors": [...], "warnings": [...]
 }`, `<severity>` being `"error"` when there are errors, else `"warn"` when
 there are warnings, else `"info"` (`02-common.md` COM-050), and each entry `{
-"kind": "generic", "path": <segments>, "message": <text> }`.
+"kind": "generic", "path": <segments>, "message": <text>, "error_type":
+<type> }` (VALIDATE-029).
 A diagnostic of level `warning` goes to `warnings`, any other to `errors`, both
 in the order of VALIDATE-020.
 
@@ -171,6 +172,12 @@ node path split at `/` without empty segments, followed by its property path
 (`["node0", "adc@5", "reg"]`). An entry's `message` shall be dt-validate's
 `formatted` text when there is one (for an address warning with a hint,
 `<message>; <hint>`), and its `message` otherwise.
+
+**VALIDATE-029** An entry's `error_type` (`02-common.md` COM-051) shall be
+`resource-conflict` for an address warning (§7); `missing-required` for a
+dt-validate diagnostic whose message ends `is a required property` or has `is
+a dependency of`; and `out-of-range` for every other diagnostic (a type, a
+range, a count, a property the binding doesn't define).
 
 ### 6.2 Human output
 
@@ -332,8 +339,10 @@ error per node of the loop), a node that references itself, each property
 to a node the workfile doesn't have or of the wrong schema or capability, a
 union member), and the chip selects of the SPI devices. It shall respond
 `{ "ok": true, "message": …, "severity": …, "errors": [...], "warnings": [...]
-}` as VALIDATE-021 has it (`04-protocol/validate.schema.json#/$defs/noos`), each entry `{ "kind":
-"generic", "path": <segments>, "message": <text> }`, `path` the node, the
+}` as VALIDATE-021 has it (`04-protocol/validate.schema.json#/$defs/noos`),
+each entry `{ "kind": "generic", "path": <segments>, "message": <text>,
+"error_type": <type> }`, `<type>` the one attach-no-os-lib gives the
+finding, `path` the node, the
 property and, in a union, the member (`["tp3_ip", "comm_init", "spi_dev"]`),
 in that order. Nothing is run and nothing is written.
 
@@ -462,7 +471,8 @@ i2c_arm/temp@53:
 ```
 $ analog-attach --json validate
 {"ok":true,"message":"0 error(s), 1 warning(s)","severity":"warn","errors":[],
- "warnings":[{"kind":"generic","path":["node0","u@48","reg"],"message":"address 0x48 is already used by t@48"}]}
+ "warnings":[{"kind":"generic","path":["node0","u@48","reg"],"message":"address 0x48 is already used by t@48",
+ "error_type":"resource-conflict"}]}
 ```
 
 (Wrapped here; the CLI writes one line.)
@@ -508,7 +518,8 @@ $ analog-attach validate
 ```
 $ analog-attach --json validate
 {"ok":true,"message":"0 error(s), 1 warning(s)","severity":"warn","errors":[],
- "warnings":[{"kind":"generic","path":["testpart_cfg","calib"],"message":"Required property has no value; the driver may need it"}]}
+ "warnings":[{"kind":"generic","path":["testpart_cfg","calib"],"message":"Required property has no value; the driver may need it",
+ "error_type":"missing-required"}]}
 ```
 
 (Wrapped here; the CLI writes one line.)

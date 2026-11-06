@@ -2,6 +2,7 @@ import os from "node:os";
 import path from "node:path";
 
 import type { SettingSpec, SettingsView } from "../../../interface/backend-interface";
+import type { ErrorType } from "../../../interface/error-types";
 
 // The Linux backend's settings. The front end stores them (JSON, local over global) and
 // checks them against these specs; the backend reads them through `session.settings`
@@ -233,6 +234,8 @@ export interface ConfigError {
     /** Setting key (e.g. `linux`, `workfile`) or resource name (e.g. `dt-schema`). */
     field: string;
     kind: "missing" | "invalid" | "unknown";
+    /** Which kind of error it is (GEN-17). */
+    error_type: ErrorType;
     message: string;
     description?: string;
     hint?: string;
@@ -240,13 +243,14 @@ export interface ConfigError {
 
 export type ConfigResult<T> = { ok: true; value: T } | { ok: false; errors: ConfigError[] };
 
-/** An `invalid` error for a setting, carrying its description and hint. */
-export function invalid_setting(key: SettingKey, problem: string, program: string = DEFAULT_PROGRAM): ConfigError {
+/** An `invalid` error for a setting, carrying its description and hint; `type` says which kind (GEN-17). */
+export function invalid_setting(key: SettingKey, problem: string, program: string = DEFAULT_PROGRAM, type: ErrorType = "invalid-setting"): ConfigError {
     const description = setting_spec(key)?.description;
     const hint = setting_hint(key, program);
     return {
         field: key,
         kind: "invalid",
+        error_type: type,
         message: `${key}: ${problem}`,
         ...(description === undefined ? {} : { description }),
         ...(hint === undefined ? {} : { hint }),
@@ -309,7 +313,7 @@ if (import.meta.vitest) {
 
     test("invalid_setting - the key, the problem, the description and the hint", () => {
         expect(invalid_setting("workfile", "x does not parse", "aa")).toEqual({
-            field: "workfile", kind: "invalid", message: "workfile: x does not parse",
+            field: "workfile", kind: "invalid", error_type: "invalid-setting", message: "workfile: x does not parse",
             description: "Path to the working DTSO overlay file (workfile)",
             hint: "Run 'aa init' to create it, or 'aa config workfile <name>' to use another.",
         });

@@ -39,7 +39,7 @@ export const move: ExtraCommand<Record<never, never>, CommonResponse> = {
             const mismatch = allowed === undefined ? undefined : wrong_parent(allowed, planned.destination_path);
             // A wrong parent is refused. To make it a warning instead: session.warn(the message) and go on.
             if (mismatch !== undefined) {
-                return refuse(`Cannot move ${path_argument} under ${destination}: ${mismatch.compatible} goes under ${mismatch.parents.join(", ")} (see: ${session.program} list parent ${mismatch.compatible})`);
+                return refuse(`Cannot move ${path_argument} under ${destination}: ${mismatch.compatible} goes under ${mismatch.parents.join(", ")} (see: ${session.program} list parent ${mismatch.compatible})`, { type: "edit-refused" });
             }
         }
         const result = typeof planned === "string" ? planned : apply_move(overlay, planned);
@@ -48,19 +48,19 @@ export const move: ExtraCommand<Record<never, never>, CommonResponse> = {
                 workspace.overlay.save();
                 return answer({ ok: true, message: `Moved ${path_argument} to ${destination}`, severity: "info" }, `Moved ${path_argument} to ${destination} in ${input}`);
             }
-            case "not-found": { return refuse(not_found_message(path_argument, overlay, base)); }
+            case "not-found": { return refuse(not_found_message(path_argument, overlay, base), { type: "not-found" }); }
             case "in-base": {
-                return refuse(`${path_argument} is part of the base device tree (${devicetree}), not this overlay; move only applies to overlay-added nodes`);
+                return refuse(`${path_argument} is part of the base device tree (${devicetree}), not this overlay; move only applies to overlay-added nodes`, { type: "read-only" });
             }
-            case "is-root": { return refuse("Cannot move the root node"); }
+            case "is-root": { return refuse("Cannot move the root node", { type: "read-only" }); }
             case "parent-not-found": {
-                return refuse(`Parent node ${destination} not found`, { text: `Couldn't find parent node ${destination} in ${devicetree} or ${input}` });
+                return refuse(`Parent node ${destination} not found`, { type: "not-found", text: `Couldn't find parent node ${destination} in ${devicetree} or ${input}` });
             }
-            case "into-self": { return refuse(`Cannot move ${path_argument} into itself or one of its descendants`); }
+            case "into-self": { return refuse(`Cannot move ${path_argument} into itself or one of its descendants`, { type: "edit-refused" }); }
             case "conflict": {
                 const found = overlay.find_node(resolve_node_identifier(path_argument, overlay));
                 const node_key = found === undefined ? path_argument : get_full_node_name(found.node);
-                return refuse(`${destination} already has a child named ${node_key}`);
+                return refuse(`${destination} already has a child named ${node_key}`, { type: "name-taken" });
             }
         }
     },

@@ -13,7 +13,7 @@ import { answer, cancelled, input_error, PromptCancelled, refuse, type Interacti
 import type { SetupResponse } from "../../../../interface/backend-responses";
 import { ensure_caches, type EnsureResult, type StartProgress } from "../../config/rebuild";
 import { read_settings, type ConfigResult, type Settings } from "../../config/settings";
-import { format_config_errors, linux_tree_problem, workspace_context, type WorkspaceContext } from "../../config/workspace";
+import { config_error_type, format_config_errors, linux_tree_problem, workspace_context, type WorkspaceContext } from "../../config/workspace";
 import { step_context, step_linux, step_overlay, type SetupPlace } from "../../setup";
 import { creation_problem } from "../../workfile";
 import { format_summary, type Summary } from "../init/command";
@@ -148,8 +148,10 @@ export function create_setup(options: SetupOptions = {}): (session: InteractiveS
         const ensure = options.ensure ?? ensure_caches;
         const ensured = await ensure(read_settings(session.settings), workspace_context(session), label => session.progress(label));
         if (!ensured.ok || !ensured.value.ok) {
-            const reason = ensured.ok ? ensured.value.message : format_config_errors(ensured.errors, session.program).human;
-            return refuse(`${reason}\nFix the problem, then run '${session.program} config --reload' to build the binding caches and '${session.program} init' to create the workfile.`);
+            const { reason, type } = ensured.ok
+                ? { reason: ensured.value.message, type: "tool-failed" as const }
+                : { reason: format_config_errors(ensured.errors, session.program).human, type: config_error_type(ensured.errors) };
+            return refuse(`${reason}\nFix the problem, then run '${session.program} config --reload' to build the binding caches and '${session.program} init' to create the workfile.`, { type });
         }
         const indexed = ensured.value.rebuilt;
         // After the cache build's progress line.

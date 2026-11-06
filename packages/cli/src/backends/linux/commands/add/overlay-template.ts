@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { DeviceTreeOverlay, get_full_node_name, type DeviceTree, type DTNode } from "attach-lib";
 
+import type { ErrorType } from "../../../../interface/error-types";
 import type { Settings } from "../../config/settings";
 import { board_fit } from "../../board-fit";
 import { scan_overlay } from "../../overlay-index";
@@ -88,7 +89,7 @@ export type OverlayTemplate =
         /** Lines about the overlay being for another board. */
         board: string[];
     }
-    | { status: "failed"; message: string };
+    | { status: "failed"; message: string; type: ErrorType };
 
 /** Find the overlay, preprocess and parse it against the base, and pick the device's node in it. */
 export function load_overlay_template(
@@ -101,17 +102,17 @@ export function load_overlay_template(
     { cwd, state_dir }: { cwd: string; state_dir: string },
 ): OverlayTemplate {
     const located = locate_overlay(linux, name, cwd);
-    if (located.kind !== "found") { return { status: "failed", message: lookup_failure(located, name, linux) }; }
+    if (located.kind !== "found") { return { status: "failed", message: lookup_failure(located, name, linux), type: located.kind === "none" ? "not-found" : "ambiguous" }; }
     const source = located.file;
     const shown = path.relative(linux, source).startsWith("..") ? source : path.relative(linux, source);
 
     const preprocessed = preprocess_overlay(source, settings.preprocess_command, linux, path.join(state_dir, "overlay-template.preprocessed.dts"));
-    if (!preprocessed.ok) { return { status: "failed", message: preprocessed.error }; }
+    if (!preprocessed.ok) { return { status: "failed", message: preprocessed.error, type: "tool-failed" }; }
     const tree = DeviceTreeOverlay.new_from_string(preprocessed.text, base);
-    if (typeof tree === "string") { return { status: "failed", message: `${source} does not parse after preprocessing: ${tree}` }; }
+    if (typeof tree === "string") { return { status: "failed", message: `${source} does not parse after preprocessing: ${tree}`, type: "parse-error" }; }
 
     const [match, ...rest] = find_overlay_nodes(tree, belongs);
-    if (match === undefined) { return { status: "failed", message: `${shown} has no node for ${compatible}` }; }
+    if (match === undefined) { return { status: "failed", message: `${shown} has no node for ${compatible}`, type: "not-found" }; }
 
     const root = base.node_at("/");
     const overlay_board = scan_overlay(preprocessed.text).board ?? [];
@@ -264,12 +265,12 @@ if (import.meta.vitest) {
             expect(load_overlay_template(file, "adi,ad7124-8", belongs, settings, linux, base(), { cwd, state_dir: path.join(cwd, ".analog-attach", "linux") }))
                 .toMatchObject({ status: "found", shown: file, place: "spi7", parent: undefined, others: [], board: [] });
             expect(load_overlay_template(file, "adi,adxl345", c => c === "adi,adxl345", settings, linux, base(), { cwd, state_dir: path.join(cwd, ".analog-attach", "linux") }))
-                .toEqual({ status: "failed", message: `${file} has no node for adi,adxl345` });
+                .toEqual({ status: "failed", message: `${file} has no node for adi,adxl345`, type: "not-found" });
             expect(load_overlay_template("nope", "adi,ad7124-8", belongs, settings, linux, base(), { cwd, state_dir: path.join(cwd, ".analog-attach", "linux") }))
-                .toEqual({ status: "failed", message: `No overlay named nope in ${linux} (list overlay <compatible> finds them), and no such file` });
+                .toEqual({ status: "failed", message: `No overlay named nope in ${linux} (list overlay <compatible> finds them), and no such file`, type: "not-found" });
             fs.writeFileSync(file, "/dts-v1/;\n/plugin/;\n&spi7 { adc@0 { ");
             expect(load_overlay_template(file, "adi,ad7124-8", belongs, settings, linux, base(), { cwd, state_dir: path.join(cwd, ".analog-attach", "linux") }))
-                .toMatchObject({ status: "failed", message: expect.stringContaining("does not parse after preprocessing") });
+                .toMatchObject({ status: "failed", message: expect.stringContaining("does not parse after preprocessing"), type: "parse-error" });
         } finally { done(); }
     });
 

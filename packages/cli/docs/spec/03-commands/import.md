@@ -162,6 +162,7 @@ conforming to `04-protocol/import.schema.json`:
 |---|---|
 | `message` | Line 1 of IMPORT-050 |
 | `severity` | `warn` when the fit is `incompatible` or IMPORT-041 or IMPORT-042 found something, else `info` |
+| `error_type` | With `warn`: `unresolved` when the fit is `incompatible`, else `bad-reference` (`02-common.md` COM-052) |
 | `path` | The new workfile, absolute |
 | `source` | The imported file, absolute |
 | `replaced` | The workfile configured before, when there was one |
@@ -253,7 +254,7 @@ The configured workfile is now /work/mine.dtso (was /work/rpi-ad7124-8-all-diff.
 
 ```
 $ analog-attach --json import ./other-overlay.dts
-{"ok":true,"message":"Imported /work/other-overlay.dts into /work/other.dtso","severity":"warn",
+{"ok":true,"message":"Imported /work/other-overlay.dts into /work/other.dtso","severity":"warn","error_type":"unresolved",
  "path":"/work/other.dtso","source":"/work/other-overlay.dts","replaced":"/work/mine.dtso",
  "fit":"incompatible","reason":"overlay: xlnx,zynqmp; base: raspberrypi,4-model-b, brcm,bcm2711",
  "unresolved_targets":[],"unresolved":[]}
@@ -261,7 +262,7 @@ $ analog-attach --json import ./other-overlay.dts
 
 ```
 $ analog-attach --json import nope
-{"ok":false,"message":"No overlay named nope in /home/u/linux (list overlay <compatible> finds them), and no such file","severity":"error"}
+{"ok":false,"message":"No overlay named nope in /home/u/linux (list overlay <compatible> finds them), and no such file","severity":"error","error_type":"not-found"}
 ```
 
 Where the backend is noos:
@@ -271,5 +272,5 @@ $ analog-attach import ../eval-workfile.json
 Imported a workfile for board testboard (platform testsoc), 5 nodes; the workfile is valid
   /home/u/eval-workfile.json -> /home/u/proj/workfile.json
 $ analog-attach --json import ../bad.json
-{"ok":false,"message":"Cannot import '/home/u/bad.json': Unknown ruleset 'nope_schema': no module in the configured roots defines it","severity":"error"}
+{"ok":false,"message":"Cannot import '/home/u/bad.json': Unknown ruleset 'nope_schema': no module in the configured roots defines it","severity":"error","error_type":"not-found"}
 ```

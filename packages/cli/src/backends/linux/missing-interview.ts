@@ -239,11 +239,11 @@ if (import.meta.vitest) {
     const irq_types: Types = { kind: "enum", options: [{ value: "IRQ_TYPE_NONE" }, { value: "IRQ_TYPE_EDGE_RISING" }] };
 
     test("fill_lines — what was set and why, the rename, or what refused it", () => {
-        expect(fill_lines("reg = <0x2a>", "from example 1", { kind: "set", message: "Set reg on acc", warned: false }, "adi,adxl345@2a"))
+        expect(fill_lines("reg = <0x2a>", "from example 1", { kind: "set", message: "Set reg on acc" }, "adi,adxl345@2a"))
             .toEqual(["Set reg = <0x2a> (from example 1); renamed to adi,adxl345@2a"]);
-        expect(fill_lines("spi-cpol", "a flag the binding requires", { kind: "set", message: "m", detail: "Set interrupt-parent", warned: false }))
+        expect(fill_lines("spi-cpol", "a flag the binding requires", { kind: "set", message: "m", detail: "Set interrupt-parent" }))
             .toEqual(["Set spi-cpol (a flag the binding requires)", "Set interrupt-parent"]);
-        expect(fill_lines("reg = <0x2a>", "from example 1", { kind: "error", message: "reg update would create a naming conflict; not written" }))
+        expect(fill_lines("reg = <0x2a>", "from example 1", { kind: "error", message: "reg update would create a naming conflict; not written", type: "name-taken" }))
             .toEqual(["Couldn't set reg = <0x2a> (from example 1): reg update would create a naming conflict; not written"]);
     });
 

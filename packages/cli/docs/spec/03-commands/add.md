@@ -894,7 +894,7 @@ $ analog-attach --json add test_gpio_pin
 
 ```
 $ analog-attach --json add dualpart
-{"ok":false,"message":"Driver 'dualpart' can be added as test_adc or test_dac (test_adc, test_dac). Pass --as test_adc or --as test_dac, or --as test_adc,test_dac for all of them on one chip","severity":"error"}
+{"ok":false,"message":"Driver 'dualpart' can be added as test_adc or test_dac (test_adc, test_dac). Pass --as test_adc or --as test_dac, or --as test_adc,test_dac for all of them on one chip","severity":"error","error_type":"ambiguous"}
 $ analog-attach add test_adc --as adc
 --as picks a driver's interface, and 'test_adc' is a schema, not a driver
                                                    (stderr, exit 2)

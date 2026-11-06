@@ -23,7 +23,8 @@ import {
 } from "attach-lib";
 import * as fs from "node:fs";
 
-import { answer, command, input_error, PromptCancelled, refuse, type FlagSpecs, type InteractiveSession, type UpdateArguments } from "../../../../interface/backend-interface";
+import { answer, command, input_error, PromptCancelled, refuse, warned, type FlagSpecs, type InteractiveSession, type UpdateArguments } from "../../../../interface/backend-interface";
+import type { ErrorType } from "../../../../interface/error-types";
 import { load_workspace, type Bindings, type Workfile } from "../../config/workspace";
 import { resolve_write_target, parse_node_path, not_found_message } from "../../utilities";
 import { child_unit_radix, find_property_definition, resolve_node_binding } from "../../binding-resolution";
@@ -154,7 +155,7 @@ Special cases:
         const { target_reference, found, is_base_target, binding_node, binding_parent, parent_name } =
             resolve_write_target(node_identifier, overlay, base_dt);
         if (found === undefined && !is_base_target) {
-            return refuse(not_found_message(node_identifier, overlay, base_dt));
+            return refuse(not_found_message(node_identifier, overlay, base_dt), { type: "not-found" });
         }
 
         const property_name = property_argument;
@@ -163,7 +164,7 @@ Special cases:
         if (property_name.includes("@")) {
             const node_path = found?.node_path ?? base_dt.locate(target_reference)?.path ?? node_identifier;
             if (overlay.effective_children(node_path).has(property_name)) {
-                if (values.length > 0) { return refuse(child_node_message(node_identifier, property_name)); }
+                if (values.length > 0) { return refuse(child_node_message(node_identifier, property_name), { type: "invalid-value" }); }
                 const child_identifier = node_identifier === "/" ? `/${property_name}` : `${node_identifier}/${property_name}`;
                 return read_target(session, overlay, { ok: true, value: bindings }, child_identifier, undefined, { quiet });
             }
@@ -174,7 +175,7 @@ Special cases:
                 if (!("error" in binding)) { child_patterns = binding.child_nodes.map(c => c.pattern); }
             }
             if (child_patterns.some(pattern => new RegExp(pattern).test(property_name))) {
-                if (values.length > 0) { return refuse(child_node_message(node_identifier, property_name)); }
+                if (values.length > 0) { return refuse(child_node_message(node_identifier, property_name), { type: "invalid-value" }); }
 
                 const child_path = create_child_node(overlay, node_path, property_name, child_patterns);
                 workspace.overlay.save();
@@ -217,12 +218,12 @@ Special cases:
                 return read_target(session, overlay, { ok: true, value: bindings }, node_identifier, property_name, { quiet });
             }
             case "error": {
-                return refuse(outcome.message);
+                return refuse(outcome.message, { type: outcome.type });
             }
             case "set": {
                 const message = outcome.detail === undefined ? outcome.message : `${outcome.message}; ${outcome.detail}`;
                 const text = outcome.detail === undefined ? outcome.message : `${outcome.message}\n${outcome.detail}`;
-                return answer<UpdateResponse>({ ok: true, message, severity: outcome.warned ? "warn" : "info" }, text);
+                return answer<UpdateResponse>({ ok: true, message, ...warned(outcome.warning) }, text);
             }
         }
     },
@@ -254,9 +255,9 @@ export function create_child_node(overlay: DeviceTreeOverlay, node_path: string,
 
 export type UpdateOutcome =
     | { kind: "read" }
-    | { kind: "error"; message: string }
-    /** `detail` is a second line (the implicit interrupt-parent); `warned` when a warning went to stderr. */
-    | { kind: "set"; message: string; detail?: string; warned: boolean };
+    | { kind: "error"; message: string; type: ErrorType }
+    /** `detail` is a second line (the implicit interrupt-parent); `warning` the type of the first warning that went to stderr. */
+    | { kind: "set"; message: string; detail?: string; warning?: ErrorType };
 
 /**
  * Set a property (or a flag) on a node and write the workfile, or say that
@@ -276,7 +277,7 @@ export async function apply_update(
     const { target_reference, found, is_base_target, binding_node, binding_parent, parent_name } =
         resolve_write_target(node_identifier, overlay, base_dt);
     if (found === undefined && !is_base_target) {
-        return { kind: "error", message: not_found_message(node_identifier, overlay, base_dt) };
+        return { kind: "error", message: not_found_message(node_identifier, overlay, base_dt), type: "not-found" };
     }
 
     // Reading or setting a flag says nothing about the schema.
@@ -296,7 +297,7 @@ export async function apply_update(
     const decision = decide_update(hint, value_arguments, existing_has_value);
 
     if (typeof decision === "object" && "error" in decision) {
-        return { kind: "error", message: `${property_name} ${decision.error}` };
+        return { kind: "error", message: `${property_name} ${decision.error}`, type: "invalid-value" };
     }
 
     if (decision === "read") { return { kind: "read" }; }
@@ -307,10 +308,10 @@ export async function apply_update(
         const printed = workfile.print();
         const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
         if (typeof test_parse === "string") {
-            return { kind: "error", message: `Update would produce an unreadable overlay: ${test_parse}` };
+            return { kind: "error", message: `Update would produce an unreadable overlay: ${test_parse}`, type: "edit-refused" };
         }
         fs.writeFileSync(input, printed);
-        return { kind: "set", message: `Set flag ${property_name} on ${node_identifier}`, warned: false };
+        return { kind: "set", message: `Set flag ${property_name} on ${node_identifier}` };
     }
 
     // decision === "value"
@@ -323,7 +324,7 @@ export async function apply_update(
     const built = build_raw_property(with_value, property_name, hint, is_label, cell_bits(property_definition));
 
     if (built !== null && typeof built === "object" && "error" in built) {
-        return { kind: "error", message: built.error };
+        return { kind: "error", message: built.error, type: "invalid-value" };
     }
 
     place_property(overlay, target_reference, found, is_base_target, built, property_name);
@@ -342,7 +343,7 @@ export async function apply_update(
         const sync = sync_unit_address_from_reg(found.node, cells.address, effective, radix);
         switch (sync) {
             case "conflict": {
-                return { kind: "error", message: "reg update would create a naming conflict; not written" };
+                return { kind: "error", message: "reg update would create a naming conflict; not written", type: "name-taken" };
             }
             case "renamed": {
                 rename_message = `; renamed to ${get_full_node_name(found.node)}`;
@@ -362,7 +363,7 @@ export async function apply_update(
     const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
 
     if (typeof test_parse === "string") {
-        return { kind: "error", message: `Update would produce an unreadable overlay: ${test_parse}` };
+        return { kind: "error", message: `Update would produce an unreadable overlay: ${test_parse}`, type: "edit-refused" };
     }
 
     fs.writeFileSync(input, printed);
@@ -380,8 +381,19 @@ export async function apply_update(
         kind: "set",
         message: `Set ${property_name} on ${node_identifier}${rename_message}`,
         ...(ip_result.message === undefined ? {} : { detail: ip_result.message }),
-        warned: unchecked || ip_result.warning !== undefined || reg_warnings.length > 0 || out_of_bounds.length > 0,
+        ...first_warning([
+            [unchecked, "unchecked"],
+            [ip_result.warning !== undefined, "out-of-range"],
+            [reg_warnings.length > 0, "resource-conflict"],
+            [out_of_bounds.length > 0, "out-of-range"],
+        ]),
     };
+}
+
+/** The type of the first warning that went out, in the order they did. */
+function first_warning(warnings: readonly (readonly [boolean, ErrorType])[]): { warning?: ErrorType } {
+    const first = warnings.find(([happened]) => happened);
+    return first === undefined ? {} : { warning: first[1] };
 }
 
 export function implicit_interrupt_parent(

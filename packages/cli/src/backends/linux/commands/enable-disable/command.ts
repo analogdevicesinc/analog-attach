@@ -34,7 +34,7 @@ function status_command(name: "enable" | "disable", status_value: "okay" | "disa
             const result = set_node_status(base, overlay, path_argument, status_value);
             if (result === "not-found") {
                 const response = status_response(result, verb, path_argument);
-                return refuse(response.message, { text: `Couldn't find node ${path_argument} in ${devicetree} or ${input}` });
+                return refuse(response.message, { type: "not-found", text: `Couldn't find node ${path_argument} in ${devicetree} or ${input}` });
             }
             workspace.overlay.save();
             return answer(status_response(result, verb, path_argument), `${verb}d ${path_argument} in ${input}`);
@@ -45,7 +45,7 @@ function status_command(name: "enable" | "disable", status_value: "okay" | "disa
 export function status_response(result: "done" | "not-found", verb: string, identifier: string): CommonResponse {
     return result === "done"
         ? { ok: true, message: `${verb}d ${identifier}`, severity: "info" }
-        : { ok: false, message: `Not found: ${identifier}`, severity: "error" };
+        : { ok: false, message: `Not found: ${identifier}`, severity: "error", error_type: "not-found" };
 }
 
 export const enable = status_command("enable", "okay", "Enable");
@@ -205,6 +205,6 @@ if (import.meta.vitest) {
         expect(status_response("done", "Disable", "spi0/spidev@0"))
             .toEqual({ ok: true, message: "Disabled spi0/spidev@0", severity: "info" });
         expect(status_response("not-found", "Enable", "nope"))
-            .toEqual({ ok: false, message: "Not found: nope", severity: "error" });
+            .toEqual({ ok: false, message: "Not found: nope", severity: "error", error_type: "not-found" });
     });
 }

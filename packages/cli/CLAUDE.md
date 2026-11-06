@@ -52,7 +52,7 @@ that holds `.analog-attach/`) and `run` / `run_shell`, which pass a child's outp
     | Constructor | Exit | Output |
     |---|---|---|
     | `answer(response, text)` | 0 | the response under `--json`, else the text |
-    | `refuse(message, { severity?, text? })` | 0 | `ok: false` |
+    | `refuse(message, { type, severity?, text? })` | 0 | `ok: false` |
     | `input_error(message)` | 2 | the message on stderr |
     | `cancelled(message)` | 130 | the message on stdout |
 

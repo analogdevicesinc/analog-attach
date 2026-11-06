@@ -128,8 +128,8 @@ if (import.meta.vitest) {
         });
 
         test("refused - exit 0, the ok: false response, or the text", async () => {
-            const outcome = refuse("No such node: spi9", { text: "Cannot read spi9" });
-            expect(await run(true, () => Promise.resolve(outcome))).toEqual({ code: 0, stdout: `{"ok":false,"message":"No such node: spi9","severity":"error"}\n`, stderr: "" });
+            const outcome = refuse("No such node: spi9", { type: "not-found", text: "Cannot read spi9" });
+            expect(await run(true, () => Promise.resolve(outcome))).toEqual({ code: 0, stdout: `{"ok":false,"message":"No such node: spi9","severity":"error","error_type":"not-found"}\n`, stderr: "" });
             expect(await run(false, () => Promise.resolve(outcome))).toEqual({ code: 0, stdout: "Cannot read spi9\n", stderr: "" });
         });
 

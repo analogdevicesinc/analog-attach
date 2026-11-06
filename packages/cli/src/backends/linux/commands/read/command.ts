@@ -38,12 +38,12 @@ export async function read_target(
     const node = node_path === undefined ? undefined : overlay.effective_node(node_path);
 
     if (node_path === undefined || node === undefined) {
-        return refuse(not_found_message(path_string, overlay, base));
+        return refuse(not_found_message(path_string, overlay, base), { type: "not-found" });
     }
 
     const property = property_name === undefined ? undefined : node.properties.find(p => p.name === property_name);
     if (property_name !== undefined && property === undefined) {
-        return refuse(`Not found: ${property_name} on ${path_string}`);
+        return refuse(`Not found: ${property_name} on ${path_string}`, { type: "not-found" });
     }
 
     // A node's binding only gives the missing required properties, which JSON mode doesn't report.
@@ -428,7 +428,7 @@ if (import.meta.vitest) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tcompatible = "adi,ad7124-8";\n\t\tspi-max-frequency = <1000000>;\n\t};\n};`, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", message: "no dt-schema" }] };
+        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "install-incomplete", message: "no dt-schema" }] };
 
         const logs = [
             outcome_text(await read_target(text_session, overlay, no_bindings, "spi0/adc@0", "spi-max-frequency", { quiet: false })),
@@ -449,7 +449,7 @@ if (import.meta.vitest) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&i2c_arm {\n\tstatus = "okay";\n\thwmon@2e {\n\t\treg = <0x2e>;\n\t};\n};`, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", message: "no dt-schema" }] };
+        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "install-incomplete", message: "no dt-schema" }] };
         const human = async (path: string, property?: string): Promise<string[]> =>
             outcome_text(await read_target(text_session, overlay, no_bindings, path, property, { quiet: false })).split("\n");
 
@@ -512,7 +512,7 @@ if (import.meta.vitest) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tvref-supply = <&spi0>;\n\t\tspi-max-frequency = <1000000>;\n\t};\n};`, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", message: "no dt-schema" }] };
+        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "install-incomplete", message: "no dt-schema" }] };
         const run = async (json: boolean, property: string, quiet = false) =>
             read_target(json ? json_session : text_session, overlay, no_bindings, "spi0/adc@0", property, { quiet });
 
@@ -533,7 +533,7 @@ if (import.meta.vitest) {
         const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [] };
         const missing = await read_target(json_session, overlay, no_bindings, "spi9", undefined, { quiet: false });
         expect(missing.kind).toBe("refused");
-        expect(await outcome_json(missing)).toEqual({ ok: false, message: "Not found: spi9. Did you mean spi0?", severity: "error" });
+        expect(await outcome_json(missing)).toEqual({ ok: false, message: "Not found: spi9. Did you mean spi0?", severity: "error", error_type: "not-found" });
         expect(outcome_text(await read_target(text_session, overlay, no_bindings, "spi0", "reg", { quiet: false }))).toBe("Not found: reg on spi0");
     });
 }

@@ -14,14 +14,16 @@ setup() {
 # Steps:
 #   1. Run init on each backend.
 #   2. Run read nosuch, with --json, on each backend.
-#   3. Check both are refused (exit 0, .ok false, severity error) with a message.
-# bats test_tags=conformity, req:READ-02, req:GEN-08, req:GEN-09, id:C0011
+#   3. Check both are refused (exit 0, .ok false, severity error, error type not-found) with a
+#      message.
+# bats test_tags=conformity, req:READ-02, req:GEN-08, req:GEN-09, req:GEN-17, id:C0011
 @test "an unknown node is refused the same way on both backends" {
 	on noos init
 	on linux init
 	conform read nosuch -- read nosuch
 	assert_same_status 0
 	assert_same '{ok, severity}' '{"ok":false,"severity":"error"}'
+	assert_same '.error_type' '"not-found"'
 	assert_same '.message | type' '"string"'
 }
 

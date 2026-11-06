@@ -32,7 +32,7 @@ export async function suggest_values(session: Session, identifier: string, prope
     const { workspace } = loaded;
     // Bindings are optional here: without them the values are just not checked.
     const found = await value_list(identifier, property, workspace.overlay.tree, workspace.base.tree, optional_bindings(workspace));
-    if (!found.ok) { return refuse(found.message, { text: found.text ?? found.message }); }
+    if (!found.ok) { return refuse(found.message, { type: found.type, text: found.text ?? found.message }); }
     const { message, suggestions } = found.value;
     // The providers read offers too (READ-036): a node the user can add instead.
     const creatable = creatable_providers(property);

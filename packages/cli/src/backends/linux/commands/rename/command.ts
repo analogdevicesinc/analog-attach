@@ -11,7 +11,7 @@ import {
     type UnitRadix,
 } from "attach-lib";
 
-import { answer, command, refuse, type RenameArguments } from "../../../../interface/backend-interface";
+import { answer, command, refuse, warned, type RenameArguments } from "../../../../interface/backend-interface";
 import type { CommonResponse } from "../../protocol/types";
 import { load_workspace, optional_bindings } from "../../config/workspace";
 import { child_unit_radix } from "../../binding-resolution";
@@ -49,13 +49,13 @@ Paths:
             : undefined;
         const result = rename_overlay_node(overlay, path_argument, new_name, radix);
         switch (result.status) {
-            case "not-found": { return refuse(not_found_message(path_argument, overlay, base)); }
+            case "not-found": { return refuse(not_found_message(path_argument, overlay, base), { type: "not-found" }); }
             case "in-base": {
-                return refuse(`${path_argument} is part of the base device tree (${devicetree}), not this overlay; rename only applies to overlay-added nodes`);
+                return refuse(`${path_argument} is part of the base device tree (${devicetree}), not this overlay; rename only applies to overlay-added nodes`, { type: "read-only" });
             }
-            case "is-root": { return refuse("Cannot rename the root node"); }
-            case "invalid-name": { return refuse(invalid_node_name_message(new_name)); }
-            case "conflict": { return refuse(`${new_name} already exists under the same parent`); }
+            case "is-root": { return refuse("Cannot rename the root node", { type: "read-only" }); }
+            case "invalid-name": { return refuse(invalid_node_name_message(new_name), { type: "invalid-name" }); }
+            case "conflict": { return refuse(`${new_name} already exists under the same parent`, { type: "name-taken" }); }
             case "renamed": {
                 workspace.overlay.save();
                 const warnings = node_reg_warnings(overlay, result.path);
@@ -67,7 +67,7 @@ Paths:
                     ...(result.reg_message === undefined ? [] : [result.reg_message]),
                     `Renamed ${path_argument} to ${new_name} in ${input}`,
                 ].join("\n");
-                return answer({ ok: true, message, severity: warnings.length > 0 ? "warn" : "info" }, text);
+                return answer({ ok: true, message, ...warned(warnings.length > 0 ? "resource-conflict" : undefined) }, text);
             }
         }
     },

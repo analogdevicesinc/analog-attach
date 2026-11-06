@@ -13,10 +13,11 @@ setup() {
 # Description: import of a file that doesn't exist is refused the same way on both backends.
 # Steps:
 #   1. Run, with --json, import /nonexistent.json on noos and import /nonexistent.dtso on linux.
-#   2. Check both are refused (exit 0, .ok false, severity error).
-# bats test_tags=conformity, req:IMPORT-01, req:GEN-08, req:GEN-09, id:C0026
+#   2. Check both are refused (exit 0, .ok false, severity error, error type not-found).
+# bats test_tags=conformity, req:IMPORT-01, req:GEN-08, req:GEN-09, req:GEN-17, id:C0026
 @test "import of a file that doesn't exist is refused the same way on both backends" {
 	conform import /nonexistent.json -- import /nonexistent.dtso
 	assert_same_status 0
 	assert_same '{ok, severity}' '{"ok":false,"severity":"error"}'
+	assert_same '.error_type' '"not-found"'
 }

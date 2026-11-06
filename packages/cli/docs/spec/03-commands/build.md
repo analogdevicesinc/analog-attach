@@ -226,7 +226,8 @@ an empty line and `  <elf>` when there is one.
 
 **BUILD-521** When the CMake build succeeds but the ELF doesn't exist, the
 CLI shall respond `{"ok": true, "message": "Built <target> for <board>, but
-no ELF was found at <elf>", "severity": "warn"}` without `path`, and write
+no ELF was found at <elf>", "severity": "warn", "error_type":
+"output-missing"}` without `path`, and write
 `Build reported success but no ELF was found at <elf>` in human mode.
 
 **BUILD-522** The CLI shall change nothing but what the tools write (the
@@ -286,7 +287,7 @@ $ cat build/adxl355.dts
 
 ```
 $ analog-attach --json build
-{"ok":false,"message":"/work/ad7124-8.dtso:20.21-23.6: ERROR (duplicate_label): /fragment@1/__overlay__/temp@53: Duplicate label 'adxl345' on /fragment@1/__overlay__/temp@53 and /fragment@1/__overlay__/accel@53\nERROR: Input tree has errors, aborting (use -f to force output)\n","severity":"error"}
+{"ok":false,"message":"/work/ad7124-8.dtso:20.21-23.6: ERROR (duplicate_label): /fragment@1/__overlay__/temp@53: Duplicate label 'adxl345' on /fragment@1/__overlay__/temp@53 and /fragment@1/__overlay__/accel@53\nERROR: Input tree has errors, aborting (use -f to force output)\n","severity":"error","error_type":"tool-failed"}
 ```
 
 Where the backend is noos (a stand-in capi that builds a host program,

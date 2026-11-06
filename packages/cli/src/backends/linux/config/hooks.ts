@@ -36,10 +36,11 @@ async function linux_changed(session: Session, linux: string): Promise<Outcome<C
     const message = set_message(session, "linux", linux);
     const reloaded = await reload_caches(read_settings(session.settings), workspace_context(session), label => session.progress(label));
     if (!reloaded.ok) {
-        return refuse(`${message}, but the binding caches were not built:\n${format_config_errors(reloaded.errors, session.program).human}`);
+        const { human, response } = format_config_errors(reloaded.errors, session.program);
+        return refuse(`${message}, but the binding caches were not built:\n${human}`, { type: response.error_type });
     }
     if (!reloaded.value.ok) {
-        return refuse(`${message}, but ${reloaded.value.message}\nFix the bindings and run '${session.program} config --reload'.`);
+        return refuse(`${message}, but ${reloaded.value.message}\nFix the bindings and run '${session.program} config --reload'.`, { type: "tool-failed" });
     }
     const done = `${message}; ${reloaded.value.message}`;
     return answer({ ok: true, message: done, severity: "info" }, done);
@@ -59,7 +60,7 @@ async function changed(keys: readonly string[], session: Session): Promise<Outco
 async function reload(session: Session): Promise<Outcome<CommonResponse>> {
     const reloaded = await reload_caches(read_settings(session.settings), workspace_context(session), label => session.progress(label));
     if (!reloaded.ok) { return config_errors_outcome(session, reloaded.errors); }
-    if (!reloaded.value.ok) { return refuse(reloaded.value.message); }
+    if (!reloaded.value.ok) { return refuse(reloaded.value.message, { type: "tool-failed" }); }
     return answer({ ok: true, message: reloaded.value.message, severity: "info" }, "Rebuilt the binding index and validation.json.");
 }
 

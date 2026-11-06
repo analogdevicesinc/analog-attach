@@ -25,10 +25,10 @@ export const list_parent: ExtraCommand<Record<never, never>, SuggestResponse> = 
 
         const binding = await load_binding(workspace.bindings, compatible);
         if (!binding.ok) {
-            if (binding.reason === "parse") { return refuse(binding.message); }
+            if (binding.reason === "parse") { return refuse(binding.message, { type: "parse-error" }); }
             // No binding: not a refusal, an empty list with a warning (as attach-linux had it).
             const message = unknown_compatible_message(workspace.bindings, compatible, session.program);
-            return answer<SuggestResponse>({ ok: true, message, severity: "warn", suggestions: [] }, message);
+            return answer<SuggestResponse>({ ok: true, message, severity: "warn", error_type: "unknown-device-type", suggestions: [] }, message);
         }
 
         const suggestions = parent_suggestions(workspace.base.tree, binding.binding);

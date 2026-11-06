@@ -28,8 +28,8 @@ export interface CommonResponse {
     severity: Severity;
     /**
      * Which kind of error or warning it is (GEN-17), from the fixed list of error-types.ts: on
-     * a refusal, and on a success whose severity is `warn`. Optional while the Linux backend
-     * doesn't set it yet; the noos backend and the front end always do.
+     * every refusal and every success whose severity is `warn` (validate's findings carry theirs);
+     * not on an `info` success.
      */
     error_type?: ErrorType;
 }
@@ -224,8 +224,8 @@ export interface ValidationFinding {
     /** `[]`: the workfile as a whole. */
     path: string[];
     message: string;
-    /** Which kind of finding it is (GEN-17). Optional while the Linux backend doesn't set it. */
-    error_type?: ErrorType;
+    /** Which kind of finding it is (GEN-17). */
+    error_type: ErrorType;
 }
 
 /**
