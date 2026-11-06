@@ -295,7 +295,7 @@ marked *noos* where it is noos.
 | `list overlay` (linux) | `<compatible>` | |
 | `move` (linux) | `<path> <destination>` | |
 | `enable`, `disable` (linux) | `[path]` | |
-| `validate` | | |
+| `validate` | | linux: `--full` |
 | `build` | | noos: `--clean` |
 | `deploy` | | noos: `--probe <probe>` |
 | `generate` (noos) | | `--output <directory>`, `--project-template <template>` |

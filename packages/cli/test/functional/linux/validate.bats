@@ -197,15 +197,13 @@ bad_channel() {
 	assert_json '.errors[0].message | contains("is too long")' true
 }
 
-# Gap: validate has no --full flag (a usage error, exit 2); validate alone checks only the nodes
-# the overlay adds (open issue V-9).
 # Description: validate --full checks the overlay merged with the base device tree, so a property
 # the overlay sets on a base node is checked against that node's binding.
 # Steps:
 #   1. Update status of spi0 to bogus.
 #   2. Run validate --full, with --json; check it succeeds and reports at least one error on
 #      status.
-# bats test_tags=req:VALIDATE-03-LNX, gap, id:L0344
+# bats test_tags=req:VALIDATE-03-LNX, id:L0344
 @test "validate --full checks what the overlay sets on a base node" {
 	aa update spi0 status bogus >/dev/null 2>&1
 	run_json validate --full
@@ -299,4 +297,26 @@ bad_channel() {
 	assert_success
 	assert_json '.errors | length' 0
 	assert_json '.warnings | length' 0
+}
+
+# Description: validate --full leaves out the base's own findings too, and says how many there
+# are.
+# Steps:
+#   1. Run validate --full on the empty overlay, with --json; check it succeeds with no errors
+#      and no warnings, and a base_findings count above 0.
+#   2. Run it in human mode; check it says No errors!, then that count of findings in the base
+#      devicetree.
+# bats test_tags=req:VALIDATE-03-LNX, id:L0359
+@test "validate --full counts the base's own findings without listing them" {
+	run_json validate --full
+	assert_success
+	assert_json '.errors | length' 0
+	assert_json '.warnings | length' 0
+	assert_json '.base_findings > 0' true
+	local count
+	count=$(jq '.base_findings' <<<"$output")
+	run aa validate --full
+	assert_success
+	assert_line --index 0 'No errors!'
+	assert_line --index 1 "$count more finding(s) in the base devicetree"
 }

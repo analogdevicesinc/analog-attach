@@ -317,7 +317,9 @@ previous=""
 for word in "$@"; do
     case "$previous" in
         -o|--json-output)
-            if [ -e "$here/diagnostics.json" ]; then cat "$here/diagnostics.json" > "$word"; else printf '[]' > "$word"; fi ;;
+            diagnostics="$here/diagnostics.json"
+            case "$word" in *full-error.json) [ -e "$here/full-diagnostics.json" ] && diagnostics="$here/full-diagnostics.json" ;; esac
+            if [ -e "$diagnostics" ]; then cat "$diagnostics" > "$word"; else printf '[]' > "$word"; fi ;;
     esac
     previous="$word"
 done
@@ -355,11 +357,17 @@ const DIAGNOSTIC = [{
     type: "error", level: "error", node: "/node0/adc@0", property_path: ["spi-max-frequency"],
     message: "99999999 is greater than the maximum of 5000000", formatted: "/node0/adc@0: spi-max-frequency: 99999999 is greater than the maximum of 5000000",
 }];
+/** What dt-validate gives on the merged tree: the finding of DIAGNOSTIC at its real path, one on spi0 (whose status the overlay sets), one of the base's. */
+const FULL_DIAGNOSTICS = [
+    { type: "error", level: "error", node: "/soc/spi@7e204000/adc@0", property_path: ["spi-max-frequency"], message: "99999999 is greater than the maximum of 5000000" },
+    { type: "error", level: "error", node: "/soc/spi@7e204000", property_path: ["status"], message: "'bogus' is not one of ['okay', 'disabled']" },
+    { type: "error", level: "error", node: "/soc", property_path: [], message: "'ranges' is a required property" },
+];
 
 interface LinuxHarness extends Harness {
     readonly linux: LinuxFixture;
-    /** The fake tools in the bundled tools directory; `fail` makes them fail. */
-    tools(options?: { fail?: boolean; diagnostics?: unknown[] }): void;
+    /** The fake tools in the bundled tools directory; `fail` makes them fail. `full` is what dt-validate gives on the merged tree (validate --full), `diagnostics` otherwise. */
+    tools(options?: { fail?: boolean; diagnostics?: unknown[]; full?: unknown[] }): void;
     /** A fake `sshpass` (and `scp`, which deploy checks for) first on PATH, until the test ends. */
     sshpass(options?: { fail?: boolean }): void;
     /** The RPi overlay that adds an ad7124-8, in the tree's overlay directory. */
@@ -384,10 +392,11 @@ function create_linux_harness(): LinuxHarness {
             process.env["PATH"] = original_path;
             linux.remove();
         },
-        tools({ fail = false, diagnostics } = {}) {
+        tools({ fail = false, diagnostics, full } = {}) {
             const directory = path.join(linux.package_root, "bundled", "linux", "tools");
             for (const name of ["dtc", "dt-mk-schema", "dt-validate"]) { write_tool(directory, name, fail); }
             if (diagnostics !== undefined) { fs.writeFileSync(path.join(directory, "diagnostics.json"), JSON.stringify(diagnostics)); }
+            if (full !== undefined) { fs.writeFileSync(path.join(directory, "full-diagnostics.json"), JSON.stringify(full)); }
         },
         sshpass({ fail = false } = {}) {
             const directory = path.join(linux.base, "bin");
@@ -519,6 +528,10 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools({ diagnostics: DIAGNOSTIC }); } },
     { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools({ fail: true }); } },
     { route: "validate", argv: ["validate"], shape: "config-refusal" },
+    {
+        route: "validate", argv: ["validate", "--full"], shape: "answer",
+        prepare: fixture => { settings_with(fixture, { "preprocess-command": "cp {input} {output}" }); fixture.tools({ diagnostics: DIAGNOSTIC, full: FULL_DIAGNOSTICS }); },
+    },
 
     { route: "build", argv: ["build"], shape: "answer", prepare: fixture => { fixture.tools(); } },
     { route: "build", argv: ["build"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); } },
@@ -710,4 +723,20 @@ check_contract<NoosHarness>({
 
 test("every backend of the registry has its contract here", () => {
     expect(CHECKED.toSorted()).toEqual(Object.keys(BACKENDS).toSorted());
+});
+
+test("validate --full keeps the merged tree's findings on what the overlay touches, once, and counts the others", async () => {
+    const fixture = create_linux_harness();
+    try {
+        settings_with(fixture, { "preprocess-command": "cp {input} {output}" });
+        fixture.tools({ diagnostics: DIAGNOSTIC, full: FULL_DIAGNOSTICS });
+        const { code, stdout } = await fixture.run(["--json", "validate", "--full"]);
+        expect(code).toBe(0);
+        const response = JSON.parse(stdout) as { errors: { path: string[] }[]; base_findings: number };
+        // The adc's finding is in both runs and shown once.
+        expect(response.errors.map(error => error.path)).toEqual([["node0", "adc@0", "spi-max-frequency"], ["soc", "spi@7e204000", "status"]]);
+        expect(response.base_findings).toBe(1);
+    } finally {
+        fixture.remove();
+    }
 });

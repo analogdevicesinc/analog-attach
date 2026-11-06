@@ -1,7 +1,9 @@
 # validate
 
 Checks the overlay against its bindings with dt-validate. Also checks the
-addresses and chip selects of the overlay's nodes. A shared command: §2 to
+addresses and chip selects of the overlay's nodes. With `--full`, it also
+checks the base devicetree with the overlay applied, and reports what the
+overlay adds or sets there. A shared command: §2 to
 §7 as the linux backend does it, §8 as the noos backend does it (the
 workfile against its schemas, without a tool).
 
@@ -9,10 +11,15 @@ workfile against its schemas, without a tool).
 
 ```
 analog-attach [--json] validate
+analog-attach [--json] validate [--full]     # where the backend is linux
 ```
 
-Grammar: rule `validate` in `01-grammar.abnf`. The command takes no arguments
-or options.
+Grammar: rule `validate` in `01-grammar.abnf`. The command takes no
+arguments.
+
+| Option (linux) | Meaning | Default |
+|---|---|---|
+| `--full` | Also check the base devicetree with the overlay applied (§5.1), whatever the `output` setting is. | off |
 
 ## 2. Terms
 
@@ -22,11 +29,14 @@ or options.
 | Validation tree | The devicetree source the CLI builds for dt-validate (§4). It has one node `node<N>` per fragment, so its paths are `/node<N>/…`. |
 | Diagnostic | One entry of dt-validate's JSON output, or one address warning (§7). It has a level (`warning`, or anything else for an error), an optional node path, an optional property path, a message, and optionally a note and context lines. |
 | Display path | A validation-tree path as human output shows it: `/node<N>` replaced by the fragment's target (§6.2). |
+| Full tree | With `--full`: the base devicetree with the overlay applied, as `build` writes it where `output` is `full` (build.md §4.1). |
+| Touched node | A node of the full tree that the overlay adds, or that is below one it adds, or a base node on which a fragment's body sets a property (any fragment for it). A base node the overlay only adds children to isn't touched. |
 
 ## 3. Resources
 
 The command needs the bindings (with `validation.json`, 02-common.md §8.4),
-the bundled tools, the base and the overlay (COM-070; §8.2, §8.3).
+the bundled tools, the base and the overlay (COM-070; §8.2, §8.3). With
+`--full` it runs `preprocess-command` on the full tree too.
 
 ## 4. The validation tree
 
@@ -47,7 +57,7 @@ fragment without an `__overlay__` body (only `__dormant__`) gives an empty
 `node<N>`. Base nodes aren't in the validation tree, and neither are the
 properties set directly in a body, on the fragment's target (`&spi0 {
 cs-gpios = …; status = "okay"; };`): only the nodes the overlay writes are
-validated. (Open issue V-9.)
+validated. (Open issue V-9; `--full` checks them, §5.1.)
 
 **VALIDATE-004** For each label that a fragment's body references, the base
 defines and the overlay doesn't, the CLI shall add a stub of that base node
@@ -92,10 +102,57 @@ message is written alone, as one line. JSON mode gives the standard error
 unchanged, final newline included, and responds `{ "errors": [{ "kind":
 "generic", "path": [], "message": <text> }], "warnings": [] }`.
 
+### 5.1 With `--full`
+
+**VALIDATE-040** Where `--full` is given, after VALIDATE-010 to VALIDATE-012
+have run on the validation tree without a tool failure, the CLI shall write
+the full tree to `.analog-attach/linux/full.dts` as build.md BUILD-010 to
+BUILD-012 write the full devicetree file, followed by an empty line and
+`/ {`, `/delete-node/ aliases;`, `/delete-node/ __overrides__;` (one tab in)
+and `};`, and preprocess it as BUILD-014 does, into
+`.analog-attach/linux/full.preprocessed.dts`. It does so whatever `output`
+is, and writes nothing in the build folder. (Open issue V-14.)
+
+**VALIDATE-041** If a fragment's target resolves to no node, or preprocessing
+fails, then the CLI shall report one tool failure (VALIDATE-013) with the
+message `full devicetree not written: <reason>`, `<reason>` being
+BUILD-013's or BUILD-014's text after `Build failed: `, written alone in
+human mode.
+
+**VALIDATE-042** The CLI shall then compile the preprocessed full tree with
+the bundled dtc into `.analog-attach/linux/full.dtb` and run dt-validate on it
+into `.analog-attach/linux/full-error.json`, as VALIDATE-010 to VALIDATE-013
+do for the validation tree; a tool failure there is reported the same way.
+
+**VALIDATE-043** Of the full run's diagnostics, the CLI shall report those
+whose node is a touched node, but not one that the validation tree's run
+already has: a diagnostic of the same node (its validation-tree path read as
+the absolute path it stands for, `/node<N>` being fragment N's target), the
+same property path and the same `message`. (Open issue V-13.)
+
+**VALIDATE-044** A reported full-run diagnostic's JSON `path` shall be its
+node's absolute path split at `/`, followed by its property path
+(`["soc", "spi@7e204000", "status"]`), and its `message` as VALIDATE-022.
+Its display path shall be label-first: the absolute path with its longest
+leading part that has a label in the base or the overlay replaced by that
+label (`spi0`, `spi0/adc@0`), or the absolute path when none has.
+
+**VALIDATE-045** The full run's other diagnostics (without a node, or on a
+node that isn't touched) shall be counted and not reported. In JSON mode the
+response has `base_findings`, that count, 0 included; without `--full` it has
+none. In human mode, when the count isn't 0, the CLI shall write `<n> more
+finding(s) in the base devicetree` after VALIDATE-026's line.
+
+**VALIDATE-046** With `--full`, the diagnostics are the validation tree's,
+then the reported full-run ones, then the address warnings of §7.4, and
+VALIDATE-021 to VALIDATE-026 apply to them all; VALIDATE-026's counts are of
+the reported ones.
+
 ## 6. Results
 
 **VALIDATE-020** The CLI shall report dt-validate's diagnostics followed by
-the address warnings of §7.4, all as diagnostics.
+the address warnings of §7.4, all as diagnostics (with `--full`,
+VALIDATE-046).
 
 ### 6.1 JSON output
 
@@ -148,8 +205,9 @@ are errors, it shall end with `<n> error(s), <m> warning(s)`.
 ### 6.3 Files
 
 **VALIDATE-028** The CLI shall change no file other than `temp.dts`,
-`temp.dtb` and `error.json` in `.analog-attach/linux/`, and the scratch files of
-02-common.md §8.2. It never changes the overlay.
+`temp.dtb` and `error.json` in `.analog-attach/linux/` (with `--full`, also
+`full.dts`, `full.preprocessed.dts`, `full.dtb` and `full-error.json`), and
+the scratch files of 02-common.md §8.2. It never changes the overlay.
 
 ### 6.4 References
 
@@ -333,14 +391,13 @@ error now, VALIDATE-114.)
 **V-8.** *Fixed.* (With errors there was no summary line. The output ends with
 `<n> error(s), <m> warning(s)` now, VALIDATE-026.)
 
-**V-9. Properties set on a fragment's target aren't validated.**
-VALIDATE-003 copies only the nodes of a body, not its own properties. With
-`&spi0 { cs-gpios = "foo"; status = "okay"; };` as the whole overlay,
-`validate` says `No errors!`: `cs-gpios` isn't in `temp.dts`, and dt-validate
-never sees it. A wrong `status`, `pinctrl-0` or `cs-gpios` on a base node
-passes. A fix would be to put the target in the validation tree as the
-merged node (the base node's properties with the overlay's applied), so its
-binding checks them.
+**V-9. Without `--full`, properties set on a fragment's target aren't
+validated.** VALIDATE-003 copies only the nodes of a body, not its own
+properties. With `&spi0 { cs-gpios = "foo"; status = "okay"; };` as the
+whole overlay, `validate` says `No errors!`: `cs-gpios` isn't in `temp.dts`,
+and dt-validate never sees it. A wrong `status`, `pinctrl-0` or `cs-gpios` on
+a base node passes. `validate --full` checks them (§5.1), at the cost of a
+second dt-validate run on the whole tree.
 
 **V-10. A `cs-gpios` provider the overlay adds turns the check off.**
 VALIDATE-103 looks the provider up in the base only. With `&{/} { exp: exp {
@@ -362,6 +419,21 @@ fragments together (`effective_node`), as `read` and `update` do.
 **V-12. The node count includes the external nodes.** `<n> nodes checked`
 (VALIDATE-502) counts every node the workfile has, external ones too, which
 `validate` doesn't check.
+
+**V-13. A touched base node brings its own findings.** VALIDATE-043 reports
+every finding of a base node the overlay sets a property on, also those
+about properties only the base has: with `status = "okay"` on spi0, the RPi
+4's `Unevaluated properties are not allowed ('dma-names', 'dmas' were
+unexpected)` on spi0 is reported, though the overlay didn't write it.
+
+**V-14. `/aliases` and `/__overrides__` aren't checked.** VALIDATE-040
+deletes both from the full tree: dt-schema's gpio fixup crashes on the RPi
+4's `/aliases` (`KeyError: '/'`), and its `/__overrides__` refers to
+`/aliases`. A node the overlay adds under either isn't checked.
+
+**V-15. Two path forms in one response.** With `--full`, JSON `path`s of the
+validation tree's diagnostics start with `node<N>` (V-1), and those of the
+full run with the absolute path (VALIDATE-044).
 
 ## 10. Examples
 
@@ -393,6 +465,19 @@ $ analog-attach validate
 i2c_arm/u@48:
   warning: reg: address 0x48 is already used by t@48
 No errors! (1 warning(s))
+```
+
+With `--full`, after `update spi0 status bogus` (abridged; the RPi 4 base):
+
+```
+$ analog-attach validate --full
+spi0:
+  error: (node): Unevaluated properties are not allowed ('dma-names', 'dmas' were unexpected)
+  error: status: ['bogus'] is not valid under any of the given schemas
+    context: {"message":"['bogus'] is not of type 'object'",…}
+    context: {"message":"'bogus' is not one of ['okay', 'disabled', 'reserved', 'fail', 'fail-needs-probe']",…}
+2 error(s), 0 warning(s)
+220 more finding(s) in the base devicetree
 ```
 
 Where the backend is noos (`mydev` a `test_spi_device` with no chip select,

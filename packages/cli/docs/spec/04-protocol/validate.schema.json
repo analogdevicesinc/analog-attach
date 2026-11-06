@@ -21,7 +21,7 @@
       "allOf": [{ "$ref": "#/$defs/base" }],
       "properties": {
         "errors": {
-          "description": "Diagnostics of any level other than warning, in the order of VALIDATE-020; or one tool failure with path [].",
+          "description": "Diagnostics of any level other than warning, in the order of VALIDATE-020 (with --full, VALIDATE-046); or one tool failure with path [].",
           "type": "array",
           "items": { "$ref": "#/$defs/linux-diagnostic" }
         },
@@ -29,6 +29,11 @@
           "description": "Diagnostics of level warning: dt-validate's, then the address warnings (7.4).",
           "type": "array",
           "items": { "$ref": "#/$defs/linux-diagnostic" }
+        },
+        "base_findings": {
+          "description": "With --full only: how many of the merged tree's findings are on nodes the overlay doesn't touch, and are left out (VALIDATE-045).",
+          "type": "integer",
+          "minimum": 0
         }
       },
       "unevaluatedProperties": false
@@ -37,7 +42,7 @@
       "allOf": [{ "$ref": "common.schema.json#/$defs/validation-finding" }],
       "properties": {
         "path": {
-          "description": "Validation-tree node segments (node<N>, ...), or the absolute path's segments for an address warning on a node no fragment holds (VALIDATE-112), followed by the property path; [] for a tool failure (VALIDATE-013). A diagnostic without a node has only its property path (VALIDATE-022).",
+          "description": "Validation-tree node segments (node<N>, ...), or the absolute path's segments for an address warning on a node no fragment holds (VALIDATE-112) and for a finding of the merged tree (--full, VALIDATE-044), followed by the property path; [] for a tool failure (VALIDATE-013). A diagnostic without a node has only its property path (VALIDATE-022).",
           "type": "array",
           "items": { "type": "string" }
         }
