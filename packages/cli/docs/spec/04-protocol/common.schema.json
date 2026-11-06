@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "common.schema.json",
   "title": "CommonResponse",
-  "description": "The fields of a response (COM-040, COM-050), and the base shapes the command schemas build on (src/interface/backend-responses.ts). Most responses have the three fields; read, update when it reads, and validate don't (02-common.md \u00a72, C-7). A refusal is exactly this object, with ok false, severity error and its error_type (COM-051). The base shapes are open, so that a backend's subtype can add fields (overview 2.1).",
+  "description": "The fields of a response (COM-040, COM-050), and the base shapes the command schemas build on (src/interface/backend-responses.ts). Every response has the three fields; read gives them alongside the node or property (READ-012). A refusal is exactly this object, with ok false, severity error and its error_type (COM-051); a success with severity warn carries one too, validate's excepted. The base shapes are open, so that a backend's subtype can add fields (overview 2.1).",
   "type": "object",
   "required": [
     "ok",
@@ -54,7 +54,8 @@
           "$ref": "#/$defs/severity"
         },
         "error_type": {
-          "$ref": "#/$defs/error-type"
+          "$ref": "#/$defs/error-type",
+          "description": "On a refusal and on a success whose severity is warn, validate's excepted (COM-051); not on an info success."
         }
       }
     },
@@ -91,7 +92,8 @@
       "required": [
         "ok",
         "message",
-        "severity"
+        "severity",
+        "error_type"
       ],
       "properties": {
         "ok": {
@@ -116,6 +118,7 @@
         "ok",
         "message",
         "severity",
+        "error_type",
         "errors",
         "hints"
       ],
@@ -129,6 +132,10 @@
         "severity": {
           "const": "error"
         },
+        "error_type": {
+          "description": "The first error's (COM-051).",
+          "$ref": "#/$defs/error-type"
+        },
         "errors": {
           "description": "One entry per problem, in the order they were found.",
           "type": "array",
@@ -138,6 +145,7 @@
             "required": [
               "field",
               "kind",
+              "error_type",
               "message"
             ],
             "properties": {
@@ -151,6 +159,9 @@
                   "invalid",
                   "unknown"
                 ]
+              },
+              "error_type": {
+                "$ref": "#/$defs/error-type"
               },
               "message": {
                 "type": "string"
@@ -590,7 +601,8 @@
       "required": [
         "kind",
         "path",
-        "message"
+        "message",
+        "error_type"
       ],
       "properties": {
         "kind": {

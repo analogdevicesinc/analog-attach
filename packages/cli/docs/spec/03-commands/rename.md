@@ -108,8 +108,9 @@ file>`, and the warnings of RENAME-041 to standard error (COM-021).
 **RENAME-043** While in JSON mode, the CLI shall write the warnings of
 RENAME-041 to standard error (COM-021), and respond with `ok` `true`,
 `message` `Renamed <path> to <new-name>`, followed by `; <note>` when
-RENAME-031 gives one, and `severity` `"warn"` when there is at least one
-warning, `"info"` otherwise (`04-protocol/rename.schema.json`).
+RENAME-031 gives one, and `severity` `"warn"` with `error_type`
+`resource-conflict` when there is at least one warning, `"info"` otherwise
+(`04-protocol/rename.schema.json`, `02-common.md` COM-052).
 
 ## 8. Where the backend is noos
 
@@ -164,7 +165,7 @@ warning: chip select 5 has no cs-gpios entry: spi@7e204000 has chip selects 0-1
 
 ```
 $ analog-attach --json rename adc adc@0
-{"ok":true,"message":"Renamed adc to adc@0; reg first cell set to 0","severity":"warn"}
+{"ok":true,"message":"Renamed adc to adc@0; reg first cell set to 0","severity":"warn","error_type":"resource-conflict"}
 ```
 
 with on standard error:
@@ -188,5 +189,5 @@ Where the backend is noos:
 $ analog-attach --json rename tp3 sensor3
 {"ok":true,"message":"Renamed 'tp3' to 'sensor3'","severity":"info"}
 $ analog-attach --json rename sensor3 tp2
-{"ok":false,"message":"Symbol 'tp2' already exists","severity":"error"}
+{"ok":false,"message":"Symbol 'tp2' already exists","severity":"error","error_type":"name-taken"}
 ```

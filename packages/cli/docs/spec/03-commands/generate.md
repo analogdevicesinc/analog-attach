@@ -164,6 +164,6 @@ $ analog-attach --json generate --output gen2
 
 ```
 $ analog-attach --json generate --project-template nope
-{"ok":false,"message":"Template set 'nope' not found at '<installation>/bundled/noos/templates/nope'. Available sets: capi, capi-iio","severity":"error"}
+{"ok":false,"message":"Template set 'nope' not found at '<installation>/bundled/noos/templates/nope'. Available sets: capi, capi-iio","severity":"error","error_type":"unknown-choice"}
 ```
 

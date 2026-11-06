@@ -18,6 +18,7 @@ import {
     type DTNode,
 } from "attach-lib";
 
+import type { ErrorType } from "../../../../interface/error-types";
 import type { Settings } from "../../config/settings";
 import type { Bindings } from "../../config/workspace";
 import { bus_kind, get_compat_index, node_compatibles, run_preprocess, type BusKind } from "../../utilities";
@@ -236,18 +237,19 @@ export function example_list(matches: readonly ExampleMatch[]): string {
 }
 
 /** The example `index` of the search, or why it can't be used (the examples that do hold the device are named). */
-export function pick_example(search: ExampleSearch, index: number, compatible: string, file: string): ExampleMatch | string {
+export function pick_example(search: ExampleSearch, index: number, compatible: string, file: string): ExampleMatch | { message: string; type: ErrorType } {
     const match = search.matches.find(candidate => candidate.index === index);
     if (match !== undefined) { return match; }
     const holding = search.matches.length === 0 ? "" : `; use ${example_list(search.matches)}`;
     if (index > search.count) {
-        return search.count === 0
+        const message = search.count === 0
             ? `There is no example ${index}: ${file} has no examples`
             : `There is no example ${index}: ${file} has ${search.count} example${search.count === 1 ? "" : "s"}${holding}`;
+        return { message, type: "not-found" };
     }
     const broken = search.broken.get(index);
-    if (broken !== undefined) { return `Example ${index} of ${file} doesn't compile: ${broken}${holding}`; }
-    return `Example ${index} of ${file} has no node for ${compatible}${holding}`;
+    if (broken !== undefined) { return { message: `Example ${index} of ${file} doesn't compile: ${broken}${holding}`, type: "tool-failed" }; }
+    return { message: `Example ${index} of ${file} has no node for ${compatible}${holding}`, type: "not-found" };
 }
 
 /** Run the example through `preprocess-command` (for its dt-bindings headers) and parse it; the files go in the state directory. */
@@ -352,17 +354,17 @@ spi {
         };
         expect(pick_example(search, 2, "adi,adxl345", "adi,adxl345.yaml")).toBe(search.matches[1]);
         expect(pick_example(search, 4, "adi,adxl345", "adi,adxl345.yaml"))
-            .toBe("There is no example 4: adi,adxl345.yaml has 3 examples; use example:1 (I2C), example:2 (SPI)");
+            .toEqual({ message: "There is no example 4: adi,adxl345.yaml has 3 examples; use example:1 (I2C), example:2 (SPI)", type: "not-found" });
         expect(pick_example(search, 3, "adi,adxl345", "adi,adxl345.yaml"))
-            .toBe("Example 3 of adi,adxl345.yaml doesn't compile: syntax error; use example:1 (I2C), example:2 (SPI)");
+            .toEqual({ message: "Example 3 of adi,adxl345.yaml doesn't compile: syntax error; use example:1 (I2C), example:2 (SPI)", type: "tool-failed" });
         expect(pick_example({ ...search, count: 3, broken: new Map(), matches: [{ index: 2, node, bus: undefined }] }, 1, "adi,adxl345", "adi,adxl345.yaml"))
-            .toBe("Example 1 of adi,adxl345.yaml has no node for adi,adxl345; use example:2");
+            .toEqual({ message: "Example 1 of adi,adxl345.yaml has no node for adi,adxl345; use example:2", type: "not-found" });
         expect(pick_example({ count: 1, matches: [], broken: new Map() }, 1, "adi,adxl345", "adi,adxl345.yaml"))
-            .toBe("Example 1 of adi,adxl345.yaml has no node for adi,adxl345");
+            .toEqual({ message: "Example 1 of adi,adxl345.yaml has no node for adi,adxl345", type: "not-found" });
         expect(pick_example({ count: 0, matches: [], broken: new Map() }, 1, "adi,adxl345", "adi,adxl345.yaml"))
-            .toBe("There is no example 1: adi,adxl345.yaml has no examples");
+            .toEqual({ message: "There is no example 1: adi,adxl345.yaml has no examples", type: "not-found" });
         expect(pick_example({ ...search, count: 1, matches: [search.matches[0]!] }, 2, "adi,adxl345", "adi,adxl345.yaml"))
-            .toBe("There is no example 2: adi,adxl345.yaml has 1 example; use example:1 (I2C)");
+            .toEqual({ message: "There is no example 2: adi,adxl345.yaml has 1 example; use example:1 (I2C)", type: "not-found" });
     });
 
     test("find_examples — each example preprocessed and searched, the broken ones with their first error line", () => {

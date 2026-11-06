@@ -392,7 +392,8 @@ The linux backend's own command (`04-protocol/list-parent.schema.json`).
 **LIST-090** If no binding has the compatible, then the CLI shall write the
 message of `add.md` ADD-013 (`Unknown compatible '<compatible>'.[ Did you
 mean <close>?] See: analog-attach list devices`) in human mode, and respond `{"ok": true,
-"message": <that message>, "severity": "warn", "suggestions": []}` in JSON
+"message": <that message>, "severity": "warn", "error_type":
+"unknown-device-type", "suggestions": []}` in JSON
 mode (open issue L-6). If the binding doesn't parse,
 then the CLI shall refuse with `Failed to parse binding <file>`.
 

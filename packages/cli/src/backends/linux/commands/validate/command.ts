@@ -15,6 +15,7 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 
 import { answer, command, refuse, validation_header, type FlagSpecs, type Outcome, type Session } from "../../../../interface/backend-interface";
+import type { ErrorType } from "../../../../interface/error-types";
 import { load_workspace, type Workspace } from "../../config/workspace";
 import { write_full_devicetree } from "../../full-devicetree";
 import { display_path } from "../../unresolved";
@@ -148,8 +149,8 @@ function check_full(workspace: Checked, session: Session, checked: DtValidateDia
     const preprocessed = path.join(directory, "full.preprocessed.dts");
     const problem = write_full_devicetree(workspace, path.join(directory, "full.dts"), preprocessed, FULL_EPILOGUE);
     if (problem !== undefined) {
-        const message = `full devicetree not written: ${problem}`;
-        return tool_failure(message, message);
+        const message = `full devicetree not written: ${problem.message}`;
+        return refuse(message, { type: problem.type });
     }
     const diagnostics = check(workspace, preprocessed, path.join(directory, "full.dtb"), path.join(directory, "full-error.json"));
     if (!Array.isArray(diagnostics)) { return diagnostics; }
@@ -373,6 +374,8 @@ interface DtValidateDiagnostic {
     context?: unknown[];
     /** How human output names the node, when not by `display_node` (a `--full` finding: label-first). */
     display?: string;
+    /** The finding's type when the CLI made it (an address warning); else `finding_type` reads it off the message. */
+    error_type?: ErrorType;
 }
 
 export function read_dt_validate_diagnostics(error_json: string): DtValidateDiagnostic[] | { error: string } {
@@ -505,6 +508,7 @@ export function reg_diagnostics(overlay: DeviceTreeOverlay, warnings: RegWarning
         node: validation_node(overlay, warning.path) ?? warning.path,
         property_path: ["reg"],
         message: warning.message,
+        error_type: "resource-conflict" as const,
         ...(warning.hint === undefined
             ? {}
             : { note: warning.hint, formatted: `${warning.message}; ${warning.hint}` }),
@@ -535,7 +539,17 @@ function map_diagnostic(d: DtValidateDiagnostic): ValidationError {
         kind: "generic",
         path: [...node_segs, ...property_segs],
         message: d.formatted ?? d.message ?? 'Unknown error',
+        error_type: d.error_type ?? finding_type(d.message ?? ""),
     };
+}
+
+/**
+ * A dt-validate finding's type (GEN-17): a required property, or one another needs, that is
+ * missing is `missing-required`; anything else the binding doesn't allow (a type, a range, a
+ * count, a property it doesn't define) is `out-of-range`.
+ */
+export function finding_type(message: string): ErrorType {
+    return / is a required property$| is a dependency of /.test(message) ? "missing-required" : "out-of-range";
 }
 
 function parse_dt_validate_output(diagnostics: DtValidateDiagnostic[]): ValidationResponse {
@@ -737,6 +751,7 @@ if (import.meta.vitest) {
                 kind: "generic",
                 path: ["soc", "spi@7e204000", "adc@1", "reg"],
                 message: "chip select 0 is already used by spidev@0; If adc@1 replaces it: disable /soc/spi@7e204000/spidev@0",
+                error_type: "resource-conflict",
             }],
         });
     });

@@ -21,6 +21,7 @@ export function init_workfile(
                 ok: false,
                 message: `Cannot create the workfile: ${problem}. Configure another with '${program} config workfile <name>'.`,
                 severity: "error",
+                error_type: "write-failed",
             };
         }
         create_workfile(current.workfile, cwd);
@@ -96,7 +97,7 @@ it, empty. It never picks another name.
             session.cwd,
             session.program,
         );
-        if (!response.ok) { return Promise.resolve(refuse(response.message)); }
+        if (!response.ok) { return Promise.resolve(refuse(response.message, { type: "write-failed" })); }
         return Promise.resolve(answer(response, style => `${format_summary({ ...response, state: response.created ? "created" : "kept" }, style, session.program).join("\n")}\n`));
     },
 });

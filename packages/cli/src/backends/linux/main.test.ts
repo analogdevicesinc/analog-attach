@@ -315,6 +315,7 @@ describe("the Linux backend through main", () => {
             ok: true,
             message: "'vref' is referenced by 1 property; deleting it would clear that reference. Re-run with --force.",
             severity: "warn",
+            error_type: "needs-force",
             node_count: 1,
             property_count: 1,
             paths: [["vref"], ["adc", "refin1-supply"]],
@@ -342,6 +343,7 @@ describe("the Linux backend through main", () => {
             ok: false,
             message: "Cannot move adc under /soc: adi,ad7124-8 goes under spi0, spi1 (see: analog-attach list parent adi,ad7124-8)",
             severity: "error",
+            error_type: "edit-refused",
         });
         expect(fs.readFileSync(workfile, "utf8")).toBe(before);
 
@@ -427,9 +429,9 @@ describe("the Linux backend through main", () => {
         fs.writeFileSync(path.join(base, "base.dts"), BASE_WITH_SPI1);
         const into_self = await run(["--json", "move", "adc", "adc"]);
         expect(into_self.code).toBe(0);
-        expect(JSON.parse(into_self.stdout)).toEqual({ ok: false, message: "Cannot move adc into itself or one of its descendants", severity: "error" });
+        expect(JSON.parse(into_self.stdout)).toEqual({ ok: false, message: "Cannot move adc into itself or one of its descendants", severity: "error", error_type: "edit-refused" });
         const nowhere = await run(["--json", "move", "adc", "i2c9"]);
-        expect(JSON.parse(nowhere.stdout)).toEqual({ ok: false, message: "Parent node i2c9 not found", severity: "error" });
+        expect(JSON.parse(nowhere.stdout)).toEqual({ ok: false, message: "Parent node i2c9 not found", severity: "error", error_type: "not-found" });
         expect(await run(["move", "adc", "i2c9"])).toMatchObject({ stdout: `Couldn't find parent node i2c9 in ${path.join(base, "base.dts")} or ${path.join(project, "overlay.dtso")}\n` });
         expect(fs.readFileSync(path.join(project, "overlay.dtso"), "utf8")).toBe(OVERLAY);
 
@@ -451,7 +453,7 @@ describe("the Linux backend through main", () => {
         expect(fs.readFileSync(path.join(project, "overlay.dtso"), "utf8")).toMatch(/adc: adc@0 \{\n(.*\n)*\t{4}status = "disabled";/);
 
         const missing = await run(["--json", "enable", "nope"]);
-        expect(JSON.parse(missing.stdout)).toEqual({ ok: false, message: "Not found: nope", severity: "error" });
+        expect(JSON.parse(missing.stdout)).toEqual({ ok: false, message: "Not found: nope", severity: "error", error_type: "not-found" });
         expect(await run(["--json", "enable"])).toMatchObject({ code: 2, stdout: "", stderr: "Missing: path\n" });
     });
 
@@ -465,12 +467,13 @@ describe("the Linux backend through main", () => {
         });
         expect(await run(["list", "parent", "adi,ad7124-8"])).toMatchObject({ stdout: "spi0  /soc/spi@7e204000\n" });
         const unknown = await run(["--json", "list", "parent", "adi,nope"]);
-        expect(JSON.parse(unknown.stdout)).toEqual({ ok: true, message: "Unknown compatible 'adi,nope'. See: analog-attach list devices", severity: "warn", suggestions: [] });
+        expect(JSON.parse(unknown.stdout)).toEqual({ ok: true, message: "Unknown compatible 'adi,nope'. See: analog-attach list devices", severity: "warn", error_type: "unknown-device-type", suggestions: [] });
         const close = await run(["--json", "add", "adi,ad7124-9"]);
         expect(JSON.parse(close.stdout)).toEqual({
             ok: false,
             message: "Unknown compatible 'adi,ad7124-9'. Did you mean adi,ad7124-4, adi,ad7124-8? See: analog-attach list devices",
             severity: "error",
+            error_type: "unknown-device-type",
         });
     });
 

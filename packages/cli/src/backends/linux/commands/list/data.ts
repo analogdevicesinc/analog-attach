@@ -18,6 +18,7 @@ import {
 } from "attach-lib";
 
 import { did_you_mean } from "../../../../interface/names";
+import type { ErrorType } from "../../../../interface/error-types";
 import type { Bindings } from "../../config/workspace";
 import type { ConfigResult } from "../../config/settings";
 import { overlay_files } from "../../overlay-index";
@@ -39,10 +40,10 @@ import {
 } from "./suggest";
 
 /** What a kind found, or why not: `message` is the response's, `text` the human wording when it differs. */
-export type Found<T> = { ok: true; value: T } | { ok: false; message: string; text?: string };
+export type Found<T> = { ok: true; value: T } | { ok: false; message: string; type: ErrorType; text?: string };
 
-const node_not_found = (identifier: string): { ok: false; message: string; text: string } =>
-    ({ ok: false, message: `Node ${identifier} not found`, text: `Node not found: ${identifier}` });
+const node_not_found = (identifier: string): { ok: false; message: string; type: ErrorType; text: string } =>
+    ({ ok: false, message: `Node ${identifier} not found`, type: "not-found", text: `Node not found: ${identifier}` });
 
 // ── devices ─────────────────────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ export async function node_properties(identifier: string, overlay: DeviceTreeOve
     if (node === undefined) { return node_not_found(identifier); }
 
     const { binding } = await resolve_target_binding(identifier, overlay, base, { ok: true, value: bindings });
-    if ("error" in binding) { return { ok: false, message: binding.error }; }
+    if ("error" in binding) { return { ok: false, message: binding.error, type: "unknown-device-type" }; }
 
     const applicable = narrowed_binding(binding, node);
     const required = new Set(applicable.required_properties);
@@ -200,9 +201,9 @@ export async function property_type(
 ): Promise<Found<{ info: PropertyInfo; set: boolean }>> {
     const { target, binding } = await resolve_target_binding(identifier, overlay, base, { ok: true, value: bindings });
     if (target.binding_node === undefined) { return node_not_found(identifier); }
-    if ("error" in binding) { return { ok: false, message: binding.error }; }
+    if ("error" in binding) { return { ok: false, message: binding.error, type: "unknown-device-type" }; }
     const result = property_info(binding, target.binding_node, property);
-    if (!result.ok) { return { ok: false, message: result.message }; }
+    if (!result.ok) { return { ok: false, message: result.message, type: result.type }; }
     const node = effective_target_node(identifier, overlay, base);
     return { ok: true, value: { info: result.info, set: node?.properties.some(p => p.name === property) === true } };
 }

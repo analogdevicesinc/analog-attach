@@ -306,7 +306,8 @@ true, "message": <report>, "severity": <severity> }`, conforming to
 `04-protocol/update.schema.json#/$defs/set`. `<report>` is the report,
 followed by `; ` and the detail of UPDATE-081 when there is one. `<severity>`
 is `"warn"` when a diagnostic of UPDATE-015 or a warning of UPDATE-040,
-UPDATE-041, UPDATE-075, UPDATE-082 or UPDATE-083 was given, and `"info"`
+UPDATE-041, UPDATE-075, UPDATE-082 or UPDATE-083 was given, with the
+`error_type` of the first of them (`02-common.md` COM-052), and `"info"`
 otherwise.
 
 ## 7. Reading
@@ -624,7 +625,7 @@ channel@0 is a child node; set its properties with `update adc/channel@0 <prop> 
 
 ```
 $ analog-attach --json update adc reg 0
-{"ok":true,"message":"Set reg on adc; renamed to adi,ad7124-8@0","severity":"warn"}
+{"ok":true,"message":"Set reg on adc; renamed to adi,ad7124-8@0","severity":"warn","error_type":"resource-conflict"}
 ```
 
 ```
@@ -648,5 +649,5 @@ $ analog-attach --json update testpart_ip comm_init --suggest
 $ analog-attach update testpart_spi_dev max_speed_hz abc
 'abc' is not a number                              (stderr, exit 2)
 $ analog-attach --json update testpart '$compatible' x
-{"ok":false,"message":"'$compatible' describes the node rather than configuring it, and cannot be set","severity":"error"}
+{"ok":false,"message":"'$compatible' describes the node rather than configuring it, and cannot be set","severity":"error","error_type":"read-only"}
 ```

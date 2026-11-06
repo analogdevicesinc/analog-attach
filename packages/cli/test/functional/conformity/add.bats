@@ -14,13 +14,15 @@ setup() {
 # Steps:
 #   1. Run init on each backend.
 #   2. Run, with --json, add nosuchdevice on noos and add adi,nosuchdevice on linux.
-#   3. Check both are refused (exit 0, .ok false, severity error) with a message.
-# bats test_tags=conformity, req:ADD-02, req:GEN-08, req:GEN-09, id:C0010
+#   3. Check both are refused (exit 0, .ok false, severity error, error type unknown-device-type) with a
+#      message.
+# bats test_tags=conformity, req:ADD-02, req:GEN-08, req:GEN-09, req:GEN-17, id:C0010
 @test "an unknown device type is refused the same way on both backends" {
 	on noos init
 	on linux init
 	conform add nosuchdevice -- add adi,nosuchdevice
 	assert_same_status 0
 	assert_same '{ok, severity}' '{"ok":false,"severity":"error"}'
+	assert_same '.error_type' '"unknown-device-type"'
 	assert_same '.message | type' '"string"'
 }

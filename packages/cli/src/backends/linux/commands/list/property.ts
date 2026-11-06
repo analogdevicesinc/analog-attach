@@ -75,7 +75,7 @@ values the binding offers.`,
 
         if (property === undefined) {
             const found = await node_properties(identifier, overlay.tree, base.tree, bindings);
-            if (!found.ok) { return refuse(found.message, { text: found.text ?? found.message }); }
+            if (!found.ok) { return refuse(found.message, { type: found.type, text: found.text ?? found.message }); }
             const entries = node_property_entries(found.value);
             return answer<ListPropertyResponse>(
                 { ok: true, message: node_properties_message(found.value), severity: "info", names: entries.map(entry => entry.value), properties: found.value.properties, suggestions: entries },
@@ -84,7 +84,7 @@ values the binding offers.`,
         }
 
         const found = await property_type(identifier, property, overlay.tree, base.tree, bindings);
-        if (!found.ok) { return refuse(found.message, { text: found.text ?? found.message }); }
+        if (!found.ok) { return refuse(found.message, { type: found.type, text: found.text ?? found.message }); }
         const { info, set } = found.value;
         return answer<ListPropertyResponse>(
             {

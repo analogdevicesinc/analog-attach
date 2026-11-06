@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { Result } from "attach-lib";
 
+import type { ErrorType } from "../../interface/error-types";
 import type { Workspace } from "./config/workspace";
 import { run_preprocess } from "./utilities";
 
@@ -20,17 +21,17 @@ export function include_path(source: string, base: string): string {
  * The base with the overlay applied (output `full`): write `source`, a devicetree
  * that includes the base file and adds the overlay's fragments as `&label { … }`
  * blocks, with `epilogue` after them, then preprocess it as the base is into
- * `preprocessed`. Gives the refusal's reason, or undefined.
+ * `preprocessed`. Gives the refusal's reason and type, or undefined.
  */
 export function write_full_devicetree(
     workspace: Workspace<"base" | "overlay">,
     source: string,
     preprocessed: string,
     epilogue = "",
-): string | undefined {
+): { message: string; type: ErrorType } | undefined {
     const printed = workspace.overlay.tree.print_full(include_path(source, workspace.base.source));
     if (!Result.is_ok(printed)) {
-        return `the target of ${printed.error.join(", ")} is in neither the base devicetree nor the overlay`;
+        return { message: `the target of ${printed.error.join(", ")} is in neither the base devicetree nor the overlay`, type: "bad-reference" };
     }
     fs.mkdirSync(path.dirname(source), { recursive: true });
     fs.writeFileSync(source, printed.value + epilogue);
@@ -38,7 +39,7 @@ export function write_full_devicetree(
     fs.mkdirSync(path.dirname(preprocessed), { recursive: true });
     const { linux, preprocess_command } = workspace.settings;
     const error = run_preprocess(preprocess_command, { input: source, output: preprocessed, ...(linux === undefined ? {} : { linux }) });
-    return error === undefined ? undefined : `preprocessing ${source} failed:\n${error}`;
+    return error === undefined ? undefined : { message: `preprocessing ${source} failed:\n${error}`, type: "tool-failed" };
 }
 
 if (import.meta.vitest) {

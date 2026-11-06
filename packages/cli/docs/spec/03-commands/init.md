@@ -189,8 +189,8 @@ $ analog-attach --json init
 
 ```
 $ analog-attach --json init            # linux and devicetree set, workfile not
-{"ok":false,"message":"Missing config field workfile","severity":"error",
- "errors":[{"field":"workfile","kind":"missing","message":"Missing config field workfile",
+{"ok":false,"message":"Missing config field workfile","severity":"error","error_type":"missing-setting",
+ "errors":[{"field":"workfile","kind":"missing","error_type":"missing-setting","message":"Missing config field workfile",
   "description":"Path to the working DTSO overlay file (workfile)"}],
  "hints":["Run 'analog-attach' on a terminal, or 'analog-attach config workfile <name>', then 'analog-attach init', to set up a workspace."]}
 ```
@@ -198,7 +198,7 @@ $ analog-attach --json init            # linux and devicetree set, workfile not
 ```
 $ analog-attach --json init            # workfile = "gone/x.dtso", no gone/
 {"ok":false,"message":"Cannot create the workfile: /work/gone is not a directory. Configure another with 'analog-attach config workfile <name>'.",
- "severity":"error"}
+ "severity":"error","error_type":"write-failed"}
 ```
 
 ```
@@ -213,7 +213,7 @@ $ analog-attach init
 Created a workfile for board testboard (platform testsoc)
   /home/u/proj/workfile.json
 $ analog-attach --json init
-{"ok":false,"message":"A workfile already exists at /home/u/proj/workfile.json","severity":"error"}
+{"ok":false,"message":"A workfile already exists at /home/u/proj/workfile.json","severity":"error","error_type":"workfile-exists"}
 ```
 
 ```

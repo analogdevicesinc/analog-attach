@@ -41,7 +41,7 @@ async function run_deploy_command(template: string, session: Session): Promise<O
     const result = await run_shell(substitute_command(template, { dtbo }), project_root(session), { line: text => { progress.line(text); }, signal: session.signal });
     progress.done();
     if (result.exit_code !== 0) {
-        return refuse(`Deploy failed with exit code ${String(result.exit_code)}`);
+        return refuse(`Deploy failed with exit code ${String(result.exit_code)}`, { type: "tool-failed" });
     }
     return answer<DeployResponse>({ ok: true, message: `Deployed ${dtbo} with '${template}'`, severity: "info" }, "Deploy completed successfully");
 }
@@ -75,7 +75,7 @@ With deploy-command set, runs that instead, at the base of the project, with
             execSync(build_scp_command(binary, user, ip, remote), { stdio: "pipe", env: environment });
         } catch (error: any) {
             const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
-            return Promise.resolve(refuse(`Deploy failed (scp):\n${stderr}`));
+            return Promise.resolve(refuse(`Deploy failed (scp):\n${stderr}`, { type: "tool-failed" }));
         }
 
         // The reboot drops the ssh connection, so a non-zero exit here is expected — the copy

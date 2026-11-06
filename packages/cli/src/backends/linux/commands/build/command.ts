@@ -24,7 +24,7 @@ function compile(dtc: string, input: string, output: string): Outcome<never> | u
         return undefined;
     } catch (error: any) {
         const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
-        return refuse(`Build failed:\n${stderr}`);
+        return refuse(`Build failed:\n${stderr}`, { type: "tool-failed" });
     }
 }
 
@@ -34,7 +34,7 @@ function compile(dtc: string, input: string, output: string): Outcome<never> | u
  */
 function build_full(workspace: Workspace<"tools" | "base" | "overlay">, session: Session, source: string, binary: string): Outcome<BuildResponse> {
     const problem = write_full_devicetree(workspace, source, path.join(session.state_dir, PREPROCESSED));
-    if (problem !== undefined) { return refuse(`Build failed: ${problem}`); }
+    if (problem !== undefined) { return refuse(`Build failed: ${problem.message}`, { type: problem.type }); }
     return compile(workspace.tools.dtc, path.join(session.state_dir, PREPROCESSED), binary)
         ?? answer({ ok: true, message: "Compiled devicetree", severity: "info", path: binary, source } satisfies BuildResponse, `Build completed successfully\n\n  ${source}\n  ${binary}`);
 }
@@ -49,7 +49,7 @@ async function run_build_command(template: string, session: Session): Promise<Ou
     const result = await run_shell(substitute_command(template, { workfile, output }), project_root(session), { line: text => { progress.line(text); }, signal: session.signal });
     progress.done();
     if (result.exit_code !== 0) {
-        return refuse(`Build failed with exit code ${String(result.exit_code)}`);
+        return refuse(`Build failed with exit code ${String(result.exit_code)}`, { type: "tool-failed" });
     }
     // The command is the user's: report the .dtbo (or .dtb) only when it wrote one where build would have.
     const built = fs.existsSync(output);

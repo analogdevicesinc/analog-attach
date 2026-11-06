@@ -4,6 +4,7 @@ import path from "node:path";
 import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
 import type { Outcome, Session } from "../../../interface/backend-interface";
+import type { ErrorType } from "../../../interface/error-types";
 import { project_root } from "../../shell";
 import type { ConfigRefusal } from "../protocol/types";
 import { getBundledDtSchemaPath, getBundledToolsPath } from "../commands/skill/utilities";
@@ -147,6 +148,7 @@ function require_setting(settings: Settings, key: SettingKey, program: string): 
     return fail({
         field: key,
         kind: "missing",
+        error_type: "missing-setting",
         message: `Missing config field ${key}`,
         ...(description === undefined ? {} : { description }),
         ...(hint === undefined ? {} : { hint }),
@@ -157,7 +159,7 @@ function require_path(settings: Settings, key: SettingKey, kind: "file" | "direc
     const value = require_setting(settings, key, program);
     if (!value.ok) { return value; }
     const stat = fs.statSync(value.value, { throwIfNoEntry: false });
-    if (stat === undefined) { return fail(invalid_setting(key, `${value.value} does not exist`, program)); }
+    if (stat === undefined) { return fail(invalid_setting(key, `${value.value} does not exist`, program, key === "workfile" ? "workfile-missing" : "invalid-setting")); }
     if (kind === "file" ? !stat.isFile() : !stat.isDirectory()) {
         return fail(invalid_setting(key, `${value.value} is not a ${kind}`, program));
     }
@@ -178,14 +180,14 @@ export function parse_linux(settings: Settings, program: string): ConfigResult<s
     const linux = require_path(settings, "linux", "directory", program);
     if (!linux.ok) { return linux; }
     const problem = linux_tree_problem(linux.value);
-    return problem === undefined ? linux : fail(invalid_setting("linux", problem, program));
+    return problem === undefined ? linux : fail(invalid_setting("linux", problem, program, "invalid-source"));
 }
 
 export function parse_dt_schema(context: Pick<WorkspaceContext, "assets_dir" | "program">): ConfigResult<string> {
     const root = getBundledDtSchemaPath(context.assets_dir);
     const complete = ["schemas", "meta-schemas"].every(directory => fs.existsSync(path.join(root, "dtschema", directory)));
     if (!complete) {
-        return fail({ field: "dt-schema", kind: "missing", message: `Bundled dt-schema not found at ${root}`, hint: bundle_hint(context.program) });
+        return fail({ field: "dt-schema", kind: "missing", error_type: "install-incomplete", message: `Bundled dt-schema not found at ${root}`, hint: bundle_hint(context.program) });
     }
     return { ok: true, value: root };
 }
@@ -195,7 +197,7 @@ export const reload_hint = (program: string): string => `Run '${program} config 
 /** The caches `config linux <path>` and `config --reload` build; commands only read them, so they must be there. */
 function parse_caches(context: Pick<WorkspaceContext, "state_dir" | "program">): ConfigResult<undefined> {
     const missing = (field: string, file: string): ConfigError => ({
-        field, kind: "missing", message: `${file} not found or unreadable in ${context.state_dir}`, hint: reload_hint(context.program),
+        field, kind: "missing", error_type: "cache-missing", message: `${file} not found or unreadable in ${context.state_dir}`, hint: reload_hint(context.program),
     });
     const errors: ConfigError[] = [];
     if (load_compat_index(context.state_dir)?.entries === undefined) { errors.push(missing("compat-index", "compat-index.json")); }
@@ -229,7 +231,7 @@ export function parse_tools(context: Pick<WorkspaceContext, "assets_dir" | "prog
     };
     const missing = Object.values(tools).filter(tool => !fs.existsSync(tool));
     if (missing.length > 0) {
-        return fail({ field: "tools", kind: "missing", message: `Bundled tools not found: ${missing.join(", ")}`, hint: bundle_hint(context.program) });
+        return fail({ field: "tools", kind: "missing", error_type: "install-incomplete", message: `Bundled tools not found: ${missing.join(", ")}`, hint: bundle_hint(context.program) });
     }
     return { ok: true, value: tools };
 }
@@ -250,7 +252,7 @@ export function parse_base(settings: Settings, linux: () => ConfigResult<string>
 
     const tool = command.trim().split(/\s+/)[0] ?? "";
     if (!is_tool_available(`${tool} --version`)) {
-        return fail(invalid_setting("preprocess-command", `${tool} not found on PATH (needed to preprocess ${source.value})`, program));
+        return fail(invalid_setting("preprocess-command", `${tool} not found on PATH (needed to preprocess ${source.value})`, program, "tool-missing"));
     }
 
     fs.mkdirSync(context.state_dir, { recursive: true });
@@ -261,12 +263,12 @@ export function parse_base(settings: Settings, linux: () => ConfigResult<string>
         ...(linux_result === undefined ? {} : { linux: linux_result.value }),
     });
     if (error !== undefined) {
-        return fail(invalid_setting("devicetree", `preprocessing ${source.value} failed:\n${error}`, program));
+        return fail(invalid_setting("devicetree", `preprocessing ${source.value} failed:\n${error}`, program, "tool-failed"));
     }
 
     const tree = DeviceTree.new_from_string(fs.readFileSync(preprocessed, "utf8"));
     if (typeof tree === "string") {
-        return fail(invalid_setting("devicetree", `${source.value} does not parse after preprocessing: ${tree}`, program));
+        return fail(invalid_setting("devicetree", `${source.value} does not parse after preprocessing: ${tree}`, program, "parse-error"));
     }
     return { ok: true, value: { source: source.value, preprocessed, tree } };
 }
@@ -282,7 +284,7 @@ export function parse_overlay(settings: Settings, base: BaseTree, program: strin
     if (!file.ok) { return file; }
     const tree = DeviceTreeOverlay.new_from_string(fs.readFileSync(file.value, "utf8"), base.tree);
     if (typeof tree === "string") {
-        return fail(invalid_setting("workfile", `${file.value} does not parse: ${tree}`, program));
+        return fail(invalid_setting("workfile", `${file.value} does not parse: ${tree}`, program, "parse-error"));
     }
     return { ok: true, value: open_workfile(file.value, tree, settings.overlay_syntax) };
 }
@@ -299,12 +301,12 @@ function parse_deploy(settings: Settings, program: string): ConfigResult<DeployT
     const { binary } = derive_build_files(overlay.value, settings.output, settings.build_dir);
     if (!fs.existsSync(binary)) {
         const what = settings.output === "full" ? "devicetree" : "overlay";
-        return fail({ field: "workfile", kind: "missing", message: `Compiled ${what} ${binary} not found`, hint: "Run 'build' first." });
+        return fail({ field: "workfile", kind: "missing", error_type: "not-generated", message: `Compiled ${what} ${binary} not found`, hint: "Run 'build' first." });
     }
 
     const missing = ["scp", "sshpass"].filter(tool => !is_tool_available(`which ${tool}`));
     if (missing.length > 0) {
-        return fail({ field: "deploy", kind: "missing", message: `${missing.join(", ")} not found on PATH (needed to deploy)` });
+        return fail({ field: "deploy", kind: "missing", error_type: "tool-missing", message: `${missing.join(", ")} not found on PATH (needed to deploy)` });
     }
 
     return { ok: true, value: { host: host.value, user: user.value, password: password.value, output: settings.output, binary } };
@@ -364,10 +366,16 @@ export function format_config_errors(errors: readonly ConfigError[], program: st
         ok: false,
         message: errors.map(error => error.message).join("; "),
         severity: "error",
-        errors: errors.map(({ field, kind, message, description }) => ({ field, kind, message, ...(description === undefined ? {} : { description }) })),
+        error_type: config_error_type(errors),
+        errors: errors.map(({ field, kind, error_type, message, description }) => ({ field, kind, error_type, message, ...(description === undefined ? {} : { description }) })),
         hints,
     };
     return { human, response };
+}
+
+/** The type a refusal over configuration errors carries (GEN-17): the first error's. */
+export function config_error_type(errors: readonly ConfigError[]): ErrorType {
+    return errors[0]?.error_type ?? "invalid-setting";
 }
 
 /**
@@ -577,8 +585,8 @@ if (import.meta.vitest) {
 
     test("config_errors_outcome - a refusal naming each problem, with the hints", () => {
         const errors: ConfigError[] = [
-            { field: "linux", kind: "missing", message: "Missing config field linux", hint: "Run 'aa config linux <path>'." },
-            { field: "deploy-ip", kind: "missing", message: "Missing config field deploy-ip" },
+            { field: "linux", kind: "missing", error_type: "missing-setting", message: "Missing config field linux", hint: "Run 'aa config linux <path>'." },
+            { field: "deploy-ip", kind: "missing", error_type: "missing-setting", message: "Missing config field deploy-ip" },
         ];
         const outcome = config_errors_outcome({ program: "aa" }, errors);
         if (outcome.kind !== "refused") { throw new Error(`expected a refusal, got ${outcome.kind}`); }
@@ -586,9 +594,10 @@ if (import.meta.vitest) {
             ok: false,
             message: "Missing config field linux; Missing config field deploy-ip",
             severity: "error",
+            error_type: "missing-setting",
             errors: [
-                { field: "linux", kind: "missing", message: "Missing config field linux" },
-                { field: "deploy-ip", kind: "missing", message: "Missing config field deploy-ip" },
+                { field: "linux", kind: "missing", error_type: "missing-setting", message: "Missing config field linux" },
+                { field: "deploy-ip", kind: "missing", error_type: "missing-setting", message: "Missing config field deploy-ip" },
             ],
             hints: ["Run 'aa config linux <path>'."],
         });

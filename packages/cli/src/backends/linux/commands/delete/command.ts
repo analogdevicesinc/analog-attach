@@ -13,6 +13,7 @@ function preview_answer(preview: { node_count: number; property_count: number; p
         ok: true,
         message,
         severity: "warn",
+        error_type: "needs-force",
         node_count: preview.node_count,
         property_count: preview.property_count,
         paths: preview.paths,
@@ -41,6 +42,7 @@ function reference_preview(identifier: string, node: DTNode, found: Referrer[]) 
         ok: true,
         message: `'${identifier}' is referenced by ${properties(found.length)}; deleting it would clear ${those}. Re-run with --force.`,
         severity: "warn",
+        error_type: "needs-force",
         node_count: count_subtree(node).node_count,
         property_count: found.length,
         paths: [[identifier], ...found.map(referrer => [referrer.owner, referrer.property])],
@@ -84,12 +86,12 @@ A node with children, or the whole overlay, is only previewed without --force.`,
         }
 
         if (path_argument === "/" && property_argument === undefined) {
-            return Promise.resolve(refuse("Cannot delete the root node"));
+            return Promise.resolve(refuse("Cannot delete the root node", { type: "read-only" }));
         }
 
         if (property_argument !== undefined) {
             const result = remove_overlay_property(overlay, path_argument, property_argument);
-            if (result !== "removed") { return Promise.resolve(refuse(`Not found: ${property_argument} on ${path_argument}`)); }
+            if (result !== "removed") { return Promise.resolve(refuse(`Not found: ${property_argument} on ${path_argument}`, { type: "not-found" })); }
             workspace.overlay.save();
             return Promise.resolve(answer<DeleteResponse>(
                 { ok: true, message: `Removed ${property_argument} from ${path_argument}`, severity: "info" },
@@ -110,11 +112,11 @@ A node with children, or the whole overlay, is only previewed without --force.`,
         for (const reference of references) { overlay.remove_property(reference.path, reference.property); }
         const result = delete_overlay_node(base, overlay, identifier);
         switch (result) {
-            case "not-found": { return Promise.resolve(refuse(not_found_message(identifier, overlay, base))); }
+            case "not-found": { return Promise.resolve(refuse(not_found_message(identifier, overlay, base), { type: "not-found" })); }
             case "in-base": {
-                return Promise.resolve(refuse(`${identifier} is part of the base device tree (${devicetree}), not this overlay; delete only removes overlay-added nodes`));
+                return Promise.resolve(refuse(`${identifier} is part of the base device tree (${devicetree}), not this overlay; delete only removes overlay-added nodes`, { type: "read-only" }));
             }
-            case "is-root": { return Promise.resolve(refuse("Cannot delete the root node")); }
+            case "is-root": { return Promise.resolve(refuse("Cannot delete the root node", { type: "read-only" })); }
             case "deleted": {
                 workspace.overlay.save();
                 const cleared = references.length === 0 ? "" : ` and cleared ${references_word(references.length)} to it`;

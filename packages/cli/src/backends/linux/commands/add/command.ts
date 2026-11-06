@@ -16,6 +16,7 @@ import {
 } from "attach-lib";
 
 import { answer, cancelled, command, input_error, PromptCancelled, refuse, type AddArguments, type InteractiveSession } from "../../../../interface/backend-interface";
+import type { ErrorType } from "../../../../interface/error-types";
 import { load_workspace, type Bindings } from "../../config/workspace";
 import type { Settings } from "../../config/settings";
 import { bus_kind, find_binding, invalid_node_name_message, node_children, parse_node_path, resolve_path, type BusKind } from "../../utilities";
@@ -116,7 +117,7 @@ Use 'list devices' to find compatible strings, 'list parent' to find valid buses
         if (typeof template === "string") { return input_error(template); }
         const copies = template.kind !== "required";
         if (copies && name !== undefined) {
-            return refuse(`--name doesn't apply with --template ${template_text(template)}: the node keeps its name (rename it afterwards)`);
+            return refuse(`--name doesn't apply with --template ${template_text(template)}: the node keeps its name (rename it afterwards)`, { type: "conflicting-flags" });
         }
 
         const loaded = load_workspace(session, ["bindings", "base", "overlay"]);
@@ -126,7 +127,7 @@ Use 'list devices' to find compatible strings, 'list parent' to find valid buses
         const { settings, overlay: workfile } = workspace;
 
         const binding_path = await find_binding(workspace.bindings, compatible);
-        if (binding_path === undefined) { return refuse(unknown_compatible_message(workspace.bindings, compatible, session.program)); }
+        if (binding_path === undefined) { return refuse(unknown_compatible_message(workspace.bindings, compatible, session.program), { type: "unknown-device-type" }); }
 
         // Only a run that may ask gets a prompter: not --json, --quiet, a run off a terminal or
         // the interview setting off. The parent question is part of the interview.
@@ -157,9 +158,9 @@ Use 'list devices' to find compatible strings, 'list parent' to find valid buses
         });
 
         if (result.status === "parent-not-found") {
-            return refuse(`Parent node ${parent} not found`, { text: `Couldn't find parent node ${parent} in ${workspace.base.source} or ${workfile.path}` });
+            return refuse(`Parent node ${parent} not found`, { type: "not-found", text: `Couldn't find parent node ${parent} in ${workspace.base.source} or ${workfile.path}` });
         }
-        if (result.status === "failed") { return refuse(result.message); }
+        if (result.status === "failed") { return refuse(result.message, { type: result.type }); }
 
         workfile.save();
         const parent_path = result.path.slice(0, result.path.lastIndexOf("/")) || "/";
@@ -280,12 +281,12 @@ async function choose_parent(compatible: string, binding_path: string, choice: P
 type AddOutcome =
     | { status: "added"; key: string; path: string; label: string; messages: (added: AddedNode) => string[] }
     | { status: "parent-not-found" }
-    | { status: "failed"; message: string };
+    | { status: "failed"; message: string; type: ErrorType };
 
 function add_by_hand(base: DeviceTree, overlay: DeviceTreeOverlay, request: AddRequest): AddOutcome {
     const result = add_device(base, overlay, request);
     if (result.status === "parent-not-found") { return result; }
-    if (result.status !== "added") { return { status: "failed", message: failure_message(result, request.parent ?? "/") }; }
+    if (result.status !== "added") { return { status: "failed", ...failure_message(result, request.parent ?? "/") }; }
     return { ...result, messages: added => result.notes.map(note => note_message(note, added)) };
 }
 
@@ -323,7 +324,7 @@ async function add_from_example(input: TemplateInput, index: number): Promise<Ad
     const file = path.basename(binding_path);
     const search = find_examples(await binding_examples(binding_path, bindings), device_matcher(bindings, binding_path, request.compatible), settings, bindings.linux, state_dir);
     const picked = pick_example(search, index, request.compatible, file);
-    if (typeof picked === "string") { return { status: "failed", message: picked }; }
+    if (!("node" in picked)) { return { status: "failed", ...picked }; }
 
     // Without --parent: the first valid parent on the bus the example is on, else the first valid parent.
     let placed: DefaultParent | undefined;
@@ -337,7 +338,7 @@ async function add_from_example(input: TemplateInput, index: number): Promise<Ad
     const bus = parent_node === undefined ? undefined : bus_kind(parent_node);
     const copied = copy_example_node(overlay, parent_path, picked.node, request);
     if (copied.status === "parent-not-found") { return copied; }
-    if (copied.status !== "added") { return { status: "failed", message: failure_message(copied, request.parent ?? placed?.label ?? parent_path) }; }
+    if (copied.status !== "added") { return { status: "failed", ...failure_message(copied, request.parent ?? placed?.label ?? parent_path) }; }
     const note = placed === undefined ? undefined : parent_note(placed, picked.index);
     const messages = [
         ...(note === undefined ? [] : [note]),
@@ -352,7 +353,7 @@ async function add_from_example(input: TemplateInput, index: number): Promise<Ad
 async function add_from_overlay(input: TemplateInput, name: string): Promise<AddOutcome> {
     const { overlay, base, settings, bindings, binding_path, request, cwd, state_dir } = input;
     const found = load_overlay_template(name, request.compatible, device_matcher(bindings, binding_path, request.compatible), settings, bindings.linux, base, { cwd, state_dir });
-    if (found.status === "failed") { return { status: "failed", message: found.message }; }
+    if (found.status === "failed") { return found; }
 
     // Without --parent: the node its fragment targets; when the base lacks that, the first valid parent of the target's bus kind.
     let placed: DefaultParent | undefined;
@@ -365,7 +366,7 @@ async function add_from_overlay(input: TemplateInput, name: string): Promise<Add
     if (parent_path === undefined) { return { status: "parent-not-found" }; }
     const copied = copy_example_node(overlay, parent_path, found.match.node, request);
     if (copied.status === "parent-not-found") { return copied; }
-    if (copied.status !== "added") { return { status: "failed", message: failure_message(copied, request.parent ?? (placed === undefined ? found.place : placed.label ?? placed.path)) }; }
+    if (copied.status !== "added") { return { status: "failed", ...failure_message(copied, request.parent ?? (placed === undefined ? found.place : placed.label ?? placed.path)) }; }
 
     return { ...copied, messages: () => overlay_messages(found, request, copied.label, copied.notes, placed) };
 }
@@ -420,13 +421,13 @@ export function add_device(base: DeviceTree, overlay: DeviceTreeOverlay, request
     });
 }
 
-function failure_message(result: Exclude<AddNodeResult, { status: "added" | "parent-not-found" }>, parent: string): string {
+function failure_message(result: Exclude<AddNodeResult, { status: "added" | "parent-not-found" }>, parent: string): { message: string; type: ErrorType } {
     switch (result.status) {
-        case "empty-unit-address": { return "Empty unit address (name@ is invalid)"; }
-        case "invalid-name": { return invalid_node_name_message(result.name); }
-        case "invalid-label": { return `Invalid label: ${result.label} (must match [A-Za-z_][A-Za-z0-9_]*)`; }
-        case "label-taken": { return `Label ${result.label} is already used by ${result.owner}`; }
-        case "duplicate": { return `${parent} already has a child named ${result.key}`; }
+        case "empty-unit-address": { return { message: "Empty unit address (name@ is invalid)", type: "invalid-name" }; }
+        case "invalid-name": { return { message: invalid_node_name_message(result.name), type: "invalid-name" }; }
+        case "invalid-label": { return { message: `Invalid label: ${result.label} (must match [A-Za-z_][A-Za-z0-9_]*)`, type: "invalid-name" }; }
+        case "label-taken": { return { message: `Label ${result.label} is already used by ${result.owner}`, type: "name-taken" }; }
+        case "duplicate": { return { message: `${parent} already has a child named ${result.key}`, type: "name-taken" }; }
     }
 }
 

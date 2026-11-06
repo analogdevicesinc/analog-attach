@@ -28,12 +28,13 @@ setup() {
 # Steps:
 #   1. Run init on each backend.
 #   2. Run rename nosuch other, with --json, on each backend.
-#   3. Check both are refused (exit 0, .ok false, severity error).
-# bats test_tags=conformity, req:RENAME-01, req:GEN-08, req:GEN-09, id:C0025
+#   3. Check both are refused (exit 0, .ok false, severity error, error type not-found).
+# bats test_tags=conformity, req:RENAME-01, req:GEN-08, req:GEN-09, req:GEN-17, id:C0025
 @test "rename of an unknown node is refused the same way on both backends" {
 	on noos init
 	on linux init
 	conform rename nosuch other -- rename nosuch other
 	assert_same_status 0
 	assert_same '{ok, severity}' '{"ok":false,"severity":"error"}'
+	assert_same '.error_type' '"not-found"'
 }

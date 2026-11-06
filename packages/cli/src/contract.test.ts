@@ -24,6 +24,7 @@ import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { BACKENDS, type Registry } from "./front/registry";
 import { build_routes, SHARED_ROUTES, type FrontEnd, type Route } from "./front/routes";
 import type { Backend, Commands, Completion, ExtraCommand, Slot } from "./interface/backend-interface";
+import { ERROR_TYPES } from "./interface/error-types";
 import { BASE_DTS, create_linux_fixture, IMPORTED, OVERLAY, type LinuxFixture } from "./backends/linux/testing/fixture";
 import { create_noos_fixture, FIXTURES, type NoosFixture } from "./backends/noos/testing/fixture";
 
@@ -287,9 +288,13 @@ function check_contract<F extends Harness>(contract: Contract<F>): void {
                     } else {
                         expect(result.code, label).toBe(0);
                         response = JSON.parse(result.stdout);
-                        const ok = (response as { ok?: unknown }).ok;
+                        const { ok, severity, error_type } = response as { ok?: unknown; severity?: unknown; error_type?: unknown };
                         if (kase.shape === "refusal" || kase.shape === "config-refusal") { expect(ok, label).toBe(false); }
                         if (kase.shape === "answer" && ok !== undefined) { expect(ok, label).toBe(true); }
+                        // GEN-17: a refusal, and a success that warned, say which kind it is (validate's findings do instead).
+                        if (ok === false || (severity === "warn" && kase.route !== "validate")) {
+                            expect(Object.keys(ERROR_TYPES), label).toContain(error_type);
+                        }
                     }
                     for (const reference of references(backend, kase as Case<Harness>)) {
                         expect(schema_errors(response, reference), `${reference}\n${label}`).toEqual([]);

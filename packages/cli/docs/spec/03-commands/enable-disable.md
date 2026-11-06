@@ -99,5 +99,5 @@ and for a node without a label (`disable /memory@0`), `target-path =
 
 ```
 $ analog-attach --json enable nope
-{"ok":false,"message":"Not found: nope","severity":"error"}
+{"ok":false,"message":"Not found: nope","severity":"error","error_type":"not-found"}
 ```

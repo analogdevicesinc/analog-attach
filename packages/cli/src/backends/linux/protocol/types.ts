@@ -14,6 +14,7 @@ import type {
     SuggestResponse,
 } from "../../../interface/backend-responses";
 import type { ListContextResponse, ListDevicesResponse, ListPropertyResponse } from "./descriptions";
+import type { ErrorType } from "../../../interface/error-types";
 
 export type { CommonResponse, PropertyConstraints, PropertySuggestions, PropertyValue, Severity, Suggestion, SuggestResponse } from "../../../interface/backend-responses";
 
@@ -34,7 +35,9 @@ export interface ConfigEnum {
 /** A command whose workspace doesn't load (COM-071): a refusal that names each problem. */
 export interface ConfigRefusal extends CommonResponse {
     ok: false;
-    errors: { field: string; kind: "missing" | "invalid" | "unknown"; message: string; description?: string }[];
+    /** The first error's. */
+    error_type: ErrorType;
+    errors: { field: string; kind: "missing" | "invalid" | "unknown"; error_type: ErrorType; message: string; description?: string }[];
     hints: string[];
 }
 
@@ -162,6 +165,8 @@ export interface ValidationError {
     kind: "generic";
     path: string[];
     message: string;
+    /** Which kind of finding it is (GEN-17). */
+    error_type: ErrorType;
 }
 
 export interface ValidationResponse extends CommonResponse {

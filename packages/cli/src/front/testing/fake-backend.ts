@@ -133,7 +133,7 @@ export function create_fake_backend(options: FakeOptions = {}): { backend: Backe
                 )),
             }),
             // refused
-            delete: command({ run: () => Promise.resolve(refuse("Nothing to delete")) }),
+            delete: command({ run: () => Promise.resolve(refuse("Nothing to delete", { type: "not-found" })) }),
             // input-error
             rename: command({ run: arguments_ => Promise.resolve(input_error(`Bad name: ${arguments_.name}`)) }),
             // cancelled
@@ -162,7 +162,7 @@ export function create_fake_backend(options: FakeOptions = {}): { backend: Backe
                 }
                 const tree = await session.prompter.input({ message: "Source tree" });
                 const write = await session.settings.set("tree", tree);
-                if (!write.ok) { return refuse(write.message); }
+                if (!write.ok) { return refuse(write.message, { type: "invalid-setting" }); }
                 session.say("Asked for the tree.");
                 return answer({ ok: true, message: "Saved tree", severity: "info", saved: ["tree"], ready: true }, "Saved tree.");
             },
