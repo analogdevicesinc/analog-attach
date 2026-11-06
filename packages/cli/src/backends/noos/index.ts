@@ -20,7 +20,7 @@ import { list_context, list_property, list_value } from "./commands/list";
 import { list_devices } from "./commands/list_devices";
 import { read } from "./commands/read";
 import { rename } from "./commands/rename";
-import { setup } from "./commands/setup";
+import { setting_suggestions, setup } from "./commands/setup";
 import { update } from "./commands/update";
 import { validate } from "./commands/validate";
 import type { NoosResponses } from "./protocol/responses";
@@ -39,7 +39,7 @@ export const backend: Backend<NoosResponses> = {
     version: package_version(),
     words: { device: "schema", path: "node", workfile: "workfile" },
     settings: SETTINGS,
-    settings_hooks: noos_settings_hooks,
+    settings_hooks: { ...noos_settings_hooks, suggestions: setting_suggestions },
     commands: {
         init,
         list: { devices: list_devices, context: list_context, property: list_property, value: list_value },

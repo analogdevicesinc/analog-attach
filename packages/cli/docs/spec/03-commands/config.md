@@ -114,6 +114,18 @@ first. The options are there for a setting that has them (`backend`,
 empty line and its hint follow. On a terminal the key is bold and
 `(required)`, the source and `(not set)` dim.
 
+**CONFIG-017** When showing one setting that takes any value, the CLI shall
+offer the values the backend finds for it, which it doesn't require: in JSON
+the entry's `suggestions` (each `{ value, display_string? }`), in human mode a
+`Found:` line after the options, one value per line, the others under the
+first, each followed by its description, dim. Where the backend is noos:
+for `capi-path`, the capi checkouts in the current directory or any above it,
+in the home directory, and one or two levels into either (`~/work/capi`),
+nearest first; for `module-paths`, the module repositories beside the
+configured `capi-path`, each described `<name> (<type>)`. They are looked for
+only for one setting, not for the whole list (a scan of folders); none found,
+there is no `suggestions` and no `Found:` line.
+
 **CONFIG-016** While in human mode, when showing every setting, the CLI
 shall write `Local:  <file>` and `Global: <file>` (the settings files, the
 home directory written `~`), an empty line, then for each category in order

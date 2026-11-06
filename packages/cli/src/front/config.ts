@@ -15,7 +15,7 @@ import {
     answer, input_error, refuse,
     type Completion, type Outcome, type Session, type SettingSpec,
 } from "../interface/backend-interface";
-import type { CommonResponse } from "../interface/backend-responses";
+import type { CommonResponse, Suggestion } from "../interface/backend-responses";
 import { did_you_mean } from "../interface/names";
 import { BACKEND_KEY, display_path, type ConfigError, type SettingsStore } from "./settings-store";
 import { backend_command, type FrontEnd, type PositionalValues, type Route } from "./routes";
@@ -32,6 +32,11 @@ export interface ConfigEntry {
     value: string | readonly string[] | null;
     /** Where `value` comes from. */
     source: "local" | "global" | "default" | "unset";
+    /**
+     * `config <key>` of a setting that takes any value (a path): values found for it, offered,
+     * not required (the backend's `suggestions` hook). Absent when none are found.
+     */
+    suggestions?: Suggestion[];
 }
 
 export interface ConfigResponse extends CommonResponse {
@@ -93,7 +98,8 @@ function source_of(settings: SettingsStore, key: string): ConfigEntry["source"] 
     return typeof origin === "string" ? origin : origin.scope;
 }
 
-async function config_entry(spec: SettingSpec, front: FrontEnd, session: Session): Promise<ConfigEntry> {
+async function config_entry(spec: SettingSpec, front: FrontEnd, session: Session, suggest = false): Promise<ConfigEntry> {
+    const suggestions = suggest ? await suggestions_of(spec.key, front, session) : [];
     /* eslint-disable unicorn/no-null -- the protocol's Config has null for "none" */
     return {
         field_name: spec.key,
@@ -104,8 +110,20 @@ async function config_entry(spec: SettingSpec, front: FrontEnd, session: Session
         default: spec.default ?? null,
         value: value_of(front.settings, spec) ?? null,
         source: source_of(front.settings, spec.key),
+        ...(suggestions.length > 0 ? { suggestions } : {}),
     };
     /* eslint-enable unicorn/no-null */
+}
+
+/** What the backend found for a setting (its `suggestions` hook); none when it fails or has no hook. */
+async function suggestions_of(key: string, front: FrontEnd, session: Session): Promise<Suggestion[]> {
+    const hook = front.backend?.settings_hooks?.suggestions;
+    if (hook === undefined) { return []; }
+    try {
+        return await hook(key, session);
+    } catch {
+        return [];
+    }
 }
 
 const NOT_SET = "(not set)";
@@ -211,6 +229,12 @@ function format_one(entry: ConfigEntry, spec: SettingSpec, front: FrontEnd, styl
         const [options = "", ...rest] = wrap(entry.type.options, width, ", ");
         lines.push(...under(`${label("Options")}${options}`, rest));
     }
+    const found = (entry.suggestions ?? []).map(suggestion =>
+        `${display_path(suggestion.value, front.home)}${suggestion.display_string === undefined ? "" : style.dim(`  ${suggestion.display_string}`)}`);
+    if (found.length > 0) {
+        const [first = "", ...rest] = found;
+        lines.push(...under(`${label("Found")}${first}`, rest));
+    }
     const hint = entry.required && entry.value === null ? hint_of(spec, front) : undefined;
     if (hint !== undefined) { lines.push("", hint); }
     return lines.join("\n");
@@ -223,7 +247,8 @@ const LABEL_WIDTH = 14;
 async function show(front: FrontEnd, session: Session, only?: SettingSpec): Promise<Outcome<ConfigResponse>> {
     if (front.settings.errors.length > 0) { return config_errors(front.settings.errors, front.json); }
     const specs = only === undefined ? front.settings.specs : [only];
-    const entries = await Promise.all(specs.map(spec => config_entry(spec, front, session)));
+    // What was found for a setting is looked for when it is asked for alone: a scan of folders.
+    const entries = await Promise.all(specs.map(spec => config_entry(spec, front, session, only !== undefined)));
     const response: ConfigResponse = { ok: true, message: `${entries.length} config field(s)`, severity: "info", configs: entries };
     const [entry] = entries;
     const { style } = session;

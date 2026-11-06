@@ -388,3 +388,30 @@ global_setting() {
 	assert_output --partial "Unknown config field: targt"
 	assert_output --regexp "(mean|closest)[^.]*target"
 }
+
+# Description: config of a path setting offers what it finds for it: config capi-path the capi
+# checkouts near the project, config module-paths the module repositories beside the capi.
+# Steps:
+#   1. Make a capi checkout with the fixtures' platform and drivers beside it, next to the project.
+#   2. Run config capi-path, with --json; check its suggestions name the checkout.
+#   3. Set capi-path to it, then run config module-paths, with --json; check its suggestions are
+#      the platform and the drivers, described by their name and type.
+#   4. Run config module-paths in human mode; check it lists them under Found.
+#   5. Run config, with --json; check no entry has suggestions (only one setting is looked for).
+# bats test_tags=req:CONFIG-02, req:SET-05, id:N0284
+@test "config of a path setting offers the checkouts and module repositories it finds" {
+	local eco="$BATS_TEST_TMPDIR/eco"
+	mkdir -p "$eco"
+	cp -r "$NOOS_FIXTURES/capi" "$NOOS_FIXTURES/platform" "$NOOS_FIXTURES/driver-collection" "$eco/"
+	sed -i 's/^name: .*/name: capi/' "$eco/capi/module.yml"
+	run_json config capi-path
+	assert_json "[.configs[0].suggestions[].value] | map(select(. == \"$eco/capi\")) | length" 1
+	aa config capi-path "$eco/capi" >/dev/null
+	run_json config module-paths
+	assert_json '[.configs[0].suggestions[].value | split("/") | last] | join(" ")' "driver-collection platform"
+	assert_json '.configs[0].suggestions[0].display_string | test("^.+ \\((driver_collection|platform)\\)$")' true
+	run aa config module-paths
+	assert_output --regexp "Found: +$eco/driver-collection"
+	run_json config
+	assert_json '[.configs[] | select(has("suggestions"))] | length' 0
+}

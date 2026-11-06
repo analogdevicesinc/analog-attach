@@ -71,3 +71,23 @@ gui_run() {
 	assert_failure 2
 	assert_output --partial "--port takes a port number"
 }
+
+# Description: the GUI's "New project" makes the project folder it is given, and switches to it,
+# with no settings yet.
+# Steps:
+#   1. Start the GUI in the background.
+#   2. POST /api/project with a folder that doesn't exist and create: true.
+#   3. Check the folder now exists, and the answer names it with no settings and no backend.
+#   4. POST /api/project with another missing folder, without create; check it is refused.
+# bats test_tags=id:N0285
+@test "the GUI makes a new project's folder when asked" {
+	need curl
+	start_gui
+	local fresh="$BATS_TEST_TMPDIR/fresh/project"
+	run curl -s -X POST -H 'content-type: application/json' -d "{\"dir\":\"$fresh\",\"create\":true}" "$GUI_URL/api/project"
+	[ -d "$fresh" ] || fail "no folder made: $output"
+	assert_output "{\"dir\":\"$fresh\",\"settings\":false,\"backend\":null}"
+	run curl -s -X POST -H 'content-type: application/json' -d "{\"dir\":\"$BATS_TEST_TMPDIR/absent\"}" "$GUI_URL/api/project"
+	assert_output --partial "Not a folder"
+	[ ! -e "$BATS_TEST_TMPDIR/absent" ]
+}

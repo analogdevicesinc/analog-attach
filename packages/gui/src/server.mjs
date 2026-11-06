@@ -91,8 +91,12 @@ export function start_gui({ cli, project, port = DEFAULT_PORT, html = INDEX_HTML
 
 			if (url.pathname === "/api/project") {
 				if (request.method === "POST") {
-					const { dir } = await read_body(request);
+					const { dir, create } = await read_body(request);
 					const resolved = path.resolve(String(dir ?? "").replace(/^~(?=$|\/)/, process.env.HOME ?? "~"));
+					// A new project's folder (the setup's "New project"): made when asked for.
+					if (create === true && !fs.existsSync(resolved)) {
+						fs.mkdirSync(resolved, { recursive: true });
+					}
 					if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
 						send(response, 400, { error: `Not a folder: ${resolved}` });
 						return;

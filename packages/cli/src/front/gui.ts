@@ -1,8 +1,8 @@
 // `analog-attach gui [--port <n>] [--server-only]`: the GUI (packages/gui) for the project in
 // the current directory. It starts the GUI's server on 127.0.0.1, which runs this same CLI for
 // every action of the page, opens the page in the browser, and runs until stopped (Ctrl-C).
-// The page is bundled with the CLI (`bundled/gui/index.html`), or taken from packages/gui
-// when the CLI runs from the repository. It handles noos projects for now: elsewhere, help and
+// The page is packages/gui's own when the CLI runs from the repository, else the copy bundled
+// with the CLI (`bundled/gui/index.html`). It handles noos projects for now: elsewhere, help and
 // completion leave it out.
 
 import { spawn } from "node:child_process";
@@ -18,9 +18,12 @@ export interface GuiResponse extends CommonResponse {
     url: string;
 }
 
-/** The page: the bundled copy, else the GUI package's own (a CLI run from the repository). */
+/**
+ * The page: the GUI package's own when the CLI runs from the repository (so an edit shows on a
+ * reload, with no build), else the copy bundled with the CLI.
+ */
 function page(root: string): string | undefined {
-    const candidates = [path.join(root, "bundled", "gui", "index.html"), path.join(root, "..", "gui", "src", "index.html")];
+    const candidates = [path.join(root, "..", "gui", "src", "index.html"), path.join(root, "bundled", "gui", "index.html")];
     return candidates.find(candidate => fs.existsSync(candidate));
 }
 

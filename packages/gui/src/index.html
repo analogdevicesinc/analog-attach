@@ -114,6 +114,26 @@
 	.setting-row td.edit .editor input, .setting-row td.edit .editor select { max-width: 560px; }
 	.req { color: var(--err); }
 
+	/* The project setup: the steps on the left, the current one beside them. */
+	.wizard { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: start; }
+	.steps { display: flex; flex-direction: column; gap: 2px; }
+	.steps button { text-align: left; border: none; background: transparent; padding: 8px 10px; border-radius: 8px; display: flex; gap: 8px; align-items: center; }
+	.steps button.current { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+	.steps .mark { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11.5px; background: var(--chip); flex: none; }
+	.steps .done .mark { background: var(--ok-soft); color: var(--ok); }
+	.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 12px 0; }
+	.choice { text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--panel); display: flex; flex-direction: column; gap: 4px; }
+	.choice.picked { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+	.choice .k { font-family: var(--mono); font-weight: 600; font-size: 13px; word-break: break-all; }
+	.found { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+	.found label { display: flex; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12.5px; }
+	.found .about { font-family: system-ui, sans-serif; color: var(--muted); font-size: 12px; }
+	.field-row { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
+	.field-row input, .field-row select, .field-row textarea { flex: 1; max-width: 620px; font-family: var(--mono); font-size: 12.5px; }
+	.problem { background: var(--err-soft); color: var(--err); border-radius: 8px; padding: 8px 12px; margin: 10px 0; font-size: 13px; white-space: pre-wrap; }
+	.optional td.key { vertical-align: top; padding-top: 12px; }
+	@media (max-width: 900px) { .wizard { grid-template-columns: 1fr; } }
+
 	#graph { overflow: auto; text-align: center; }
 	#graph svg { max-width: none; }
 
@@ -145,6 +165,7 @@
 	<div class="project">
 		<input id="project" spellcheck="false" title="Project folder: where .analog-attach/ and the workfile live">
 		<button id="open">Open</button>
+		<button id="new-project" title="Set up a new project in a folder">New project</button>
 	</div>
 	<span id="board" class="chip">no board</span>
 	<span id="status" class="chip">…</span>
@@ -161,6 +182,7 @@
 		<button data-view="add">Add devices</button>
 		<button data-view="graph">Graph</button>
 		<div class="section">Project</div>
+		<button data-view="setup">Project setup <span class="count" id="count-missing"></span></button>
 		<button data-view="build">Generate &amp; build</button>
 		<button data-view="settings">Settings</button>
 	</nav>
@@ -191,6 +213,8 @@ const state = {
 	view: "workfile",
 	selected: null,
 	filter: "",
+	missing: [],         // analog-attach --json alone: the required settings still unset
+	setup: { step: null, problem: "", optional_seen: false, entry: null, optional: null },
 	details: new Set(),  // "node.prop" rows with their details open
 	detail_text: {},
 	busy: false,
@@ -307,6 +331,9 @@ async function refresh() {
 	const project = await (await fetch("/api/project")).json();
 	state.project = project;
 	$("project").value = project.dir;
+	// What is still to set up: `analog-attach --json` alone names the required settings unset.
+	const bare = await cli(["--json"], { quiet: true });
+	state.missing = bare.json?.missing ?? [];
 	// The workfile is wherever the `workfile` setting says: ask the CLI rather than look.
 	const tree = project.backend === "noos" ? await cli(["read", "--json"], { quiet: true }) : undefined;
 	project.workfile = tree?.json !== undefined && tree.json.ok !== false;
@@ -324,6 +351,9 @@ async function refresh() {
 	}
 	if (state.selected !== null && !state.nodes.some(node => node.key === state.selected)) state.selected = null;
 	state.detail_text = {};
+	// A folder that isn't set up opens on its setup, once: after that the user goes where they like.
+	if (state.open_setup !== false && project.backend !== "linux" && (state.missing.length > 0 || !project.workfile)) state.view = "setup";
+	state.open_setup = false;
 	render();
 }
 
@@ -357,7 +387,10 @@ function render() {
 	const board = workfile_prop("board");
 	$("board").textContent = board ? `⌂ ${board}` : (state.project?.workfile ? "no board" : "no workfile");
 	const status = $("status");
-	if (!state.project?.workfile) {
+	if (!state.project?.backend) {
+		status.className = "chip warn";
+		status.textContent = "not set up";
+	} else if (!state.project?.workfile) {
 		status.className = "chip warn";
 		status.textContent = "no workfile";
 	} else if (state.errors.length > 0) {
@@ -368,6 +401,7 @@ function render() {
 		status.textContent = state.warnings.length > 0 ? `✓ valid · ${state.warnings.length} warning(s)` : "✓ valid";
 	}
 	$("count-nodes").textContent = state.nodes.length > 0 ? String(state.nodes.length) : "";
+	$("count-missing").textContent = state.missing.length > 0 ? `${state.missing.length} to set` : "";
 	for (const button of $("nav").querySelectorAll("button")) button.classList.toggle("active", button.dataset.view === state.view);
 
 	const wide = state.view !== "workfile";
@@ -379,6 +413,7 @@ function render() {
 	else if (state.view === "settings") render_settings();
 	else if (state.view === "build") render_build();
 	else if (state.view === "graph") render_graph();
+	else if (state.view === "setup") render_setup();
 }
 
 function no_workfile() {
@@ -615,6 +650,152 @@ function render_build() {
 		</ol></div>`;
 }
 
+// --- the project setup -----------------------------------------------------------------
+// The CLI's guided setup (`analog-attach` alone on a terminal), as steps: the ecosystem, the
+// settings it needs (each from `config <key> --json`: its options, or what the CLI finds for
+// a path), a few optional ones, then the workfile. Every step saves with `config`, so the CLI
+// checks the value; a refusal shows in the step.
+
+const ECOSYSTEMS = {
+	noos: { title: "noos (CAPI)", about: "Firmware for a microcontroller board: no-OS drivers on CAPI, generated, built and flashed." },
+	linux: { title: "Linux", about: "Device tree overlays for a Linux board (Raspberry Pi and others)." },
+};
+// The settings a backend's setup asks for, in order, and the optional ones it offers after.
+const SETUP_KEYS = { noos: ["capi-path", "module-paths", "target"], linux: ["linux", "devicetree", "workfile"] };
+const OPTIONAL_KEYS = { noos: ["project-name", "example", "interview", "bootstrap"], linux: ["overlay-syntax"] };
+const STEP_TITLES = {
+	backend: "Ecosystem", "capi-path": "CAPI checkout", "module-paths": "Module repositories", target: "Board",
+	linux: "Linux tree", devicetree: "Base devicetree", workfile: "Workfile", optional: "More settings", init: "Create the workfile",
+};
+
+/** The steps for this project: [{ id, done }]. */
+function setup_steps() {
+	const backend = state.project?.backend;
+	const configs = new Map((state.configs ?? []).map(config => [config.field_name, config]));
+	const set = key => {
+		const value = configs.get(key)?.value;
+		return value !== null && value !== undefined && !(Array.isArray(value) && value.length === 0);
+	};
+	const steps = [{ id: "backend", done: Boolean(backend) }];
+	if (backend) {
+		for (const key of SETUP_KEYS[backend] ?? []) steps.push({ id: key, done: set(key) && !state.missing.includes(key) });
+		steps.push({ id: "optional", done: state.setup.optional_seen });
+		if (backend === "noos") steps.push({ id: "init", done: Boolean(state.project?.workfile) });
+	}
+	return steps;
+}
+
+async function render_setup() {
+	const content = $("content");
+	content.innerHTML = `<div class="card"><p class="subtle">Reading the project's settings…</p></div>`;
+	await load_configs();
+	const steps = setup_steps();
+	if (state.setup.step === null || !steps.some(step => step.id === state.setup.step)) state.setup.step = (steps.find(step => !step.done) ?? steps.at(-1)).id;
+	const step = state.setup.step;
+	const index = steps.findIndex(candidate => candidate.id === step);
+	const body = await setup_body(step);
+	content.innerHTML = `<div class="card">
+		<div class="title-row"><h2>Project setup</h2><span class="chip mono">${esc(state.project?.dir ?? "")}</span></div>
+		<p class="subtle">The same as <code>analog-attach</code> alone on a terminal: each step saves a setting with <code>analog-attach config</code>, in this project's <code>.analog-attach/config.json</code>.</p>
+	</div>
+	<div class="wizard">
+		<div class="card steps">${steps.map((candidate, at) => `<button class="${candidate.id === step ? "current" : ""} ${candidate.done ? "done" : ""}" data-act="setup-step" data-step="${esc(candidate.id)}">
+			<span class="mark">${candidate.done ? "✓" : at + 1}</span>${esc(STEP_TITLES[candidate.id] ?? candidate.id)}</button>`).join("")}</div>
+		<div class="card">
+			<h3>${index + 1}. ${esc(STEP_TITLES[step] ?? step)}</h3>
+			${state.setup.problem ? `<div class="problem">${esc(state.setup.problem)}</div>` : ""}
+			${body}
+			<div class="actions-row" style="margin-top:14px">
+				${index > 0 ? `<button data-act="setup-back">← Back</button>` : ""}
+				${index < steps.length - 1 && steps[index].done ? `<button data-act="setup-next">Next →</button>` : ""}
+			</div>
+		</div>
+	</div>`;
+}
+
+/** The current step's content. */
+async function setup_body(step) {
+	if (step === "backend") {
+		const current = state.project?.backend;
+		return `<p class="subtle">What does this project target? It is saved as the <code>backend</code> setting.</p>
+			<div class="choices">${Object.entries(ECOSYSTEMS).map(([id, ecosystem]) => `<button class="choice${id === current ? " picked" : ""}" data-act="setup-save" data-key="backend" data-value="${esc(id)}">
+				<span class="k">${esc(ecosystem.title)}</span><span class="subtle">${esc(ecosystem.about)}</span></button>`).join("")}</div>
+			${current === "linux" ? `<p class="subtle">This GUI edits noos projects for now: the setup saves a Linux project's settings, and the rest is the CLI's.</p>` : ""}`;
+	}
+	if (step === "optional") return optional_body();
+	if (step === "init") {
+		return state.project?.workfile
+			? `<p>The workfile is there. Next: <a href="#" data-goto="add">add a device</a>.</p>`
+			: `<p class="subtle">Everything is set: create the workfile for the target (<code>analog-attach init</code>).</p>
+				<button class="primary" data-act="setup-init">Create the workfile</button>`;
+	}
+	// A setting: what config says of it, with what the CLI found for it.
+	const result = await cli(["config", step, "--json"], { quiet: true });
+	const entry = result.json?.configs?.[0];
+	state.setup.entry = entry ?? null;
+	if (entry === undefined) return `<div class="problem">${esc(result.stderr || result.stdout)}</div>`;
+	const about = `<p class="subtle">${esc(entry.description)}${entry.required ? "" : " (optional)"}</p>`;
+	const value = entry.value;
+	if (typeof entry.type === "object") {
+		const options = entry.type.options;
+		const many = options.length > 8;
+		const filter = state.setup.filter ?? "";
+		return `${about}${many ? `<div class="field-row"><input id="setup-filter" placeholder="Filter…" value="${esc(filter)}" spellcheck="false"></div>` : ""}
+			<div class="choices">${options.filter(option => !many || option.includes(filter)).map(option => `<button class="choice${option === value ? " picked" : ""}" data-act="setup-save" data-key="${esc(step)}" data-value="${esc(option)}"><span class="k">${esc(option)}</span></button>`).join("")}</div>`;
+	}
+	const found = entry.suggestions ?? [];
+	if (entry.type === "path_list") {
+		const chosen = new Set(Array.isArray(value) ? value : []);
+		const others = (Array.isArray(value) ? value : []).filter(item => !found.some(suggestion => suggestion.value === item));
+		const list = found.length > 0
+			? `<p>Found beside the CAPI checkout:</p><div class="found">${found.map(suggestion => `<label><input type="checkbox" data-found="${esc(suggestion.value)}"${chosen.size === 0 || chosen.has(suggestion.value) ? " checked" : ""}>${esc(suggestion.value)} <span class="about">${esc(suggestion.display_string ?? "")}</span></label>`).join("")}</div>`
+			: `<p class="subtle">Nothing found beside the CAPI checkout: give the module repositories' paths.</p>`;
+		return `${about}${list}
+			<div class="field-row"><textarea id="setup-more" rows="2" placeholder="Other paths, one per line" spellcheck="false">${esc(others.join("\n"))}</textarea></div>
+			<button class="primary" data-act="setup-save-list" data-key="${esc(step)}">Save</button>`;
+	}
+	if (step === "target" && entry.type === "string") {
+		return `${about}<p class="subtle">No board or chip is known yet: set the CAPI checkout and its module repositories first, which bring the boards.</p>`;
+	}
+	const list = found.length > 0
+		? `<p>Found:</p><div class="found">${found.map(suggestion => `<label><button class="link" data-act="setup-save" data-key="${esc(step)}" data-value="${esc(suggestion.value)}">${esc(suggestion.value)}</button> <span class="about">${esc(suggestion.display_string ?? "")}</span></label>`).join("")}</div>`
+		: "";
+	return `${about}${list}
+		<div class="field-row"><input id="setup-value" value="${esc(typeof value === "string" ? value : "")}" placeholder="${entry.type === "path" ? "a path; ~ for your home folder" : ""}" spellcheck="false">
+			<button class="primary" data-act="setup-save-input" data-key="${esc(step)}">Save</button></div>
+		${step === "linux" ? `<p class="subtle">Setting the Linux tree indexes its bindings: it may take a minute.</p>` : ""}`;
+}
+
+/** The optional settings, on one step: each with its current value, saved together. */
+function optional_body() {
+	const keys = OPTIONAL_KEYS[state.project?.backend] ?? [];
+	const configs = (state.configs ?? []).filter(config => keys.includes(config.field_name));
+	return `<p class="subtle">These have defaults; change any you like, or go on.</p>
+		<table class="optional">${configs.map(config => {
+			const value = config.value ?? "";
+			const input = typeof config.type === "object"
+				? `<select data-optional="${esc(config.field_name)}">${config.type.options.map(option => `<option${option === value ? " selected" : ""}>${esc(option)}</option>`).join("")}</select>`
+				: `<input data-optional="${esc(config.field_name)}" value="${esc(value)}" placeholder="${esc(config.default ?? "unset")}" spellcheck="false">`;
+			return `<tr><td class="key">${esc(config.field_name)}</td><td class="edit"><div class="editor">${input}</div><div class="subtle" style="font-size:12px;margin-top:3px">${esc(config.description)}</div></td></tr>`;
+		}).join("")}</table>
+		<div class="actions-row" style="margin-top:10px"><button class="primary" data-act="setup-save-optional">Save and go on</button><button data-act="setup-skip-optional">Keep the defaults</button></div>`;
+}
+
+/** Save a setting from the setup; on a refusal stay on the step and show why, else go on. */
+async function setup_save(key, values) {
+	const result = await cli(["config", key, ...values, "--json"]);
+	if (result.code !== 0 || result.json?.ok === false) {
+		state.setup.problem = result.json?.message ?? (result.stderr || result.stdout).trim();
+		render();
+		return false;
+	}
+	state.setup.problem = "";
+	state.setup.step = null;
+	state.devices = null;
+	await refresh();
+	return true;
+}
+
 let mermaid;
 async function render_graph() {
 	const content = $("content");
@@ -698,6 +879,72 @@ document.addEventListener("click", async event => {
 	case "init":
 		await mutate(["init"]);
 		break;
+	case "setup-step":
+		state.setup.step = target.dataset.step;
+		state.setup.problem = "";
+		render();
+		break;
+	case "setup-back":
+	case "setup-next": {
+		const steps = setup_steps();
+		const at = steps.findIndex(step => step.id === state.setup.step) + (act === "setup-next" ? 1 : -1);
+		state.setup.step = steps[Math.max(0, Math.min(at, steps.length - 1))].id;
+		state.setup.problem = "";
+		render();
+		break;
+	}
+	case "setup-save":
+		await setup_save(target.dataset.key, [target.dataset.value]);
+		break;
+	case "setup-save-input": {
+		const value = $("setup-value").value.trim();
+		if (value !== "") await setup_save(target.dataset.key, [value]);
+		break;
+	}
+	case "setup-save-list": {
+		const picked = [...document.querySelectorAll("[data-found]")].filter(box => box.checked).map(box => box.dataset.found);
+		const more = $("setup-more").value.split("\n").map(line => line.trim()).filter(line => line !== "");
+		const values = [...picked, ...more];
+		if (values.length === 0) {
+			state.setup.problem = "Pick at least one module repository, or give a path.";
+			render();
+			break;
+		}
+		await setup_save(target.dataset.key, values);
+		break;
+	}
+	case "setup-save-optional": {
+		for (const field of document.querySelectorAll("[data-optional]")) {
+			const key = field.dataset.optional;
+			const config = state.configs.find(candidate => candidate.field_name === key);
+			const value = field.value.trim();
+			if (value === (config?.value ?? "")) continue;
+			const result = await cli(value === "" ? ["config", key, "--reset", "--json"] : ["config", key, value, "--json"]);
+			if (result.code !== 0 || result.json?.ok === false) {
+				state.setup.problem = `${key}: ${result.json?.message ?? (result.stderr || result.stdout).trim()}`;
+				render();
+				return;
+			}
+		}
+		state.setup.optional_seen = true;
+		state.setup.problem = "";
+		state.setup.step = null;
+		await refresh();
+		break;
+	}
+	case "setup-skip-optional":
+		state.setup.optional_seen = true;
+		state.setup.step = null;
+		render();
+		break;
+	case "setup-init": {
+		const result = await mutate(["init"]);
+		if (result?.json?.ok !== false) {
+			state.view = "add";
+			render();
+		}
+		break;
+	}
 	case "rename": {
 		const to = prompt(`Rename ${node} to:`, node);
 		if (to && to !== node) {
@@ -828,6 +1075,34 @@ document.addEventListener("keydown", event => {
 	if (event.key === "Enter" && ["add-key", "add-name", "add-as"].includes(event.target.id)) document.querySelector('[data-act="add-free"]').click();
 });
 
+// The board step's filter: re-render the choices as the user types, keeping the cursor.
+document.addEventListener("input", event => {
+	if (event.target.id !== "setup-filter") return;
+	state.setup.filter = event.target.value;
+	const at = event.target.selectionStart;
+	render_setup().then(() => {
+		$("setup-filter")?.focus();
+		$("setup-filter")?.setSelectionRange(at, at);
+	});
+});
+
+$("new-project").onclick = async () => {
+	const dir = prompt("Folder for the new project (made when it doesn't exist):", `${state.project?.dir ?? "~"}/new-project`);
+	if (!dir) return;
+	const response = await fetch("/api/project", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ dir, create: true }) });
+	const result = await response.json();
+	if (!response.ok) {
+		toast(result.error, true);
+		return;
+	}
+	state.selected = null;
+	state.devices = null;
+	state.setup = { step: null, problem: "", optional_seen: false, entry: null, optional: null };
+	state.view = "setup";
+	toast(`New project in ${result.dir}`);
+	await refresh();
+};
+
 $("open").onclick = async () => {
 	const response = await fetch("/api/project", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ dir: $("project").value.trim() }) });
 	const result = await response.json();
@@ -837,6 +1112,8 @@ $("open").onclick = async () => {
 	}
 	state.selected = null;
 	state.devices = null;
+	state.setup = { step: null, problem: "", optional_seen: false, entry: null, optional: null };
+	state.open_setup = true;
 	try { localStorage.setItem("aa-gui-project", result.dir); } catch {}
 	toast(`Opened ${result.dir}`);
 	await refresh();

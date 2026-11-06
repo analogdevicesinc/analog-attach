@@ -19,7 +19,7 @@
  * are declared as data too (`ExtraCommand`), and the front end turns them into routes.
  */
 
-import type { CommonResponse, Responses, SetupResponse, Severity } from "./backend-responses";
+import type { CommonResponse, Responses, SetupResponse, Severity, Suggestion } from "./backend-responses";
 import type { ErrorType } from "./error-types";
 
 // =====================================================================================
@@ -235,6 +235,12 @@ export type SettingWrite = { ok: true; file: string } | { ok: false; message: st
 export interface SettingsHooks {
     /** The options of a `dynamic` setting. */
     options?(key: string, session: Session): Promise<string[]>;
+    /**
+     * Values found for a setting that takes any (a path): offered, not required, by
+     * `analog-attach config <key>` (no-OS: the capi checkouts near the project, the module
+     * repositories beside the capi). Empty when nothing is found.
+     */
+    suggestions?(key: string, session: Session): Promise<Suggestion[]>;
     /**
      * Before a write. `also` are settings to change with it, in the same write (a setting
      * another one follows from); `null` resets one. `scope` is the file the write goes to,

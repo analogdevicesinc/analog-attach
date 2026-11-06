@@ -48,7 +48,13 @@
           "description": "The effective value: local, then global, then the default, a backend's field from its section of each file (COM-124); absolute for a local path; null when it has none.",
           "anyOf": [{ "type": ["string", "null"] }, { "type": "array", "items": { "type": "string" } }]
         },
-        "source": { "enum": ["local", "global", "default", "unset"], "description": "Where value comes from." }
+        "source": { "enum": ["local", "global", "default", "unset"], "description": "Where value comes from." },
+        "suggestions": {
+          "description": "config <key> of a setting that takes any value: values found for it, offered, not required (CONFIG-017). Where the backend is noos: the capi checkouts near the project for capi-path, the module repositories beside the capi for module-paths. Absent when none are found, and in config with no key.",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestion" },
+          "minItems": 1
+        }
       },
       "additionalProperties": false
     },

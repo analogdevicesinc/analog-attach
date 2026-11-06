@@ -15,7 +15,9 @@ import {
     refuse,
     type InteractiveSession,
     type Outcome,
+    type Session,
 } from "../../../interface/backend-interface";
+import type { Suggestion } from "../../../interface/backend-responses";
 import type { SetupResponse } from "../protocol/responses";
 import { install, is_module_checkout, looks_like_capi, read_module } from "../settings";
 
@@ -218,6 +220,21 @@ function next_steps(program: string, heading: string): string {
 }
 
 // --- Finding things ---
+
+/**
+ * The settings hook `suggestions`: the capi checkouts near the project for `capi-path`, and the
+ * module repositories beside the configured capi for `module-paths`, for `config <key>` to offer.
+ */
+export function setting_suggestions(key: string, session: Session): Promise<Suggestion[]> {
+    if (key === "capi-path") {
+        return Promise.resolve(find_capi_candidates(session.cwd).map(found => ({ value: found })));
+    }
+    const capi = session.settings.get("capi-path");
+    if (key === "module-paths" && capi !== undefined) {
+        return Promise.resolve(module_roots_near(capi).map(root => ({ value: root.path, display_string: `${root.name} (${root.type})` })));
+    }
+    return Promise.resolve([]);
+}
 
 /**
  * capi checkouts near where the user is: in the current directory or any above it, in the
