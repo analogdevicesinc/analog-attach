@@ -156,6 +156,25 @@
             }
         },
         {
+            "key": "status",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "okay",
+                        "disabled",
+                        "reserved",
+                        "fail",
+                        "fail-needs-probe"
+                    ],
+                    "enum_type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
             "key": "pinctrl-names",
             "value": {
                 "_t": "list",
@@ -573,6 +592,25 @@
                             "default": "0n",
                             "description": "The sampling phase shift to be applied on the miso line (to account\nfor any lag in the miso line). Valid values:\n - 0: No phase shift.\n - 1: 90 degree phase shift sampling.\n - 2: 180 degree phase shift sampling.\n - 3: 270 degree phase shift sampling.\n",
                             "typeSize": 32
+                        }
+                    },
+                    {
+                        "key": "status",
+                        "value": {
+                            "_t": "list",
+                            "item": {
+                                "_t": "enum",
+                                "enum": [
+                                    "okay",
+                                    "disabled",
+                                    "reserved",
+                                    "fail",
+                                    "fail-needs-probe"
+                                ],
+                                "enum_type": "string"
+                            },
+                            "maxItems": 1,
+                            "minItems": 1
                         }
                     },
                     {

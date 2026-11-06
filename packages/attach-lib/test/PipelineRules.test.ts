@@ -167,7 +167,7 @@ patternProperties:
         };
 
         expect(await channel('merged-node', 'unevaluatedProperties: false')).toEqual(expect.arrayContaining(['reg', 'bipolar', 'diff-channels']));
-        expect(await channel('closed-node', 'additionalProperties: false')).toStrictEqual(['reg', 'pinctrl-names']);
+        expect(await channel('closed-node', 'additionalProperties: false')).toStrictEqual(['reg', 'status', 'pinctrl-names']);
     });
 
     test('a schema that references itself (i2c-controller\'s i2c-bus) still resolves, the inner node empty', async () => {
