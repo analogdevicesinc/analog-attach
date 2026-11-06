@@ -45,7 +45,7 @@ no_caches() {
 	run_json config
 	assert_success
 	assert_json '[.configs[].field_name] | join(",")' \
-		"backend,linux,devicetree,workfile,overlay-syntax,preprocess-command,interview,build-command,build-dir,deploy-command,deploy-ip,deploy-user,deploy-password"
+		"backend,linux,devicetree,workfile,overlay-syntax,preprocess-command,interview,output,build-command,build-dir,deploy-command,deploy-ip,deploy-user,deploy-password"
 	assert_json '[.configs[].category] | unique | sort | join(",")' "Build,Deploy,General,Workspace"
 	assert_json '.configs[] | select(.field_name == "linux") | .required' true
 	assert_json '.configs[] | select(.field_name == "devicetree") | .required' true

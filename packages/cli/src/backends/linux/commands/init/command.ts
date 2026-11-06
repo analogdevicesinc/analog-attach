@@ -106,7 +106,7 @@ if (import.meta.vitest) {
     const os = await import("node:os");
     const { create_style } = await import("../../../../front/session");
 
-    const SETTINGS_BASE = { overlay_syntax: "fragment", preprocess_command: "", interview: true, build_dir: "/build", linux: "/l", devicetree: "/d.dts" } as const;
+    const SETTINGS_BASE = { overlay_syntax: "fragment", preprocess_command: "", interview: true, output: "overlay", build_dir: "/build", linux: "/l", devicetree: "/d.dts" } as const;
     const summary_text = (summary: Summary): string => format_summary(summary, create_style(false), "aa").join("\n");
 
     test("init_workfile — creates the configured workfile, then keeps it on a re-run", () => {

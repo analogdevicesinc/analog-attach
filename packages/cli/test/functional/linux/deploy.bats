@@ -266,3 +266,30 @@ path_with_only() {
 	assert_success
 	assert_output "Deployed $PROJECT/build/overlay.dtbo to ${AA_DEPLOY_USER:-pi}@$AA_DEPLOY_IP:/boot/overlays/ and rebooted"
 }
+
+# Description: with output full, deploy copies the built .dtb over the device's
+# /boot/devicetree.dtb, then reboots it; before a build it says the .dtb is missing.
+# Steps:
+#   1. Set output to full and put the stand-ins on PATH.
+#   2. Run deploy, with --json; check it is refused, the error says the compiled devicetree
+#      build/overlay.dtb is not found, and the hint says to run build first.
+#   3. Build, then run deploy, with --json; check it succeeds with remote path
+#      /boot/devicetree.dtb.
+#   4. Check the first call is scp of overlay.dtb to pi@10.0.0.5:/boot/devicetree.dtb and the
+#      second the reboot.
+# bats test_tags=req:DEPLOY-01, req:DEPLOY-03-FULL, req:SET-12-LNX, id:L0358
+@test "with output full, deploy copies the .dtb over the device's devicetree, then reboots it" {
+	aa config output full >/dev/null
+	stand_ins
+	PATH="$STAND_INS" run_config_error deploy
+	assert_json '.errors[0].message' "Compiled devicetree $PROJECT/build/overlay.dtb not found"
+	assert_json '.hints[0]' "Run 'build' first."
+	aa build >/dev/null
+	PATH="$STAND_INS" run_json deploy
+	assert_success
+	assert_json '.ok' true
+	assert_json '.remote_path' /boot/devicetree.dtb
+	run cat "$CALLS"
+	assert_line --index 0 "-e scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $PROJECT/build/overlay.dtb pi@10.0.0.5:/boot/devicetree.dtb SSHPASS=secret"
+	assert_line --index 1 "-e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null pi@10.0.0.5 sudo reboot SSHPASS=secret"
+}

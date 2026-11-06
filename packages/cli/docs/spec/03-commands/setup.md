@@ -129,7 +129,7 @@ when the user answered yes to SETUP-093's question; then it shall run `init`
 in that order, and stop at the first failure. What was written before the
 failure stays: a failed cache build leaves the settings the steps saved.
 
-**SETUP-036** The setup run shall not change `overlay-syntax`,
+**SETUP-036** The setup run shall not change `overlay-syntax`, `output`,
 `preprocess-command` or the `deploy-*` fields, and shall not run `add`.
 
 ## 7. Result

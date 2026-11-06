@@ -1,6 +1,7 @@
 # deploy
 
-Copies the compiled overlay to a remote device and reboots it. A shared
+Copies the compiled overlay to a remote device and reboots it; where the
+`output` setting is `full`, the compiled devicetree over the device's own. A shared
 command: §2 to §4 as the linux backend does it, §5 as the noos backend does
 it (flashes the generated project to the board through a debug probe).
 
@@ -26,14 +27,15 @@ target comes from the settings (02-common.md §8.1):
 | `deploy-user` | SSH user name |
 | `deploy-password` | SSH password, stored in plain text in the settings file |
 | `workfile` | The overlay. Its `.dtbo` (named as `build` names it, in the build folder, build.md §2) is what is copied. |
+| `output` | `full`: the `.dtb` that `build` compiles from the overlay (build.md §4.1) is copied instead. |
 | `deploy-command` | When set, run instead of the copy and the reboot (DEPLOY-012). |
 
 ## 2. Terms
 
 | Term | Meaning |
 |---|---|
-| Compiled overlay | The `.dtbo` path derived from `workfile` and `build-dir`, per `build`'s *Output file*. |
-| Remote directory | `/boot/overlays/` on the device. |
+| Compiled overlay | The `.dtbo` path derived from `workfile` and `build-dir`, per `build`'s *Output file*; where `output` is `full`, the `.dtb` path (the *compiled devicetree*). |
+| Remote path | `/boot/overlays/` on the device; where `output` is `full`, `/boot/devicetree.dtb`, the devicetree U-Boot loads on Kuiper's Zynq boards. |
 | SSH options | `-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null` |
 
 ## 3. Resources
@@ -60,7 +62,8 @@ checks that the compiled overlay exists, and when it does, that `scp` and
 **DEPLOY-002** If the compiled overlay doesn't exist, then the problem shall be
 `{ "field": "workfile", "kind": "missing", "message": "Compiled overlay <path>
 not found" }` with the hint `Run 'build' first.`, `<path>` being the compiled
-overlay.
+overlay; where `output` is `full`, the message is `Compiled devicetree <path>
+not found`.
 
 **DEPLOY-003** If `scp` or `sshpass` isn't on `PATH`, then the problem shall be
 `{ "field": "deploy", "kind": "missing", "message": "<tools> not found on PATH
@@ -73,7 +76,7 @@ than the overlay or that the overlay parses.
 ### 4.2 Copy
 
 **DEPLOY-010** The CLI shall run the shell command `sshpass -e scp <SSH
-options> "<compiled overlay>" <user>@<ip>:/boot/overlays/`, with the password
+options> "<compiled overlay>" <user>@<ip>:<remote path>`, with the password
 in the environment variable `SSHPASS` and not on the command line.
 
 **DEPLOY-011** If the copy exits with a non-zero status, then the CLI shall
@@ -85,8 +88,8 @@ leaves an empty line at the end. JSON mode gives it as `message`.
 **DEPLOY-012** When `deploy-command` is set (and not empty), the CLI shall
 run it instead of DEPLOY-001 to DEPLOY-022, with the shell, in the directory
 that holds `.analog-attach/`, after the progress line `Deploying <compiled
-overlay> with '<command>'`. `{dtbo}` in it is the compiled overlay, in double
-quotes. It needs only `workfile` to be set (DEPLOY-001 with that problem
+overlay> with '<command>'`. `{dtbo}` in it is the compiled overlay (the `.dtb` where `output` is
+`full`), in double quotes. It needs only `workfile` to be set (DEPLOY-001 with that problem
 alone); the compiled overlay needn't exist, and the deploy settings and tools
 aren't checked. The command's standard output and standard error go to
 standard error, line by line.
@@ -106,10 +109,10 @@ options> <user>@<ip> sudo reboot` with the same environment.
 output: the reboot drops the connection, so a failure is expected.
 
 **DEPLOY-022** After DEPLOY-020, the CLI shall write `Deployed <compiled
-overlay> to <user>@<ip>:/boot/overlays/ and rebooted` in human mode. In JSON
+overlay> to <user>@<ip>:<remote path> and rebooted` in human mode. In JSON
 mode it shall respond per `04-protocol/deploy.schema.json`: `{ "ok": true,
 "message": "Deployed and rebooted", "severity": "info", "host": <ip>,
-"remote_path": "/boot/overlays/" }`.
+"remote_path": <remote path> }`.
 
 **DEPLOY-023** The CLI shall not change any workspace file.
 
@@ -193,6 +196,12 @@ directory.
 
 **D-7. `--probe` is ignored with `deploy-command`.** The command runs as it
 is; `--probe` is still checked (DEPLOY-500).
+
+**D-8. A full devicetree always goes to `/boot/devicetree.dtb`.** That is
+where U-Boot finds it on Kuiper's Zynq boards; others name it otherwise
+(`system.dtb` on ZynqMP, the board's own `.dtb` on a Raspberry Pi), and no
+setting changes the path. The device's devicetree is written over with no
+copy kept, so one that doesn't boot has to be put back from the SD card.
 
 ## 7. Examples
 
