@@ -64,14 +64,14 @@ describe('peripheral properties', () => {
 
     test('under a parent that is not an SPI controller the SPI properties go, the binding\'s own ones too, narrowed too', async () => {
         const { parsed, narrowed } = await offered(DUAL_BUS, i2c);
-        expect(parsed).toEqual(['compatible', 'reg', 'pinctrl-names']);
-        expect(narrowed).toEqual(['compatible', 'reg', 'pinctrl-names']);
+        expect(parsed).toEqual(['compatible', 'reg', 'status', 'pinctrl-names']);
+        expect(narrowed).toEqual(['compatible', 'reg', 'status', 'pinctrl-names']);
     });
 
     test('an SPI property the binding requires stays under any parent', async () => {
         const { parsed, narrowed } = await offered(DUAL_BUS.replace('  - reg\n', '  - reg\n  - spi-max-frequency\n'), i2c);
-        expect(parsed).toEqual(['compatible', 'reg', 'spi-max-frequency', 'pinctrl-names']);
-        expect(narrowed).toEqual(['compatible', 'reg', 'spi-max-frequency', 'pinctrl-names']);
+        expect(parsed).toEqual(['compatible', 'reg', 'spi-max-frequency', 'status', 'pinctrl-names']);
+        expect(narrowed).toEqual(['compatible', 'reg', 'spi-max-frequency', 'status', 'pinctrl-names']);
     });
 
     test('a parent whose name is not given keeps the SPI properties', async () => {

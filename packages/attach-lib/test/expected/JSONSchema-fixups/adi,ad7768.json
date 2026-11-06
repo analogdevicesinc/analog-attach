@@ -234,6 +234,46 @@
                                     "minimum": 0,
                                     "type": "integer",
                                     "typeSize": 32
+                                },
+                                "status": {
+                                    "allOf": [
+                                        {
+                                            "allOf": [
+                                                {
+                                                    "dtType": "non-unique-string-array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 1,
+                                                    "type": "array"
+                                                },
+                                                {
+                                                    "uniqueItems": true
+                                                }
+                                            ],
+                                            "dtType": "string-array"
+                                        },
+                                        {
+                                            "maxItems": 1,
+                                            "minItems": 1,
+                                            "type": "array"
+                                        }
+                                    ],
+                                    "dtType": "string",
+                                    "items": [
+                                        {
+                                            "enum": [
+                                                "okay",
+                                                "disabled",
+                                                "reserved",
+                                                "fail",
+                                                "fail-needs-probe"
+                                            ]
+                                        }
+                                    ],
+                                    "maxItems": 1,
+                                    "minItems": 1,
+                                    "type": "array"
                                 }
                             },
                             "type": "object"
@@ -551,48 +591,36 @@
             "uniqueItems": true
         },
         "clocks": {
-            "anyOf": [
-                {
-                    "type": "object"
-                },
-                {
-                    "dtType": "phandle-array",
-                    "items": {
-                        "additionalItems": {
-                            "dtType": "uint32",
-                            "maximum": 4294967295,
-                            "minimum": 0,
-                            "type": "integer",
-                            "typeSize": 32
-                        },
-                        "items": [
-                            {
-                                "oneOf": [
-                                    {
-                                        "maximum": 4294967295,
-                                        "minimum": 1,
-                                        "type": "integer"
-                                    },
-                                    {
-                                        "const": 0,
-                                        "type": "integer"
-                                    }
-                                ]
-                            }
-                        ],
-                        "maxItems": 1024,
-                        "minItems": 1,
-                        "type": "array"
-                    },
-                    "minItems": 1,
-                    "type": "array"
-                }
-            ],
             "description": "Master clock",
             "dtType": "phandle-array",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
                 "type": "array"
             },
+            "minItems": 1,
             "type": "array"
         },
         "compatible": {
@@ -724,6 +752,46 @@
             "minimum": 0,
             "type": "integer",
             "typeSize": 32
+        },
+        "status": {
+            "allOf": [
+                {
+                    "allOf": [
+                        {
+                            "dtType": "non-unique-string-array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        },
+                        {
+                            "uniqueItems": true
+                        }
+                    ],
+                    "dtType": "string-array"
+                },
+                {
+                    "maxItems": 1,
+                    "minItems": 1,
+                    "type": "array"
+                }
+            ],
+            "dtType": "string",
+            "items": [
+                {
+                    "enum": [
+                        "okay",
+                        "disabled",
+                        "reserved",
+                        "fail",
+                        "fail-needs-probe"
+                    ]
+                }
+            ],
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
         },
         "vref-supply": {
             "description": "Reference voltage - difference voltage between the REFx+ and REFx- pins.",

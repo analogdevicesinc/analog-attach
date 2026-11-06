@@ -79,7 +79,9 @@
                         "_t": "list",
                         "item": {
                             "_t": "any"
-                        }
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
                     }
                 ]
             }
@@ -225,6 +227,25 @@
             "value": {
                 "_t": "flag",
                 "description": "Set if the regulator is critical to system stability or functionality."
+            }
+        },
+        {
+            "key": "status",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "okay",
+                        "disabled",
+                        "reserved",
+                        "fail",
+                        "fail-needs-probe"
+                    ],
+                    "enum_type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1
             }
         },
         {

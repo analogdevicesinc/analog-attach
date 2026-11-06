@@ -128,7 +128,9 @@
                                 "_t": "list",
                                 "item": {
                                     "_t": "any"
-                                }
+                                },
+                                "maxItems": 1024,
+                                "minItems": 1
                             }
                         ]
                     }
@@ -292,6 +294,25 @@
                     }
                 },
                 {
+                    "key": "status",
+                    "value": {
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "enum": [
+                                "okay",
+                                "disabled",
+                                "reserved",
+                                "fail",
+                                "fail-needs-probe"
+                            ],
+                            "enum_type": "string"
+                        },
+                        "maxItems": 1,
+                        "minItems": 1
+                    }
+                },
+                {
                     "key": "pinctrl-names",
                     "value": {
                         "_t": "list",
@@ -422,7 +443,9 @@
                         "_t": "list",
                         "item": {
                             "_t": "any"
-                        }
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
                     }
                 ]
             }
@@ -598,6 +621,25 @@
                         "minItems": 1
                     }
                 ]
+            }
+        },
+        {
+            "key": "status",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "okay",
+                        "disabled",
+                        "reserved",
+                        "fail",
+                        "fail-needs-probe"
+                    ],
+                    "enum_type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1
             }
         },
         {

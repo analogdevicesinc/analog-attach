@@ -234,6 +234,46 @@
                                     "minimum": 0,
                                     "type": "integer",
                                     "typeSize": 32
+                                },
+                                "status": {
+                                    "allOf": [
+                                        {
+                                            "allOf": [
+                                                {
+                                                    "dtType": "non-unique-string-array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 1,
+                                                    "type": "array"
+                                                },
+                                                {
+                                                    "uniqueItems": true
+                                                }
+                                            ],
+                                            "dtType": "string-array"
+                                        },
+                                        {
+                                            "maxItems": 1,
+                                            "minItems": 1,
+                                            "type": "array"
+                                        }
+                                    ],
+                                    "dtType": "string",
+                                    "items": [
+                                        {
+                                            "enum": [
+                                                "okay",
+                                                "disabled",
+                                                "reserved",
+                                                "fail",
+                                                "fail-needs-probe"
+                                            ]
+                                        }
+                                    ],
+                                    "maxItems": 1,
+                                    "minItems": 1,
+                                    "type": "array"
                                 }
                             },
                             "type": "object"
@@ -590,6 +630,46 @@
                     "maxItems": 1,
                     "minItems": 1,
                     "type": "array"
+                },
+                "status": {
+                    "allOf": [
+                        {
+                            "allOf": [
+                                {
+                                    "dtType": "non-unique-string-array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "minItems": 1,
+                                    "type": "array"
+                                },
+                                {
+                                    "uniqueItems": true
+                                }
+                            ],
+                            "dtType": "string-array"
+                        },
+                        {
+                            "maxItems": 1,
+                            "minItems": 1,
+                            "type": "array"
+                        }
+                    ],
+                    "dtType": "string",
+                    "items": [
+                        {
+                            "enum": [
+                                "okay",
+                                "disabled",
+                                "reserved",
+                                "fail",
+                                "fail-needs-probe"
+                            ]
+                        }
+                    ],
+                    "maxItems": 1,
+                    "minItems": 1,
+                    "type": "array"
                 }
             },
             "required": [
@@ -674,46 +754,33 @@
             "uniqueItems": true
         },
         "clocks": {
-            "anyOf": [
-                {
-                    "type": "object"
-                },
-                {
-                    "dtType": "phandle-array",
-                    "items": {
-                        "additionalItems": {
-                            "dtType": "uint32",
-                            "maximum": 4294967295,
-                            "minimum": 0,
-                            "type": "integer",
-                            "typeSize": 32
-                        },
-                        "items": [
-                            {
-                                "oneOf": [
-                                    {
-                                        "maximum": 4294967295,
-                                        "minimum": 1,
-                                        "type": "integer"
-                                    },
-                                    {
-                                        "const": 0,
-                                        "type": "integer"
-                                    }
-                                ]
-                            }
-                        ],
-                        "maxItems": 1024,
-                        "minItems": 1,
-                        "type": "array"
-                    },
-                    "minItems": 1,
-                    "type": "array"
-                }
-            ],
             "description": "Optional external clock connected to the CLK pin.",
             "dtType": "phandle-array",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -841,6 +908,46 @@
                 "minItems": 1,
                 "type": "array"
             },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "status": {
+            "allOf": [
+                {
+                    "allOf": [
+                        {
+                            "dtType": "non-unique-string-array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        },
+                        {
+                            "uniqueItems": true
+                        }
+                    ],
+                    "dtType": "string-array"
+                },
+                {
+                    "maxItems": 1,
+                    "minItems": 1,
+                    "type": "array"
+                }
+            ],
+            "dtType": "string",
+            "items": [
+                {
+                    "enum": [
+                        "okay",
+                        "disabled",
+                        "reserved",
+                        "fail",
+                        "fail-needs-probe"
+                    ]
+                }
+            ],
             "maxItems": 1,
             "minItems": 1,
             "type": "array"

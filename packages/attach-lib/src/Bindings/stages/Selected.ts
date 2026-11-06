@@ -106,12 +106,31 @@ function without_alternatives(selected: unknown, type: unknown): unknown {
     return result;
 }
 
+/**
+ * `selected` without the `oneOf` / `anyOf` branches that are a node: dt-core.yaml's `status` is a node or a string, and
+ * a property the node names is not its child node. A single branch left takes the place of the `oneOf`.
+ */
+function without_nodes(selected: unknown): unknown {
+    if (!is_schema(selected)) { return selected; }
+
+    const result: Schema = { ...selected };
+    for (const key of ["oneOf", "anyOf"]) {
+        const branches = selected[key];
+        if (!Array.isArray(branches) || !branches.some(branch => is_object_schema(branch))) { continue; }
+        const kept = branches.filter(branch => !is_object_schema(branch));
+        delete result[key];
+        if (kept.length === 1 && is_schema(kept[0])) { Object.assign(result, kept[0]); }
+        else if (kept.length > 0) { result[key] = kept; }
+    }
+    return result;
+}
+
 /** `definition` merged with the definitions of it in the `select: true` schemas, `everywhere`. */
 function merge_property(definition: unknown, everywhere: unknown[] | undefined): unknown {
     // A child node of the name (a `clocks` container, `cpus`) is no property
     if (everywhere === undefined || is_object_schema(definition)) { return definition; }
     const type = is_schema(definition) ? definition[DT_TYPE] : undefined;
-    return merge_definitions([definition, ...everywhere.map(other => without_alternatives(structuredClone(other), type))]);
+    return merge_definitions([definition, ...everywhere.map(other => without_alternatives(without_nodes(structuredClone(other)), type))]);
 }
 
 /**
@@ -146,4 +165,25 @@ export function merge_selected(binding: DtBindingSchema, selected: SelectedDefin
     };
 
     return merge_node(binding as unknown as Schema) as unknown as DtBindingSchema;
+}
+
+if (import.meta.vitest) {
+
+    const { test, expect } = import.meta.vitest;
+
+    const selected = (properties: Record<string, unknown[]>): SelectedDefinitions =>
+        ({ properties: new Map(Object.entries(properties)), patterns: new Map() });
+
+    test("a property takes the branches of a selected definition that aren't a node: dt-core's status is a string", () => {
+        const status = { oneOf: [{ type: "object" }, { $ref: "types.yaml#/definitions/string", enum: ["okay", "disabled"] }] };
+        const merged = merge_selected({ properties: { status: true } } as unknown as DtBindingSchema, selected({ status: [status] }));
+        expect((merged as unknown as Schema)["properties"]).toStrictEqual({
+            status: { $ref: "types.yaml#/definitions/string", enum: ["okay", "disabled"] },
+        });
+    });
+
+    test("a selected definition without node branches keeps its alternatives", () => {
+        const frequency = { oneOf: [{ $ref: "types.yaml#/definitions/uint32" }, { $ref: "types.yaml#/definitions/uint64" }] };
+        expect(without_nodes(frequency)).toStrictEqual(frequency);
+    });
 }
