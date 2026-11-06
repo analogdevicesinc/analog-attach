@@ -132,25 +132,22 @@ bash_complete() {
 	done
 }
 
-# Gap: zsh has no folder of the user's that it loads by itself; the script goes to
-# $XDG_DATA_HOME/zsh/site-functions and the CLI asks for an fpath line in ~/.zshrc, which it
-# doesn't write (COMPLETION-02 forbids editing a startup file).
-# Description: completion zsh --install writes the zsh script where zsh loads it by itself, with
-# nothing left for the user to add to a startup file.
+# Description: completion zsh --install writes the zsh script to its folder and, since zsh has no
+# folder of the user's that it loads by itself, gives the fpath line the user adds to ~/.zshrc.
 # Steps:
 #   1. Run completion zsh --install.
 #   2. Check it succeeds, the file exists at its place and the output names it.
 #   3. Check the file is the script completion zsh prints.
-#   4. Check the output asks for no fpath line in ~/.zshrc.
-# bats test_tags=req:COMPLETION-02, gap, id:L0350
-@test "completion --install puts the zsh script where zsh loads it by itself" {
+#   4. Check the output gives the fpath line for the script's folder, to add to ~/.zshrc.
+# bats test_tags=req:COMPLETION-02, id:L0350
+@test "completion --install puts the zsh script in its folder and gives the fpath line" {
 	run aa completion zsh --install
 	assert_success
 	[ -f "$ZSH_FILE" ] || fail "zsh: no $ZSH_FILE"
 	assert_output --partial "$ZSH_FILE"
 	diff <(aa completion zsh) "$ZSH_FILE"
-	# The gap: last, so the checks above hold while it is open.
-	refute_output --partial "fpath"
+	assert_output --partial "~/.zshrc"
+	assert_output --partial "fpath=($(dirname "$ZSH_FILE") \$fpath)"
 }
 
 # Description: completion --install replaces a script installed earlier.

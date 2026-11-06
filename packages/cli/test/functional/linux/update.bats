@@ -118,75 +118,82 @@ with_channel() {
 	assert_unchanged
 }
 
-# Gap: a property the binding doesn't define is written, with only a diagnostic on standard error
-# (`Property nosuch-prop not defined by adi,ad7124-8 binding; written without schema validation`).
-# Description: setting a property the node's binding does not define is refused.
+# `assert_warned <property>`: the last run_json accepted the edit with a warning: exit 0, ok true,
+# severity warn, and the warning on standard error naming the property.
+assert_warned() {
+	assert_success
+	assert_json '.ok' true
+	assert_json '.severity' warn
+	[[ "$stderr" == *"$1"* ]] || fail "no warning about $1 on standard error: $stderr"
+}
+
+# Gap: the property is written with a diagnostic on standard error (`Property nosuch-prop not
+# defined by adi,ad7124-8 binding; written without schema validation`), but the result's severity
+# is info, not warn.
+# Description: setting a property the node's binding does not define is accepted, with a warning.
 # Steps:
-#   1. Make the overlay with the AD7124-8 and snapshot it.
+#   1. Make the overlay with the AD7124-8.
 #   2. Run update ad7124_8 nosuch-prop 5, with --json.
-#   3. Check it is refused (exit 0, .ok false).
-#   4. Check the workfile is unchanged.
+#   3. Check the overlay has nosuch-prop = <5>.
+#   4. Check it succeeds (exit 0, .ok true) with severity warn, and standard error names
+#      nosuch-prop.
 # bats test_tags=req:UPDATE-02, gap, id:L0312
-@test "update refuses a property the binding does not have" {
+@test "update warns about a property the binding does not have, and writes it" {
 	with_adc
-	snapshot
 	run_json update ad7124_8 nosuch-prop 5
-	assert_success
-	assert_json '.ok' false
-	assert_unchanged
+	grep -q 'nosuch-prop = <5>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	# The gap: last, so the checks above hold while it is open.
+	assert_warned nosuch-prop
 }
 
-# Gap: the binding gives only a shape hint: a value outside the enum (adi,reference-select is one
-# of 0, 1, 3) is written.
-# Description: a value outside the options of an enum property is refused.
+# Gap: a value outside the enum (adi,reference-select is one of 0, 1, 3) is written with no
+# warning: severity info, nothing on standard error.
+# Description: a value outside the options of an enum property is accepted, with a warning.
 # Steps:
-#   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.
+#   1. Make the overlay with the AD7124-8 and channel@0.
 #   2. Run update ad7124_8/channel@0 adi,reference-select 2 (not one of 0, 1, 3), with --json.
-#   3. Check it is refused (exit 0, .ok false).
-#   4. Check the workfile is unchanged.
+#   3. Check the overlay has adi,reference-select = <2>.
+#   4. Check it succeeds (exit 0, .ok true) with severity warn, and standard error names
+#      adi,reference-select.
 # bats test_tags=req:UPDATE-02, gap, id:L0313
-@test "update refuses a value that is not one of an enum's options" {
+@test "update warns about a value that is not one of an enum's options, and writes it" {
 	with_channel
-	snapshot
 	run_json update ad7124_8/channel@0 adi,reference-select 2
-	assert_success
-	assert_json '.ok' false
-	assert_unchanged
+	grep -q 'adi,reference-select = <2>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	# The gap: last, so the checks above hold while it is open.
+	assert_warned adi,reference-select
 }
 
-# Gap: a channel's reg above the binding's maximum (15) is written, and the node renamed channel@20.
-# Description: a number above the binding's maximum is refused.
+# Gap: a channel's reg above the binding's maximum (15) is written, and the node renamed
+# channel@20, with no warning: severity info, nothing on standard error.
+# Description: a number above the binding's maximum is accepted, with a warning.
 # Steps:
-#   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.
+#   1. Make the overlay with the AD7124-8 and channel@0.
 #   2. Run update ad7124_8/channel@0 reg 20 (the maximum is 15), with --json.
-#   3. Check it is refused (exit 0, .ok false).
-#   4. Check the workfile is unchanged.
+#   3. Check the overlay has the channel as channel@20, with reg = <20>.
+#   4. Check it succeeds (exit 0, .ok true) with severity warn, and standard error names reg.
 # bats test_tags=req:UPDATE-02, gap, id:L0314
-@test "update refuses a number above the maximum" {
+@test "update warns about a number above the maximum, and writes it" {
 	with_channel
-	snapshot
 	run_json update ad7124_8/channel@0 reg 20
-	assert_success
-	assert_json '.ok' false
-	assert_unchanged
+	grep -A1 'channel@20 {' "$WORKFILE" | grep -q 'reg = <20>;' || fail "not written: $(cat "$WORKFILE")"
+	# The gap: last, so the checks above hold while it is open.
+	assert_warned reg
 }
 
-# Gap: an array longer than the binding allows is written, with `warning: diff-channels takes 2
-# values, got 3` on standard error.
-# Description: an array with more values than the binding allows is refused.
+# Description: an array with more values than the binding allows is accepted, with a warning.
 # Steps:
-#   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.
+#   1. Make the overlay with the AD7124-8 and channel@0.
 #   2. Run update ad7124_8/channel@0 diff-channels 1 2 3 (it takes 2), with --json.
-#   3. Check it is refused (exit 0, .ok false).
-#   4. Check the workfile is unchanged.
-# bats test_tags=req:UPDATE-02, gap, id:L0315
-@test "update refuses an array longer than its size" {
+#   3. Check it succeeds (exit 0, .ok true) with severity warn, and standard error names
+#      diff-channels.
+#   4. Check the overlay has diff-channels = <1 2 3>.
+# bats test_tags=req:UPDATE-02, id:L0315
+@test "update warns about an array longer than its size, and writes it" {
 	with_channel
-	snapshot
 	run_json update ad7124_8/channel@0 diff-channels 1 2 3
-	assert_success
-	assert_json '.ok' false
-	assert_unchanged
+	assert_warned diff-channels
+	grep -q 'diff-channels = <1 2 3>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
 }
 
 # Description: update with a property and no value shows the property exactly as read does, in
