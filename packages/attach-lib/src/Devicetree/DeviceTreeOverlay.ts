@@ -17,6 +17,7 @@ import {
 import { Result } from "../result.js";
 import { DeviceTree, Stream, walk_nodes } from "./DeviceTree.js";
 import { type LocatedNode, type NodeTarget, normalize_target, patch_node, parent_path as access_parent_path } from "./nodes/Access.js";
+import { print_full_dts, type FullDtsBlock } from "./syntax/Printer.js";
 
 export type FoundNodeResult = {
     node: DTNode;
@@ -671,6 +672,47 @@ export class DeviceTreeOverlay {
     public print(options?: import("./syntax/Printer.js").DtoPrintOptions): string {
         return print_dto(this.overlay, undefined, options);
     }
+
+    /**
+     * The base with the overlay applied, as a full devicetree that includes
+     * the base file `include` (`print_full_dts`): one block per fragment with
+     * an `__overlay__`, in file order, which is the order dtc applies them in.
+     * A fragment for a base label keeps it (`&spi0`); any other is written by
+     * the path its target resolves to, so a label the overlay itself defines
+     * may come after its use. `__dormant__` bodies and the root's other nodes
+     * (`__overrides__`) are left out, as the kernel's overlay apply leaves
+     * them. An error names the fragments whose target resolves to no node.
+     */
+    public print_full(include: string): Result<string, string[]> {
+        const blocks: FullDtsBlock[] = [];
+        const unplaced: string[] = [];
+        for (const fragment of this.get_fragments()) {
+            const body = fragment.children.find(c => c.name === "__overlay__");
+            if (body === undefined) { continue; }
+            const path = this.get_fragment_root_path(fragment);
+            if (path === undefined) {
+                unplaced.push(get_full_node_name(fragment));
+                continue;
+            }
+            const label = fragment_target_label(fragment);
+            const by_path = path === "/" && body.labels.length === 0 ? "/" : `&{${path}}`;
+            const reference = label !== undefined && this.base_dts?.locate(label)?.path === path ? `&${label}` : by_path;
+            blocks.push({ reference, body });
+        }
+        return unplaced.length > 0 ? Result.Err(unplaced) : Result.Ok(print_full_dts(include, blocks));
+    }
+}
+
+/** The label a fragment's `target = <&label>` names, if it names one. */
+function fragment_target_label(fragment: DTNode): string | undefined {
+    const target = fragment.properties.find(p => p.name === "target");
+    if (target === undefined || is_dt_flag(target.value)) { return undefined; }
+    for (const value of target.value) {
+        if (value.kind !== "array") { continue; }
+        const element = value.elements.find(candidate => candidate.kind === "label");
+        if (element !== undefined) { return element.name.startsWith("&") ? element.name.slice(1) : element.name; }
+    }
+    return undefined;
 }
 
 if (import.meta.vitest !== undefined) {
@@ -1004,5 +1046,57 @@ ${overlay_with_imu.replace("/dts-v1/;\n/plugin/;\n", "")}`);
         const overlay = overlay_on(fan_base, `/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 {\n\t\ttarget = <&b>;\n\t\ta: __overlay__ {};\n\t};\n\tfragment@1 {\n\t\ttarget = <&a>;\n\t\tb: __overlay__ {};\n\t};\n};`);
         expect(overlay.get_fragment_root_path(fragment_with(overlay, "0"))).toBeUndefined();
         expect(overlay.get_fragment_root_path(fragment_with(overlay, "1"))).toBeUndefined();
+    });
+
+    test("print_full — the base included, a block per fragment: base labels kept, other targets by path, the root as /", () => {
+        const overlay = overlay_on(fan_base, [
+            "/dts-v1/;", "/plugin/;", "/ {",
+            "\tfragment@0 { target-path = \"/\"; __overlay__ { vref: regulator { compatible = \"regulator-fixed\"; }; }; };",
+            "\tfragment@1 { target = <&i2c1>; __overlay__ { status = \"okay\"; adc: adc@48 { reg = <0x48>; }; }; };",
+            "\tfragment@2 { target = <&adc>; __overlay__ { vref-supply = <&vref>; }; };",
+            "\tfragment@3 { target-path = \"/soc\"; __overlay__ { ranges; }; };",
+            "};",
+        ].join("\n"));
+        const printed = overlay.print_full("../linux/board.dts");
+        expect(printed).toEqual(Result.Ok([
+            "/dts-v1/;",
+            "#include \"../linux/board.dts\"",
+            "",
+            "/ {",
+            "\tvref: regulator {",
+            "\t\tcompatible = \"regulator-fixed\";",
+            "\t};",
+            "};",
+            "",
+            "&i2c1 {",
+            "\tstatus = \"okay\";",
+            "\tadc: adc@48 {",
+            "\t\treg = <0x48>;",
+            "\t};",
+            "};",
+            "",
+            "&{/soc/i2c@7e804000/adc@48} {",
+            "\tvref-supply = <&vref>;",
+            "};",
+            "",
+            "&{/soc} {",
+            "\tranges;",
+            "};",
+            "",
+        ].join("\n")));
+    });
+
+    test("print_full — labels on a body go before its reference; __dormant__ bodies and __overrides__ are left out", () => {
+        const overlay = overlay_on(fan_base, fan_overlay.replace("};\n};", "};\n\t__overrides__ { fan = <&busfrag>, \"target:0=\", <&i2c1>; };\n};"));
+        const printed = overlay.print_full("board.dts");
+        expect(printed).toEqual(Result.Ok("/dts-v1/;\n#include \"board.dts\"\n\ni2cbus: &i2c1 {\n\tstatus = \"okay\";\n};\n"));
+
+        const two = overlay_on(fan_base, "/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 { target-path = \"/\"; a: b: __overlay__ { x; }; };\n};");
+        expect(two.print_full("board.dts")).toEqual(Result.Ok("/dts-v1/;\n#include \"board.dts\"\n\na: &{/} {\n\tx;\n};\n\nb: &{/} {\n};\n"));
+    });
+
+    test("print_full — the fragments whose target resolves to no node are the error", () => {
+        const overlay = overlay_on(fan_base, "/dts-v1/;\n/plugin/;\n&nope { x; };\n&i2c1 { y; };\n");
+        expect(overlay.print_full("board.dts")).toEqual(Result.Err(["fragment@0"]));
     });
 }

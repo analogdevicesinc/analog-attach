@@ -2,4 +2,4 @@
 export * from "./AST.js";
 export type { DTSParseResult } from "./Parser.js";
 export { parse_dts, parse_dto, format_parse_error } from "./Parser.js";
-export { print_dts, print_dto, print_value, print_property } from "./Printer.js";
+export { print_dts, print_dto, print_value, print_property, print_full_dts, type FullDtsBlock } from "./Printer.js";
