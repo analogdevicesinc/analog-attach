@@ -473,6 +473,9 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "update", argv: ["update", "adc", "channel@0"], shape: "answer" },
     { route: "update", argv: ["update", "adc", "interrupt-parent", "--suggest"], shape: "answer" },
     { route: "update", argv: ["update", "spi0", "status", "disabled"], shape: "answer" },
+    // Written with a warning: a value outside the binding's enum, a property it doesn't define (UPDATE-041, UPDATE-015).
+    { route: "update", argv: ["update", "spi0", "status", "bogus"], shape: "answer" },
+    { route: "update", argv: ["update", "adc", "nosuch-prop", "1"], shape: "answer" },
     { route: "update", argv: ["update", "nope", "status", "okay"], shape: "refusal" },
 
     { route: "delete", argv: ["delete", "adc", "reg"], shape: "answer" },

@@ -34,6 +34,7 @@ import { describe_missing, missing_lines, missing_required_of, type NewNode } fr
 import { ask_for_missing } from "../../missing-interview";
 import type { UpdateChildResponse, UpdateResponse } from "../../protocol/types";
 import { count_warning, value_count } from "../../item-count";
+import { value_warning } from "../../value-check";
 import { build_raw_property, cell_bits, shape_hint, type ShapeHint } from "../../property-value";
 
 /** Where a warning goes: `session.warn`, stderr in every mode. */
@@ -52,17 +53,17 @@ export async function resolve_property_definition(
     bindings: Bindings,
     property_name: string,
     warn: Warn,
-): Promise<{ definition: ResolvedProperty | undefined }> {
-    if (binding_node === undefined) { return { definition: undefined }; }
+): Promise<{ definition: ResolvedProperty | undefined; unchecked: boolean }> {
+    if (binding_node === undefined) { return { definition: undefined, unchecked: false }; }
     const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, bindings);
     if ("error" in binding) {
         warn(`Property ${property_name} written without schema validation: ${binding.error}`);
-        return { definition: undefined };
+        return { definition: undefined, unchecked: true };
     }
     const result = binding.narrow_and_populate(binding_node);
     if (result === undefined) {
         warn(`Property ${property_name} written without schema validation: failed to narrow binding`);
-        return { definition: undefined };
+        return { definition: undefined, unchecked: true };
     }
     const definition = find_property_definition(binding, result.properties, property_name);
     if (definition === undefined) {
@@ -71,7 +72,7 @@ export async function resolve_property_definition(
             : `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
         warn(`Property ${property_name} not defined by ${origin_desc}; written without schema validation`);
     }
-    return { definition };
+    return { definition, unchecked: definition === undefined };
 }
 
 export type UpdateDecision = "set-flag" | "read" | "value" | { error: string };
@@ -279,7 +280,7 @@ export async function apply_update(
     }
 
     // Reading or setting a flag says nothing about the schema.
-    const { definition: property_definition } = await resolve_property_definition(
+    const { definition: property_definition, unchecked } = await resolve_property_definition(
         binding_node, binding_parent, parent_name, base_dt, bindings,
         property_name, value_arguments.length === 0 ? () => {} : warn,
     );
@@ -368,17 +369,18 @@ export async function apply_update(
 
     const reg_warnings = property_name === "reg" && reg_path !== undefined ? node_reg_warnings(overlay, reg_path) : [];
     for (const line of reg_warnings.flatMap(w => reg_warning_lines(w))) { warn(line); }
-    // The binding shapes the value but never refuses it: a count it doesn't allow is written, with a warning.
-    const count = property_definition === undefined || built === undefined
-        ? undefined
-        : count_warning(property_name, property_definition.value, value_count(built));
-    if (count !== undefined) { warn(count); }
+    // The binding shapes the value but never refuses it: a count or a value it doesn't allow is written, with a warning.
+    const checks = property_definition === undefined || built === undefined
+        ? []
+        : [count_warning(property_name, property_definition.value, value_count(built)), value_warning(property_name, property_definition.value, built)];
+    const out_of_bounds = checks.filter(warning => warning !== undefined);
+    for (const warning of out_of_bounds) { warn(warning); }
 
     return {
         kind: "set",
         message: `Set ${property_name} on ${node_identifier}${rename_message}`,
         ...(ip_result.message === undefined ? {} : { detail: ip_result.message }),
-        warned: ip_result.warning !== undefined || reg_warnings.length > 0 || count !== undefined,
+        warned: unchecked || ip_result.warning !== undefined || reg_warnings.length > 0 || out_of_bounds.length > 0,
     };
 }
 

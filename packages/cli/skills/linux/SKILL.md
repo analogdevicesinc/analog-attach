@@ -592,7 +592,7 @@ analog-attach update <path> <property> --suggest    # the values it can take, as
 | Phandle | `update adc interrupt-parent gpio` | `interrupt-parent = <&gpio>;` |
 | Matrix | `update adc reg 0 0,1 0` or `update adc reg 0 0 , 1 0` | `reg = <0 0>, <1 0>;` (a `,` separates rows) |
 
-**Value counts**: a number of values the binding doesn't allow is still written, with `warning: diff-channels takes 2 values, got 3` (on stderr, severity warn under `--json`). Fix it before `validate`, which reports it as an error.
+**What the binding doesn't allow**: it is still written, with a warning on stderr and severity warn under `--json`: a count (`warning: diff-channels takes 2 values, got 3`), a value outside its range or enum (`warning: reg takes 0 to 15, got 20`), or a property the binding doesn't define (`Property foo not defined by adi,ad7124-8 binding; written without schema validation`). Fix it before `validate`, which reports it as an error.
 
 **Examples**:
 ```bash

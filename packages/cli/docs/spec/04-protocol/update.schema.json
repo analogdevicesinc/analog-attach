@@ -47,7 +47,7 @@
         },
         "severity": {
           "enum": ["info", "warn"],
-          "description": "warn when a warning of UPDATE-040, UPDATE-075, UPDATE-082 or UPDATE-083 was given (UPDATE-100); the diagnostics of UPDATE-015, UPDATE-073 and UPDATE-074 leave it info."
+          "description": "warn when a diagnostic of UPDATE-015 or a warning of UPDATE-040, UPDATE-041, UPDATE-075, UPDATE-082 or UPDATE-083 was given (UPDATE-100); the diagnostics of UPDATE-073 and UPDATE-074 leave it info."
         }
       }
     },
