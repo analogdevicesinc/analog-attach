@@ -333,6 +333,26 @@ if (import.meta.vitest) {
         }
     });
 
+    test("setup — no Linux tree under ~: the clone of ADI's kernel is suggested, and the path asked", async () => {
+        const { root, linux, session, prompter, stdout, done } = workspace(({ linux }) => [linux]);
+        try {
+            const home = path.join(root, "empty-home");
+            fs.mkdirSync(home);
+            await create_setup({ home, ensure: built, ...tools(ready) })(session);
+            expect(prompter.asked[0]).toBe("Linux source path");
+            expect(stdout.text).toContain([
+                "No Linux source trees found under ~.",
+                "",
+                "To get one, clone ADI's Linux kernel (the rpi-6.12.y branch, for the Raspberry Pi) in another terminal:",
+                "  git clone --depth 1 --branch rpi-6.12.y https://github.com/analogdevicesinc/linux.git ~/linux-adi",
+                "",
+            ].join("\n"));
+            expect(stdout.text).toContain(`✓ linux = ${linux}`);
+        } finally {
+            done();
+        }
+    });
+
     test("setup — a configured tree that isn't one is named and asked again", async () => {
         const { root, linux, dts, settings, session, prompter, stdout, done } = workspace(({ linux }) => [linux, false]);
         try {

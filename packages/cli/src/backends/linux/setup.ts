@@ -146,8 +146,15 @@ export function find_linux_trees(root = os.homedir()): string[] {
 /** The choice that asks for a path instead of a listed one. */
 const TYPE_PATH = Symbol("type a path");
 
+/** The tree suggested when none is found (SETUP-062): ADI's Linux kernel, at its Raspberry Pi branch. */
+export const SUGGESTED_LINUX = { repository: "https://github.com/analogdevicesinc/linux.git", branch: "rpi-6.12.y", directory: "~/linux-adi" } as const;
+
+/** The command that clones SUGGESTED_LINUX: one commit, which is all the CLI reads. */
+export const suggested_clone = (): string =>
+    `git clone --depth 1 --branch ${SUGGESTED_LINUX.branch} ${SUGGESTED_LINUX.repository} ${SUGGESTED_LINUX.directory}`;
+
 export async function step_linux(session: InteractiveSession, place: SetupPlace): Promise<string> {
-    const { bold, dim } = session.style;
+    const { bold, cyan, dim } = session.style;
     const say = (line: string): void => { session.say(line); };
     say(bold("Step 1: Linux kernel source tree"));
     say("");
@@ -161,6 +168,9 @@ export async function step_linux(session: InteractiveSession, place: SetupPlace)
 
     if (trees.length === 0) {
         say("No Linux source trees found under ~.");
+        say("");
+        say(`To get one, clone ADI's Linux kernel (the ${SUGGESTED_LINUX.branch} branch, for the Raspberry Pi) in another terminal:`);
+        say(`  ${cyan(suggested_clone())}`);
         say("");
         say(dim("Tab-complete available. Path must contain Documentation/devicetree/bindings/ and include/."));
         return ask_path(session, place, "Linux source path", answer => check_linux(answer, place));
