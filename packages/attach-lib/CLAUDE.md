@@ -8,7 +8,7 @@
 
 ## Commands
 
-There is no top-level test script that isolates just this package — use `cd packages/attach-lib && yarn test`.
+There is no top-level test script that isolates just this package — use `cd packages/attach-lib && yarn test`. A change here is a Linux-side change: before calling it done, run `yarn verify:linux` from the repo root (this package, then the CLI without its noos backend; nothing of attach-no-os-lib), not the full `yarn verify`, which is for common changes and before a push (see *Definition of done* in `packages/cli/CLAUDE.md`).
 
 Lint with `yarn lint` (ESLint + unicorn, config in `eslint.config.mjs`, same as the CLI).
 

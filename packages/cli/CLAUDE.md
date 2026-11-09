@@ -132,14 +132,24 @@ interview, setup, generate, build and deploy, protocol. Read it before changing 
 
 ### Definition of done
 
-Before saying a task is done, run `yarn verify` from the repo root (`scripts/verify.sh`) and fix
-every error, including pre-existing lint errors in files you edited. It runs:
-1. attach-lib: build, type-check, tests, lint;
-2. attach-no-os-lib: build, tests, lint;
-3. @analog-attach/cli: build with `tsc`, lint, tests.
+Before saying a task is done, run the verify of the side you changed from the repo root
+(`scripts/verify.sh`) and fix every error, including pre-existing lint errors in files you edited:
 
-A Stop hook (`.claude/hooks/stop-verify.sh`) runs it when attach-lib, attach-no-os-lib or the CLI
-changed, and blocks on failure. Never report completion with failing lint or type checks.
+| Changed | Run | What it runs |
+|---|---|---|
+| The Linux side only: attach-lib, `src/backends/linux/` | `yarn verify:linux` | attach-lib: build, type-check, tests, lint; the CLI: build, lint, tests without the noos backend |
+| The no-OS side only: attach-no-os-lib, `src/backends/noos/` | `yarn verify:no-os` | attach-no-os-lib: build, tests, lint; the CLI: build, lint, tests without the linux backend |
+| Anything common (the front end, the interface, `shell.ts`, the contract test, `04-protocol`, `scripts/`), or both sides | `yarn verify` | all of it: attach-lib, attach-no-os-lib, then the CLI (`tsc` build, lint, tests) |
+
+Never run the other side's builds or tests for a change of one side: a Linux change runs nothing
+no-OS. A side's verify builds the other lib only when its `dist/` is missing, as the CLI's build
+needs it, and leaves out the other backend's tests (its `src/backends/<id>/` files and the contract
+test's `the <id> backend` cases, so a backend-only test there goes under a `describe` of that
+prefix). The full `yarn verify` is also the check before a push or a handoff.
+
+A Stop hook (`.claude/hooks/stop-verify.sh`) runs the same choice when attach-lib, attach-no-os-lib,
+the CLI or `scripts/` changed, and blocks on failure; a change to the spec's prose alone runs
+nothing. Never report completion with failing lint or type checks.
 
 ### Spec
 
@@ -185,8 +195,8 @@ the user says which one when it's needed.
 - Never commit, amend, rebase or rewrite history unless asked. Subagents and forks never commit.
 - "Commit" means the full working diff unless told otherwise. Never revert uncommitted changes you
   didn't make.
-- Parallel agents get disjoint file lists, and the main agent runs `yarn verify` and waits for
-  review before any commit.
+- Parallel agents get disjoint file lists, and the main agent runs the verify of the changed side
+  (*Definition of done*) and waits for review before any commit.
 
 ### Working through findings
 

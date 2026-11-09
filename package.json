@@ -194,6 +194,8 @@
     "lint:cli": "yarn workspace @analog-attach/cli lint",
     "test-clean": "yarn clean:attach-lib && yarn clean:attach-no-os-lib && yarn clean:cli && yarn install && yarn build:cli && yarn test",
     "verify": "scripts/verify.sh",
+    "verify:linux": "scripts/verify.sh --linux",
+    "verify:no-os": "scripts/verify.sh --no-os",
     "test": "yarn workspace attach-lib test --run && yarn workspace @analog-attach/cli test --run && yarn workspace attach-no-os-lib test --run",
     "test:attach-no-os-lib": "yarn workspace attach-no-os-lib test",
     "test:cli": "yarn workspace @analog-attach/cli test",

@@ -709,18 +709,21 @@ test("every backend of the registry has its contract here", () => {
     expect(CHECKED.toSorted()).toEqual(Object.keys(BACKENDS).toSorted());
 });
 
-test("validate --full keeps the merged tree's findings on what the overlay touches, once, and counts the others", async () => {
-    const fixture = create_linux_harness();
-    try {
-        settings_with(fixture, { "preprocess-command": "cp {input} {output}" });
-        fixture.tools({ diagnostics: DIAGNOSTIC, full: FULL_DIAGNOSTICS });
-        const { code, stdout } = await fixture.run(["--json", "validate", "--full"]);
-        expect(code).toBe(0);
-        const response = JSON.parse(stdout) as { errors: { path: string[] }[]; base_findings: number };
-        // The adc's finding is in both runs and shown once.
-        expect(response.errors.map(error => error.path)).toEqual([["node0", "adc@0", "spi-max-frequency"], ["soc", "spi@7e204000", "status"]]);
-        expect(response.base_findings).toBe(1);
-    } finally {
-        fixture.remove();
-    }
+// Linux-only, so under the prefix `verify --no-os` leaves out
+describe("the linux backend beyond the contract", () => {
+    test("validate --full keeps the merged tree's findings on what the overlay touches, once, and counts the others", async () => {
+        const fixture = create_linux_harness();
+        try {
+            settings_with(fixture, { "preprocess-command": "cp {input} {output}" });
+            fixture.tools({ diagnostics: DIAGNOSTIC, full: FULL_DIAGNOSTICS });
+            const { code, stdout } = await fixture.run(["--json", "validate", "--full"]);
+            expect(code).toBe(0);
+            const response = JSON.parse(stdout) as { errors: { path: string[] }[]; base_findings: number };
+            // The adc's finding is in both runs and shown once.
+            expect(response.errors.map(error => error.path)).toEqual([["node0", "adc@0", "spi-max-frequency"], ["soc", "spi@7e204000", "status"]]);
+            expect(response.base_findings).toBe(1);
+        } finally {
+            fixture.remove();
+        }
+    });
 });
