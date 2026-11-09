@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
+import { unicorn_rules } from "../../eslint.unicorn.mjs";
 
 // Tier 3 (experimental): full type-aware linting scoped to this package only.
 // strictTypeChecked  -> correctness/bug rules (async misuse, unsafe `any`,
@@ -29,6 +30,8 @@ export default defineConfig([
 			// --- carried over from the repo-wide config ---
 			"unicorn/empty-brace-spaces": "off",
 			"unicorn/filename-case": "off",
+			// unicorn's rules as the repository uses them (eslint.unicorn.mjs).
+			...unicorn_rules,
 			"@typescript-eslint/naming-convention": ["warn", {
 				selector: "import",
 				format: ["camelCase", "PascalCase"],

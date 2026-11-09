@@ -133,7 +133,6 @@ export class DeviceTreeOverlay {
         const target: DTLabel | DTPath = label === undefined
             ? { kind: "path", labels: [], path: located?.path ?? path }
             : { kind: "label", labels: [], name: label };
-        // eslint-disable-next-line unicorn/no-useless-undefined
         if (!this.add_fragment(target, undefined, undefined)) { return undefined; }
         return this.find_node(target)?.node;
     }
@@ -533,7 +532,7 @@ export class DeviceTreeOverlay {
         if (overlay_node === undefined) { return undefined; }
 
         let current: DTNode = overlay_node;
-        let parent: DTNode | undefined = undefined;
+        let parent: DTNode | undefined;
         const actual_segments: string[] = [];
 
         for (const segment of segments) {

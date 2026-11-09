@@ -29,7 +29,7 @@ export type SchemaContext = {
 };
 
 function expand_home(directory: string): string {
-    return directory.startsWith("~") ? directory.replace("~", os.homedir()) : directory;
+    return directory.startsWith("~") ? directory.replace("~", () => os.homedir()) : directory;
 }
 
 function property_types(paths: SchemaPaths): PropertyTypes {

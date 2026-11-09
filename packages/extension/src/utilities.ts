@@ -35,7 +35,7 @@ export function read_compatible_mappings_from_file(
 export function expand_tilde_if_present(tilde_path: string): string {
 
     if (tilde_path.startsWith('~')) {
-        return tilde_path.replace('~', os.homedir());
+        return tilde_path.replace('~', () => os.homedir());
     }
 
     return tilde_path;
@@ -48,7 +48,8 @@ export function get_circular_replacer(): (this: any, key: string, value: any) =>
             return value;
         }
         // `this` is the object that value is contained in,
-        // i.e., its direct parent.
+        // i.e., its direct parent (JSON.stringify calls a replacer with it).
+        // eslint-disable-next-line unicorn/no-this-outside-of-class
         while (ancestors.length > 0 && ancestors.at(-1) !== this) {
             ancestors.pop();
         }

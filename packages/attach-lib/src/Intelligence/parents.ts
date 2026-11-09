@@ -52,7 +52,6 @@ export function suggest_parents(devicetree: DeviceTree, node: ParsedBinding): Pa
     }
 
     const spi_max_frequency = node.properties.some((value) => value.key === "spi-max-frequency");
-    // eslint-disable-next-line unicorn/prevent-abbreviations
     const i2c_example = node.examples.some((example) => /\bi2c[\d@&]?\S*\s*\{/.test(example));
 
     let suggestions: PathAndLabel[] = [];

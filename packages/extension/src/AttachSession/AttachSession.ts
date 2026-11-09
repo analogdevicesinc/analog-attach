@@ -99,8 +99,8 @@ const preprocessDtsIfNeeded = async (file_contents: string, file_path: string): 
         const include_directory_path = quoteIfNeeded(path.join(linux_root, "include"));
         const arch_directory_path = quoteIfNeeded(path.join(linux_root, "arch"));
         expanded_command = expanded_command
-            .replaceAll("{include_dir_path}", include_directory_path)
-            .replaceAll("{arch_dir_path}", arch_directory_path);
+            .replaceAll("{include_dir_path}", () => include_directory_path)
+            .replaceAll("{arch_dir_path}", () => arch_directory_path);
     }
 
     const quotedPath = file_path.includes(" ")
@@ -1567,8 +1567,8 @@ export class AttachSession {
         const device_tree = printDts(this.device_tree);
 
         const composed_command = `echo '${device_tree}' | ${compile_dts_command} | ${sshpass_config} ${ssh_config}`
-            .replace("{command}", write_dtb_to_overlays)
-            .replace("{dtb_name}", `${device_name}.dtb`);
+            .replace("{command}", () => write_dtb_to_overlays)
+            .replace("{dtb_name}", () => `${device_name}.dtb`);
 
         console.log(`Running ${composed_command}`);
 
@@ -1606,7 +1606,7 @@ export class AttachSession {
             return;
         }
 
-        const composed_command = `${sshpass_config} ${ssh_config}`.replace("{command}", reboot_device_command);
+        const composed_command = `${sshpass_config} ${ssh_config}`.replace("{command}", () => reboot_device_command);
 
         console.log(`Running ${composed_command}`);
 

@@ -258,6 +258,8 @@ if (import.meta.vitest) {
         const idle = new AbortController();
         const pressed = new AbortController();
         pressed.abort();
+        // The prompts' errors are told apart by name, so the test makes errors of those names.
+        // eslint-disable-next-line unicorn/no-error-property-assignment
         const named = (name: string): Error => Object.assign(new Error("x"), { name });
         expect(is_stop(named("ExitPromptError"), idle.signal)).toBe(true);
         expect(is_stop(named("AbortPromptError"), idle.signal)).toBe(false);

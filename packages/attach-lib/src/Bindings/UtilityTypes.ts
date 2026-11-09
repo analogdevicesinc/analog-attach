@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/prevent-abbreviations */
 import { DtBindingSchema } from "./Schema";
 
 export type RefResolvedBinding = {

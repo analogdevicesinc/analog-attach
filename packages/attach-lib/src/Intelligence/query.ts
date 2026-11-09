@@ -361,7 +361,6 @@ function refine_gpio(
         description: property.value.description,
     });
 
-    // eslint-disable-next-line unicorn/prefer-ternary
     if (max_rows !== undefined && max_rows <= 1) {
         property.value = row;
     } else {

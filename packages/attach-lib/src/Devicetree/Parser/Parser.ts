@@ -300,7 +300,6 @@ export class Parser {
     const r_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
     if (Result.is_err(r_semi)) { return r_semi; }
 
-    // eslint-disable-next-line unicorn/no-useless-undefined
     return Result.Ok(undefined);
   }
 
@@ -638,7 +637,6 @@ export class Parser {
     const r_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
     if (Result.is_err(r_semi)) { return r_semi; }
 
-    // eslint-disable-next-line unicorn/no-useless-undefined
     return Result.Ok(undefined);
   }
 
@@ -1205,7 +1203,6 @@ export class Parser {
       this.comments_stream.advance();
     }
 
-    // eslint-disable-next-line unicorn/no-useless-undefined
     return Result.Ok(undefined);
   }
 }

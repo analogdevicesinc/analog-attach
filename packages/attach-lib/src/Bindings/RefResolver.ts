@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/prevent-abbreviations */
 import { FileInfo, getJsonSchemaRefParserDefaultOptions, JSONSchema, Plugin, ResolverError } from "@apidevtools/json-schema-ref-parser";
 import { Result } from "../result.js";
 import { SchemaContext, SearchPath } from "./Context.js";

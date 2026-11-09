@@ -142,7 +142,7 @@ export function positional_word(arguments_: Readonly<Record<string, string | rea
 export function substitute_command(template: string, values: Record<string, string>): string {
     let command = template;
     for (const [name, value] of Object.entries(values)) {
-        command = command.replaceAll(`{${name}}`, `"${value}"`);
+        command = command.replaceAll(`{${name}}`, () => `"${value}"`);
     }
     return command;
 }

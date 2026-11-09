@@ -213,7 +213,6 @@ if (import.meta.vitest) {
             properties: [{ key: "reg", value: {} as any }, { key: "pl022,interface", value: {} as any }],
             examples: [],
         };
-        // eslint-disable-next-line unicorn/no-useless-undefined
         expect(filter_peripheral_properties(binding, undefined)).toBe(binding);
     });
 

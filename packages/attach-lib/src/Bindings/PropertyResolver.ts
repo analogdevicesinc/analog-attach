@@ -1,4 +1,4 @@
-/* eslint-disable unicorn/prevent-abbreviations */
+/* eslint-disable unicorn/name-replacements */
 import { DtBindingSchema } from "./Schema";
 import { SchemaContext } from "./Context.js";
 import { dereference } from "./RefResolver.js";

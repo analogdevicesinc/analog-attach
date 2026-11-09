@@ -101,7 +101,9 @@ function order_properties(properties: ResolvedProperty[], required: string[] | u
 
         if (group_start !== undefined) {
             const group_start_index = ordered.indexOf(group_start);
-            for (const property of ordered) {
+            // Over a copy: the loop moves the properties it finds within `ordered`.
+            const before = [...ordered];
+            for (const property of before) {
                 if (property.key !== to_sort.property && property.key.includes(to_sort.search_term)) {
                     const found_index = ordered.indexOf(property);
                     const element = structuredClone(property);

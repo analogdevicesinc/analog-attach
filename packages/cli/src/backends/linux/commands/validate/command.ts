@@ -280,7 +280,7 @@ function print_dtprop(property: DTProperty, indent: string): string {
 function fill_template(template: string, node_blocks: string[]): string {
     return template.replace(
         /[ \t]*node\{nr\} \{[\s\S]*?\n[ \t]*\};/,
-        node_blocks.join('\n\n')
+        () => node_blocks.join('\n\n')
     );
 }
 

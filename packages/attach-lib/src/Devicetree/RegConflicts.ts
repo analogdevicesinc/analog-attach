@@ -219,7 +219,6 @@ function shared_address(a: RegEntry[], b: RegEntry[], ranges: boolean): bigint |
 }
 
 if (import.meta.vitest) {
-    /* eslint-disable unicorn/numeric-separators-style */
     const { test, expect } = import.meta.vitest;
 
     const setup = (base_source: string, overlay_source: string): DeviceTreeOverlay => {

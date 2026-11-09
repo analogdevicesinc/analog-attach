@@ -333,7 +333,7 @@ export class DeviceState {
         // We don't rely on modified_by_user because it's not preserved across file reloads.
         const isCustom = schema === undefined;
 
-        let customType: CustomPropertyType | undefined = undefined;
+        let customType: CustomPropertyType | undefined;
         if (isCustom) {
             // Check DTS component kind to detect phandle refs (the parsed value won't have "&")
             // Phandles can be: top-level ref (&label) or array containing ref (<&label>)

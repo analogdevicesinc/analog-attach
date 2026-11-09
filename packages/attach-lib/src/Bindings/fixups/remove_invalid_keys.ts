@@ -24,6 +24,8 @@ if (import.meta.vitest) {
             select: true,
             properties: { select: { description: "a property that happens to be named select" }, compatible: { enum: ["one"] } },
         };
+        // NodeFixup's signature takes the path; this fixup's own function ignores it.
+        // eslint-disable-next-line unicorn/no-invalid-argument-count
         fixup_remove_invalid_keys(schema, []);
         expect(schema).toStrictEqual({
             $id: "test_id",

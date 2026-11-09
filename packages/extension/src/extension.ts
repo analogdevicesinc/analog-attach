@@ -367,13 +367,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
             // Apply replacements
             if (remoteUser !== undefined) {
-                sshConfig = sshConfig.replace("{remoteUser}", remoteUser);
+                sshConfig = sshConfig.replace("{remoteUser}", () => remoteUser);
             }
             if (remoteHost !== undefined) {
-                sshConfig = sshConfig.replace("{remoteHost}", remoteHost);
+                sshConfig = sshConfig.replace("{remoteHost}", () => remoteHost);
             }
             if (remotePassword !== undefined) {
-                sshpassConfig = sshpassConfig.replace("{remotePassword}", remotePassword);
+                sshpassConfig = sshpassConfig.replace("{remotePassword}", () => remotePassword);
             }
 
             const dtbFileName = path.basename(dtbFilePath);
@@ -392,14 +392,14 @@ export async function activate(context: vscode.ExtensionContext) {
                     progress.report({ message: `Uploading ${dtbFileName}...` });
 
                     // Replace {dtb_name} placeholder in the write command
-                    const writeCommand = writeDtbToOverlays.replace('{dtb_name}', dtbFileName);
+                    const writeCommand = writeDtbToOverlays.replace('{dtb_name}', () => dtbFileName);
 
                     // Build the full deployment command:
                     // sshpass -p analog ssh user@address 'sudo tee /boot/overlays/{name} > /dev/null' < {local_file}
                     const remoteWriteCommand = remoteSudoAuth && remoteSudoAuth.trim().length > 0
                         ? `${remoteSudoAuth} ${writeCommand}`
                         : writeCommand;
-                    const sshWriteCommand = sshConfig.replace('{command}', remoteWriteCommand);
+                    const sshWriteCommand = sshConfig.replace('{command}', () => remoteWriteCommand);
                     const deployCommand = `${sshpassConfig} ${sshWriteCommand} < "${dtbFilePath}"`;
 
                     await execAsync(deployCommand);
@@ -418,7 +418,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
                         // Build reboot command
                         const sshRebootCommand = sshConfig
-                            .replace('{command}', `${remoteSudoAuth} ${rebootDevice}`);
+                            .replace('{command}', () => `${remoteSudoAuth} ${rebootDevice}`);
                         const rebootCommand = `${sshpassConfig} ${sshRebootCommand}`;
 
                         // Execute reboot command (don't wait for response as device will disconnect)
