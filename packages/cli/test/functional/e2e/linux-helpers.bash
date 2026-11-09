@@ -22,7 +22,7 @@ builds_into_dtbo() {
 	assert_json '.ok' true
 	assert_json '.path' "$dtbo"
 	[ "$(head -c 4 "$dtbo" | od -An -tx1 | tr -d ' ')" = d00dfeed ] || fail "$dtbo is not a .dtbo"
-	run "$CLI_DIR/bundled/linux/tools/dtc" -I dtb -O dts "$dtbo"
+	run dtc -I dtb -O dts "$dtbo"
 	assert_success
 	for compatible in "$@"; do
 		assert_output --partial "compatible = \"$compatible\";"

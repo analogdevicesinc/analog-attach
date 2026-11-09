@@ -4,14 +4,22 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 // Derived state kept in the backend's state directory (`session.state_dir`). It is never
-// a setting: every cache records the linux / dt-schema paths it was built from. They are
-// built by `config linux <path>`, `config --reload` and the setup run only; a cache older
-// than the bindings, or built for another tree, is just warned about.
+// a setting: every cache records the Linux tree and the dt-schema (its path and version) it
+// was built from. They are built by `config linux <path>`, `config --reload` and the setup
+// run only; a cache older than the bindings, or built for another tree, is just warned about.
 
 export interface CacheStamp {
     generated_at: number;
     linux?: string;
     dt_schema?: string;
+    dt_schema_version?: string;
+}
+
+/** What the caches are built from: the Linux tree, and the installed dt-schema's root and version. */
+export interface SchemaSource {
+    linux: string;
+    dt_schema: string;
+    dt_schema_version: string;
 }
 
 export interface CompatIndex extends CacheStamp {
@@ -46,24 +54,26 @@ export type StaleReason =
     | { kind: "stale" }
     | { kind: "linux-changed"; from: string; to: string };
 
-/** Why a cache built from `stamp` is out of date for these linux / dt-schema paths, if it is. */
-export function stale_reason(stamp: CacheStamp | undefined, linux: string, dt_schema: string): StaleReason | undefined {
+/** Why a cache built from `stamp` is out of date for this Linux tree and dt-schema, if it is. */
+export function stale_reason(stamp: CacheStamp | undefined, { linux, dt_schema, dt_schema_version }: SchemaSource): StaleReason | undefined {
     if (stamp === undefined) { return { kind: "missing" }; }
     if (typeof stamp.generated_at !== "number") { return { kind: "stale" }; }
     if (stamp.linux !== undefined && path.resolve(linux) !== path.resolve(stamp.linux)) {
         return { kind: "linux-changed", from: stamp.linux, to: linux };
     }
     if (stamp.dt_schema !== undefined && path.resolve(dt_schema) !== path.resolve(stamp.dt_schema)) { return { kind: "stale" }; }
+    if (stamp.dt_schema_version !== undefined && stamp.dt_schema_version !== dt_schema_version) { return { kind: "stale" }; }
 
+    // The package only: dt_schema is the directory holding it (site-packages).
     const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
-    const latest_mtime = Math.max(get_latest_mtime(bindings_folder), get_latest_mtime(dt_schema));
+    const latest_mtime = Math.max(get_latest_mtime(bindings_folder), get_latest_mtime(path.join(dt_schema, "dtschema")));
 
     return latest_mtime > stamp.generated_at ? { kind: "stale" } : undefined;
 }
 
-export function compat_index_stale_reason(index: CompatIndex | undefined, linux: string, dt_schema: string): StaleReason | undefined {
+export function compat_index_stale_reason(index: CompatIndex | undefined, source: SchemaSource): StaleReason | undefined {
     if (index?.entries === undefined) { return { kind: "missing" }; }
-    return stale_reason(index, linux, dt_schema);
+    return stale_reason(index, source);
 }
 
 function read_json<T>(file: string): T | undefined {
@@ -86,8 +96,8 @@ export function load_compat_index(state_directory: string): CompatIndex | undefi
     return read_json<CompatIndex>(compat_index_path(state_directory));
 }
 
-export function save_compat_index(entries: Record<string, string>, linux: string, dt_schema: string, state_directory: string): string {
-    const index: CompatIndex = { generated_at: Date.now(), linux, dt_schema, entries };
+export function save_compat_index(entries: Record<string, string>, { linux, dt_schema, dt_schema_version }: SchemaSource, state_directory: string): string {
+    const index: CompatIndex = { generated_at: Date.now(), linux, dt_schema, dt_schema_version, entries };
     write_json(compat_index_path(state_directory), index);
     return compat_index_path(state_directory);
 }
@@ -99,10 +109,10 @@ export function validation_schema_path(state_directory: string): string {
 
 const validation_stamp_path = (state_directory: string): string => path.join(state_directory, "validation.stamp.json");
 
-/** Why the cached validation schema is out of date for these paths, if it is. */
-export function validation_schema_stale_reason(linux: string, dt_schema: string, state_directory: string): StaleReason | undefined {
+/** Why the cached validation schema is out of date for this source, if it is. */
+export function validation_schema_stale_reason(source: SchemaSource, state_directory: string): StaleReason | undefined {
     if (!fs.existsSync(validation_schema_path(state_directory))) { return { kind: "missing" }; }
-    return stale_reason(read_json<CacheStamp>(validation_stamp_path(state_directory)), linux, dt_schema);
+    return stale_reason(read_json<CacheStamp>(validation_stamp_path(state_directory)), source);
 }
 
 const rebuild_hint = (program: string): string => `run '${program} config --reload' to rebuild them.`;
@@ -113,10 +123,10 @@ const rebuild_hint = (program: string): string => `run '${program} config --relo
  * decides with `config --reload`. Shell completion prints it nowhere, since a
  * `complete` session's `warn` is silent.
  */
-export function cache_warning(linux: string, dt_schema: string, state_directory: string, program: string): string | undefined {
+export function cache_warning(source: SchemaSource, state_directory: string, program: string): string | undefined {
     const reasons = [
-        compat_index_stale_reason(load_compat_index(state_directory), linux, dt_schema),
-        validation_schema_stale_reason(linux, dt_schema, state_directory),
+        compat_index_stale_reason(load_compat_index(state_directory), source),
+        validation_schema_stale_reason(source, state_directory),
     ];
     const moved = reasons.find(reason => reason?.kind === "linux-changed");
     if (moved !== undefined) {
@@ -130,24 +140,26 @@ export type BuildResult = { ok: true; schemas: unknown } | { ok: false; error: s
 
 /**
  * Run `dt-mk-schema -j` over the Linux bindings into `validation.json`, with
- * its stamp. The tool writes to a temporary file that is renamed once it
- * holds JSON, so a failure or a parallel reader never sees a partial file (a
- * previous file stays).
+ * its stamp. `dt_mk_schema` is the command and its first arguments
+ * (`mk_schema_command`). The tool writes to a temporary file that is renamed
+ * once it holds JSON, so a failure or a parallel reader never sees a partial
+ * file (a previous file stays).
  */
-export async function build_validation_schema(dt_mk_schema: string, linux: string, dt_schema: string, state_directory: string): Promise<BuildResult> {
-    const bindings = path.join(linux, "Documentation", "devicetree", "bindings");
+export async function build_validation_schema(dt_mk_schema: readonly string[], source: SchemaSource, state_directory: string): Promise<BuildResult> {
+    const [command = "dt-mk-schema", ...first] = dt_mk_schema;
+    const bindings = path.join(source.linux, "Documentation", "devicetree", "bindings");
     const target = validation_schema_path(state_directory);
     const temporary = `${target}.${process.pid}.tmp`;
     let schemas: unknown;
     fs.mkdirSync(path.dirname(target), { recursive: true });
     try {
-        await promisify(execFile)(dt_mk_schema, ["-j", "-o", temporary, bindings], { maxBuffer: 16 * 1024 * 1024 });
+        await promisify(execFile)(command, [...first, "-j", "-o", temporary, bindings], { maxBuffer: 16 * 1024 * 1024 });
         if (!fs.existsSync(temporary) || fs.statSync(temporary).size === 0) {
-            return { ok: false, error: `${dt_mk_schema} produced no output` };
+            return { ok: false, error: `${dt_mk_schema.join(" ")} produced no output` };
         }
         schemas = read_json<unknown>(temporary);
         if (schemas === undefined) {
-            return { ok: false, error: `${dt_mk_schema} produced output that isn't JSON` };
+            return { ok: false, error: `${dt_mk_schema.join(" ")} produced output that isn't JSON` };
         }
         fs.renameSync(temporary, target);
     } catch (error) {
@@ -156,7 +168,8 @@ export async function build_validation_schema(dt_mk_schema: string, linux: strin
     } finally {
         fs.rmSync(temporary, { force: true });
     }
-    write_json(validation_stamp_path(state_directory), { generated_at: Date.now(), linux, dt_schema } satisfies CacheStamp);
+    const { linux, dt_schema, dt_schema_version } = source;
+    write_json(validation_stamp_path(state_directory), { generated_at: Date.now(), linux, dt_schema, dt_schema_version } satisfies CacheStamp);
     return { ok: true, schemas };
 }
 
@@ -164,11 +177,12 @@ if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
     const os = await import("node:os");
 
-    const fake_tool = (directory: string, body: string): string => {
+    const fake_tool = (directory: string, body: string): string[] => {
         const tool = path.join(directory, "dt-mk-schema");
         fs.writeFileSync(tool, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
-        return tool;
+        return [tool];
     };
+    const source = (linux: string, dt_schema = "/dt-schema", dt_schema_version = "2026.9"): SchemaSource => ({ linux, dt_schema, dt_schema_version });
     /** The state directory of a test workspace. */
     const state_of = (directory: string): string => path.join(directory, "state");
     const workspace_with_bindings = (): string => {
@@ -183,10 +197,10 @@ if (import.meta.vitest) {
             // dt-mk-schema -j -o <file> <bindings>
             const tool = fake_tool(directory, `echo '{"generated-types":{}}' > "$3"`);
             const linux = path.join(directory, "linux");
-            expect(await build_validation_schema(tool, linux, "/dt-schema", state_of(directory))).toEqual({ ok: true, schemas: { "generated-types": {} } });
+            expect(await build_validation_schema(tool, source(linux), state_of(directory))).toEqual({ ok: true, schemas: { "generated-types": {} } });
             expect(fs.readFileSync(validation_schema_path(state_of(directory)), "utf8")).toContain("generated-types");
             expect(read_json<CacheStamp>(path.join(state_of(directory), "validation.stamp.json")))
-                .toMatchObject({ linux, dt_schema: "/dt-schema" });
+                .toMatchObject({ linux, dt_schema: "/dt-schema", dt_schema_version: "2026.9" });
             expect(fs.readdirSync(state_of(directory)).sort()).toEqual(["validation.json", "validation.stamp.json"]);
         } finally {
             fs.rmSync(directory, { recursive: true });
@@ -197,7 +211,7 @@ if (import.meta.vitest) {
         const directory = workspace_with_bindings();
         try {
             const tool = fake_tool(directory, `echo "bad binding" >&2; echo partial > "$3"; exit 1`);
-            const result = await build_validation_schema(tool, path.join(directory, "linux"), "/dt-schema", state_of(directory));
+            const result = await build_validation_schema(tool, source(path.join(directory, "linux")), state_of(directory));
             expect(result.ok).toBe(false);
             expect(!result.ok && result.error).toContain("bad binding");
             expect(fs.existsSync(state_of(directory)) ? fs.readdirSync(state_of(directory)) : []).toEqual([]);
@@ -212,7 +226,7 @@ if (import.meta.vitest) {
             fs.mkdirSync(state_of(directory), { recursive: true });
             fs.writeFileSync(validation_schema_path(state_of(directory)), "old");
             const tool = fake_tool(directory, `: > "$3"`);
-            const result = await build_validation_schema(tool, path.join(directory, "linux"), "/dt-schema", state_of(directory));
+            const result = await build_validation_schema(tool, source(path.join(directory, "linux")), state_of(directory));
             expect(!result.ok && result.error).toContain("no output");
             expect(fs.readFileSync(validation_schema_path(state_of(directory)), "utf8")).toBe("old");
             expect(fs.readdirSync(state_of(directory))).toEqual(["validation.json"]);
@@ -227,7 +241,7 @@ if (import.meta.vitest) {
             fs.mkdirSync(state_of(directory), { recursive: true });
             fs.writeFileSync(validation_schema_path(state_of(directory)), "old");
             const tool = fake_tool(directory, `echo '{ partial' > "$3"`);
-            const result = await build_validation_schema(tool, path.join(directory, "linux"), "/dt-schema", state_of(directory));
+            const result = await build_validation_schema(tool, source(path.join(directory, "linux")), state_of(directory));
             expect(!result.ok && result.error).toContain("isn't JSON");
             expect(fs.readFileSync(validation_schema_path(state_of(directory)), "utf8")).toBe("old");
             expect(fs.readdirSync(state_of(directory))).toEqual(["validation.json"]);
@@ -236,9 +250,9 @@ if (import.meta.vitest) {
         }
     });
 
-    const save_both = (directory: string, linux: string, generated_at: number): void => {
-        write_json(path.join(state_of(directory), "compat-index.json"), { generated_at, linux, dt_schema: "/dt-schema", entries: {} });
-        write_json(validation_stamp_path(state_of(directory)), { generated_at, linux, dt_schema: "/dt-schema" } satisfies CacheStamp);
+    const save_both = (directory: string, linux: string, generated_at: number, dt_schema_version = "2026.9"): void => {
+        write_json(path.join(state_of(directory), "compat-index.json"), { generated_at, linux, dt_schema: "/dt-schema", dt_schema_version, entries: {} });
+        write_json(validation_stamp_path(state_of(directory)), { generated_at, linux, dt_schema: "/dt-schema", dt_schema_version } satisfies CacheStamp);
         fs.writeFileSync(validation_schema_path(state_of(directory)), "{}");
     };
 
@@ -249,10 +263,14 @@ if (import.meta.vitest) {
             const dt_schema = path.join(directory, "dt-schema");
             fs.mkdirSync(dt_schema);
             save_both(directory, linux, Date.now() + 60_000);
-            expect(cache_warning(linux, "/dt-schema", state_of(directory), "aa")).toBeUndefined();
+            expect(cache_warning(source(linux), state_of(directory), "aa")).toBeUndefined();
+            save_both(directory, linux, Date.now() + 60_000, "2026.6");
+            expect(cache_warning(source(linux), state_of(directory), "aa")).toBe(
+                "The binding caches are older than the bindings; run 'aa config --reload' to rebuild them.",
+            );
             save_both(directory, linux, 0);
             fs.writeFileSync(path.join(linux, "Documentation", "devicetree", "bindings", "x.yaml"), "");
-            expect(cache_warning(linux, "/dt-schema", state_of(directory), "aa")).toBe(
+            expect(cache_warning(source(linux), state_of(directory), "aa")).toBe(
                 "The binding caches are older than the bindings; run 'aa config --reload' to rebuild them.",
             );
         } finally {
@@ -265,7 +283,7 @@ if (import.meta.vitest) {
         try {
             const linux = path.join(directory, "linux");
             save_both(directory, "/elsewhere", Date.now() + 60_000);
-            expect(cache_warning(linux, "/dt-schema", state_of(directory), "aa")).toBe(
+            expect(cache_warning(source(linux), state_of(directory), "aa")).toBe(
                 `The binding caches were built for /elsewhere, not ${linux}; run 'aa config --reload' to rebuild them.`,
             );
         } finally {
@@ -273,16 +291,22 @@ if (import.meta.vitest) {
         }
     });
 
-    test("stale_reason - missing, a changed linux path, newer files, fresh", () => {
+    test("stale_reason - missing, a changed linux path, another dt-schema version, newer files, fresh", () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-cache-"));
         try {
             const future = Date.now() + 60_000;
-            expect(stale_reason(undefined, directory, directory)).toEqual({ kind: "missing" });
-            expect(stale_reason({ generated_at: future, linux: "/elsewhere", dt_schema: directory }, directory, directory))
+            const here = source(directory, directory);
+            expect(stale_reason(undefined, here)).toEqual({ kind: "missing" });
+            expect(stale_reason({ generated_at: future, linux: "/elsewhere", dt_schema: directory }, here))
                 .toEqual({ kind: "linux-changed", from: "/elsewhere", to: directory });
+            expect(stale_reason({ generated_at: future, linux: directory, dt_schema: directory, dt_schema_version: "2026.6" }, here)).toEqual({ kind: "stale" });
+            // Only the dtschema package counts, not the rest of the directory that holds it.
             fs.writeFileSync(path.join(directory, "x.yaml"), "");
-            expect(stale_reason({ generated_at: 0, linux: directory, dt_schema: directory }, directory, directory)).toEqual({ kind: "stale" });
-            expect(stale_reason({ generated_at: future, linux: directory, dt_schema: directory }, directory, directory)).toBeUndefined();
+            expect(stale_reason({ generated_at: Date.now() - 60_000, linux: directory, dt_schema: directory }, here)).toBeUndefined();
+            fs.mkdirSync(path.join(directory, "dtschema"));
+            fs.writeFileSync(path.join(directory, "dtschema", "x.yaml"), "");
+            expect(stale_reason({ generated_at: 0, linux: directory, dt_schema: directory }, here)).toEqual({ kind: "stale" });
+            expect(stale_reason({ generated_at: future, linux: directory, dt_schema: directory, dt_schema_version: "2026.9" }, here)).toBeUndefined();
         } finally {
             fs.rmSync(directory, { recursive: true });
         }

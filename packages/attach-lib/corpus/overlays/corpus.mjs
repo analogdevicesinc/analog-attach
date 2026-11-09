@@ -22,8 +22,9 @@
 // CORPUS_JOBS  overlays validated in parallel (default: the CPUs minus one, at most 8)
 // CORPUS_CACHE  where the checkout and the processed schema go (default $XDG_CACHE_HOME/attach-corpus)
 //
-// Reads dist/ (`yarn build` first) and the CLI's bundled dtc / dt-mk-schema / dt-validate
-// (packages/cli/bundled/linux/tools: `packages/cli/scripts/bundle-dt-schema.sh`, which `yarn test` runs too).
+// Reads dist/ (`yarn build` first) and runs dtc, dt-mk-schema and dt-validate from PATH, as the CLI does: dtc from
+// the package manager, dt-schema at DT_SCHEMA_VERSION ('pipx install dtschema==2026.9', then
+// 'pipx inject dtschema ruamel.yaml.clib'), since the snapshots hold dt-validate's wording.
 import { execFile, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { availableParallelism, homedir, tmpdir } from "node:os";
@@ -35,7 +36,8 @@ import { validation_tree } from "./validation-tree.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
 const baseline = join(here, "snapshots");
-const tools = resolve(root, "../cli/bundled/linux/tools");
+// The CLI's (DT_SCHEMA_VERSION in packages/cli/src/backends/linux/config/tools.ts): keep them in step.
+const DT_SCHEMA_VERSION = "2026.9";
 const LINUX_URL = "https://github.com/analogdevicesinc/linux";
 const LINUX_COMMIT = "16bea53d3413344f5561b1fc45b90699239b55bb"; // rpi-6.12.y, 2026-09-30
 const LINUX_PATHS = ["arch/arm/boot/dts/broadcom", "arch/arm/boot/dts/overlays", "include", "Documentation/devicetree/bindings"];
@@ -79,10 +81,15 @@ if (!existsSync(join(root, "dist/index.js"))) {
   process.exit(2);
 }
 for (const tool of ["dtc", "dt-mk-schema", "dt-validate"]) {
-  if (!existsSync(join(tools, tool))) {
-    console.error(`missing ${join(tools, tool)} (run packages/cli/scripts/bundle-dt-schema.sh)`);
+  if (spawnSync(tool, ["--version"], { stdio: "ignore" }).status !== 0) {
+    console.error(`${tool} not found on PATH (dtc from the package manager; dt-schema: pipx install dtschema==${DT_SCHEMA_VERSION})`);
     process.exit(2);
   }
+}
+const dt_schema_version = spawnSync("dt-mk-schema", ["--version"], { encoding: "utf8" }).stdout.trim();
+if (dt_schema_version !== DT_SCHEMA_VERSION) {
+  console.error(`dt-schema ${dt_schema_version} is installed; the snapshots are of ${DT_SCHEMA_VERSION} (pipx install --force dtschema==${DT_SCHEMA_VERSION})`);
+  process.exit(2);
 }
 if (spawnSync("cpp", ["--version"], { stdio: "ignore" }).status !== 0) {
   console.error("cpp not found on PATH (needed to preprocess the devicetrees)");
@@ -118,12 +125,12 @@ function preprocess(input, output) {
   return { text: readFileSync(output, "utf8") };
 }
 
-// The processed schema is built once per run (it follows the bundled dt-schema), meanwhile the overlays parse.
+// The processed schema is built once per run (it follows the installed dt-schema), meanwhile the overlays parse.
 const schema_ready = (async () => {
   mkdirSync(cache, { recursive: true });
   const temporary = `${processed_schema}.${process.pid}.tmp`;
   try {
-    await run_tool(join(tools, "dt-mk-schema"), ["-j", "-o", temporary, join(linux, "Documentation/devicetree/bindings")], { maxBuffer: 64 * 1024 * 1024 });
+    await run_tool("dt-mk-schema", ["-j", "-o", temporary, join(linux, "Documentation/devicetree/bindings")], { maxBuffer: 64 * 1024 * 1024 });
     if (!existsSync(temporary) || statSync(temporary).size === 0) return "dt-mk-schema produced no output";
     renameSync(temporary, processed_schema);
     return undefined;
@@ -194,7 +201,7 @@ async function validate(name, tree) {
   const json = join(work, `${name}.errors.json`);
   writeFileSync(dts, build_validation_dts(tree));
   try {
-    await run_tool(join(tools, "dtc"), ["-I", "dts", "-O", "dtb", "-o", dtb, dts]);
+    await run_tool("dtc", ["-I", "dts", "-O", "dtb", "-o", dtb, dts]);
   } catch (error) {
     return { crash: true, message: `dtc: ${failure(error)}` };
   }
@@ -202,7 +209,7 @@ async function validate(name, tree) {
   if (schema_error !== undefined) return { crash: true, message: schema_error };
   try {
     // exits non-zero when there are errors: only a missing output file is a failure
-    await run_tool(join(tools, "dt-validate"), ["-s", processed_schema, dtb, "--json-output", json], { maxBuffer: 64 * 1024 * 1024 });
+    await run_tool("dt-validate", ["-s", processed_schema, dtb, "--json-output", json], { maxBuffer: 64 * 1024 * 1024 });
   } catch (error) {
     if (!existsSync(json)) return { crash: true, message: `dt-validate: ${failure(error)}` };
   }

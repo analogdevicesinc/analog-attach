@@ -12,7 +12,7 @@
           "node2",
           "goodix@14"
         ],
-        "message": "goodix@14 (goodix,gt911): 'anyOf' conditional failed, one must be fixed:\n\t'interrupts' is a required property\n\t'interrupts-extended' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/input/touchscreen/goodix.yaml"
+        "message": "goodix@14 (goodix,gt911): 'oneOf' conditional failed, one must be fixed:\n\t'interrupts' is a required property\n\t'interrupts-extended' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/input/touchscreen/goodix.yaml"
       }
     ],
     "warnings": []

@@ -1,4 +1,6 @@
-# The entry point of the bundled dt-mk-schema (scripts/bundle-dt-schema.sh).
+# A faster dt-mk-schema, with the same output. The build copies it into the Linux backend's
+# assets (bundled/linux/), and the CLI runs it with the Python of the installed dt-schema
+# (mk_schema_command in src/backends/linux/config/tools.ts), so it imports that dtschema.
 #
 # dt-schema processes each binding on its own (load, meta-schema check,
 # fixup) and one after another, which is nearly all of its run time. This

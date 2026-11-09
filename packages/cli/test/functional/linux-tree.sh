@@ -7,7 +7,7 @@
 # checkout to use instead; the tests expect rpi-6.12.y's content.
 #
 # The caches are built once by the CLI itself (`config linux <tree>`), and again only when the
-# tree, its commit or the bundled tools change; each test copies them into its project.
+# tree, its commit or the installed dt-schema change; each test copies them into its project.
 #
 #   linux-tree.sh    clone and build what is missing, then print the tree's path
 set -euo pipefail
@@ -39,9 +39,10 @@ if [ -z "${AA_LINUX:-}" ] && [ "$(git -C "$tree" rev-parse HEAD 2>/dev/null)" !=
 fi
 [ -d "$tree/Documentation/devicetree/bindings" ] || { echo "Not a Linux tree: $tree" >&2; exit 2; }
 
-recipe="$cli/bundled/linux/tools/.recipe"
-[ -f "$recipe" ] || { echo "No bundled tools: run 'yarn workspace @analog-attach/cli build' first." >&2; exit 2; }
-stamp="$tree $(git -C "$tree" rev-parse HEAD 2>/dev/null || echo unversioned) $(cat "$recipe")"
+[ -f "$cli/dist/cli.js" ] || { echo "No CLI build: run 'yarn workspace @analog-attach/cli build' first." >&2; exit 2; }
+dt_schema="$(dt-mk-schema --version 2>/dev/null)" || { echo "dt-mk-schema not found on PATH: install dt-schema (test/functional/README.md)." >&2; exit 2; }
+script="$(sha256sum "$cli/scripts/dt-mk-schema.py" | cut -d' ' -f1)"
+stamp="$tree $(git -C "$tree" rev-parse HEAD 2>/dev/null || echo unversioned) dt-schema $dt_schema $script"
 if [ "$(cat "$caches/.stamp" 2>/dev/null)" != "$stamp" ]; then
 	echo "Building the binding caches of $tree..." >&2
 	work="$(mktemp -d)"

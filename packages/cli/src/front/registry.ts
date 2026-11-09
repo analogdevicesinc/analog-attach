@@ -1,6 +1,6 @@
 // The backends the front end knows, by the value of the `backend` setting. Each loader is a
 // dynamic import, so the bundle keeps every backend in its own chunk and a run loads only
-// the active one (a no-OS run never loads attach-lib or the bundled dt-schema).
+// the active one (a no-OS run never loads attach-lib).
 
 import type { BackendLoader } from "../interface/backend-interface";
 

@@ -1,9 +1,10 @@
 // The Linux backend's `setup`: what the bare `analog-attach` on a terminal asks once the
-// backend is chosen. As the noos setup does, it walks the Linux tree, the base devicetree
-// and the workfile, skipping a setting that is set and valid, and saves each answer as it
-// is given, so a stopped run keeps what was answered. Then it builds the binding caches
-// when they aren't current. The workfile itself is left to `init`, which the front end
-// runs next when the response is `ready`.
+// backend is chosen. It first checks the tools on PATH, offering to install dt-schema with
+// pipx. Then, as the noos setup does, it walks the Linux tree, the base devicetree and the
+// workfile, skipping a setting that is set and valid, and saves each answer as it is given,
+// so a stopped run keeps what was answered. Then it builds the binding caches when they
+// aren't current. The workfile itself is left to `init`, which the front end runs next when
+// the response is `ready`.
 
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -11,8 +12,10 @@ import path from "node:path";
 
 import { answer, cancelled, input_error, PromptCancelled, refuse, type InteractiveSession, type Outcome } from "../../../../interface/backend-interface";
 import type { SetupResponse } from "../../../../interface/backend-responses";
+import { run as run_command } from "../../../shell";
 import { ensure_caches, type EnsureResult, type StartProgress } from "../../config/rebuild";
 import { read_settings, type ConfigResult, type Settings } from "../../config/settings";
+import { check_tools, DT_SCHEMA_VERSION, find_executable, type ToolsReport } from "../../config/tools";
 import { config_error_type, format_config_errors, linux_tree_problem, workspace_context, type WorkspaceContext } from "../../config/workspace";
 import { step_context, step_linux, step_overlay, type SetupPlace } from "../../setup";
 import { creation_problem } from "../../workfile";
@@ -20,11 +23,34 @@ import { format_summary, type Summary } from "../init/command";
 
 export type Ensure = (settings: Settings, context: WorkspaceContext, start_progress: StartProgress) => Promise<ConfigResult<EnsureResult>>;
 
+/** Runs the pipx commands; their output goes to stderr. */
+export type Install = (session: InteractiveSession, commands: readonly string[]) => Promise<void>;
+
 export interface SetupOptions {
     /** Where Linux trees are looked for. Default: the home directory. */
     home?: string;
     /** Builds the binding caches unless they are current; replaced in tests. */
     ensure?: Ensure;
+    /** Looks the tools up, the preprocessor of `preprocess-command` among them; replaced in tests. */
+    check_tools?: (program: string, preprocess_command: string) => ToolsReport;
+    /** Whether pipx is on PATH; replaced in tests. */
+    pipx?: () => boolean;
+    /** Installs dt-schema; replaced in tests. */
+    install?: Install;
+}
+
+/** Each command in turn, as a progress on stderr, up to the first that fails (SETUP-102). */
+async function pipx_install(session: InteractiveSession, commands: readonly string[]): Promise<void> {
+    for (const command of commands) {
+        const [name = "", ...words] = command.split(" ");
+        const progress = session.progress(`Running '${command}'`);
+        const { exit_code } = await run_command(name, words, session.cwd, { line: text => { progress.line(text); }, signal: session.signal });
+        if (exit_code !== 0) {
+            progress.done(`'${command}' failed (exit status ${exit_code})`);
+            return;
+        }
+        progress.done();
+    }
 }
 
 /** Why a configured path can't be kept: the Linux tree, or the base devicetree file. */
@@ -91,14 +117,59 @@ class SetupRun {
 /** The header, before the first step. */
 function say_header(session: InteractiveSession): void {
     const title = `${session.program} setup`;
-    for (const line of ["", session.style.bold(title), "=".repeat(title.length), "", "This sets up the workspace: a Linux kernel source tree, a base device tree and the overlay file.", ""]) {
+    for (const line of ["", session.style.bold(title), "=".repeat(title.length), "", "This checks the tools and sets up the workspace: a Linux kernel source tree, a base device tree and the overlay file.", ""]) {
         session.say(line);
     }
 }
 
+const stopped = (program: string): Outcome<never> => cancelled(`Stopped. What was answered is saved; run ${program} again to go on.`);
+
+/**
+ * The tools (SETUP-100 to SETUP-103): a `✓` line for each one found. While one has a
+ * problem, each problem and its hint, once the offer to install dt-schema with pipx, then
+ * `Check the tools again?`; no ends the run.
+ */
+async function step_tools(run: SetupRun, tools: Required<Pick<SetupOptions, "check_tools" | "pipx" | "install">>): Promise<{ ok: true } | { ok: false; outcome: Outcome<never> }> {
+    const { session } = run;
+    const { style } = session;
+    let offered = false;
+    for (;;) {
+        const report = tools.check_tools(session.program, read_settings(session.settings).preprocess_command);
+        if (report.problems.length === 0) {
+            for (const { name, value } of report.found) { run.skip(name, value); }
+            return { ok: true };
+        }
+        run.start_step();
+        for (const { name, value } of report.found) { session.say(`${style.cyan("✓")} ${name}: ${value}`); }
+        for (const { name, problem } of report.problems) {
+            session.say(style.yellow(`✗ ${name}: ${problem.message}`));
+            session.say(`  ${problem.hint}`);
+        }
+        session.say("");
+        const commands = report.dt_schema_install;
+        if (commands !== undefined && !offered && tools.pipx()) {
+            offered = true;
+            if (await session.prompter.confirm({ message: `Install dt-schema ${DT_SCHEMA_VERSION} with pipx now?`, default: true })) {
+                await tools.install(session, commands);
+                if (session.signal.aborted) { return { ok: false, outcome: stopped(session.program) }; }
+                continue;
+            }
+        }
+        if (!await session.prompter.confirm({ message: "Check the tools again?", default: true })) {
+            return { ok: false, outcome: refuse(`Install the tools above, then run '${session.program}' again.`, { type: "tool-missing" }) };
+        }
+    }
+}
+
 /** The steps: what is set, and whether `init` should run (the workfile exists, or the user wants it created). */
-async function run_steps(run: SetupRun): Promise<{ ok: true; linux: string; devicetree: string; workfile: string; create: boolean } | { ok: false; outcome: Outcome<never> }> {
+async function run_steps(run: SetupRun, options: SetupOptions): Promise<{ ok: true; linux: string; devicetree: string; workfile: string; create: boolean } | { ok: false; outcome: Outcome<never> }> {
     const { session, place } = run;
+    const tools = await step_tools(run, {
+        check_tools: options.check_tools ?? check_tools,
+        pipx: options.pipx ?? (() => find_executable("pipx") !== undefined),
+        install: options.install ?? pipx_install,
+    });
+    if (!tools.ok) { return tools; }
     const current = read_settings(session.settings);
 
     const linux = await run.ensure("linux", current.linux, tree_problem, () => step_linux(session, place));
@@ -136,11 +207,9 @@ export function create_setup(options: SetupOptions = {}): (session: InteractiveS
         say_header(session);
         let steps: Awaited<ReturnType<typeof run_steps>>;
         try {
-            steps = await run_steps(run);
+            steps = await run_steps(run, options);
         } catch (error) {
-            if (error instanceof PromptCancelled) {
-                return cancelled(`Stopped. What was answered is saved; run ${session.program} again to go on.`);
-            }
+            if (error instanceof PromptCancelled) { return stopped(session.program); }
             throw error;
         }
         if (!steps.ok) { return steps.outcome; }
@@ -202,13 +271,25 @@ if (import.meta.vitest) {
         }) as InteractiveSession;
         return { root, linux, dts, work, settings, session, prompter, stdout, done: () => { fs.rmSync(root, { recursive: true }); } };
     };
+    const { dt_schema_commands } = await import("../../config/tools");
+    const ready: ToolsReport = { found: [{ name: "dtc", value: "1.7.0" }, { name: "cpp", value: "13.2.0" }, { name: "dt-schema", value: DT_SCHEMA_VERSION }], problems: [] };
+    /** The tools as `reports` say, one per check (the last one stays), and pipx on PATH. */
+    const tools = (...reports: ToolsReport[]): Pick<SetupOptions, "check_tools" | "pipx"> => ({
+        check_tools: () => (reports.length > 1 ? reports.shift()! : reports[0]!),
+        pipx: () => true,
+    });
+    const no_dt_schema: ToolsReport = {
+        found: [{ name: "dtc", value: "1.7.0" }],
+        problems: [{ name: "dt-schema", problem: { kind: "missing", message: "dt-mk-schema not found on PATH", hint: "Install dt-schema." } }],
+        dt_schema_install: dt_schema_commands(),
+    };
     const built: Ensure = () => Promise.resolve({ ok: true, value: { ok: true, rebuilt: true, message: "built" } });
     const current: Ensure = () => Promise.resolve({ ok: true, value: { ok: true, rebuilt: false, message: "current" } });
 
     test("setup — with nothing set, asks the three steps and saves each answer; init then creates the workfile", async () => {
         const { root, linux, dts, work, settings, session, prompter, done } = workspace(({ linux }) => [linux, "manual", "../base.dts", "mine"]);
         try {
-            const outcome = await create_setup({ home: root, ensure: built })(session);
+            const outcome = await create_setup({ home: root, ensure: built, ...tools(ready) })(session);
             expect(prompter.asked).toEqual(["Linux source tree", "Choose how to select the base .dts file", "Path to .dts file", "Overlay file name"]);
             expect(await outcome_json(outcome)).toEqual({
                 ok: true, message: "Saved linux, devicetree, workfile; the binding caches are built", severity: "info",
@@ -228,10 +309,10 @@ if (import.meta.vitest) {
             const kept = path.join(work, "overlay.dtso");
             fs.writeFileSync(kept, "/dts-v1/;\n/plugin/;\n/ {\n};\n");
             for (const [key, value] of [["linux", linux], ["devicetree", dts], ["workfile", kept]] as const) { await settings.set(key, value); }
-            const outcome = await create_setup({ home: root, ensure: current })(session);
+            const outcome = await create_setup({ home: root, ensure: current, ...tools(ready) })(session);
             expect(prompter.asked).toEqual([]);
             expect(await outcome_json(outcome)).toMatchObject({ saved: [], ready: true, message: "Every setting was already set; the binding caches are current" });
-            expect(stdout.text).toContain(`✓ linux: ${linux}\n✓ devicetree: ${dts}\n✓ workfile: ${kept}\n`);
+            expect(stdout.text).toContain(`✓ dtc: 1.7.0\n✓ cpp: 13.2.0\n✓ dt-schema: ${DT_SCHEMA_VERSION}\n✓ linux: ${linux}\n✓ devicetree: ${dts}\n✓ workfile: ${kept}\n`);
         } finally {
             done();
         }
@@ -241,7 +322,7 @@ if (import.meta.vitest) {
         const { root, linux, dts, work, settings, session, prompter, done } = workspace(() => [false]);
         try {
             for (const [key, value] of [["linux", linux], ["devicetree", dts], ["workfile", path.join(work, "overlay.dtso")]] as const) { await settings.set(key, value); }
-            const outcome = await create_setup({ home: root, ensure: current })(session);
+            const outcome = await create_setup({ home: root, ensure: current, ...tools(ready) })(session);
             expect(prompter.asked).toEqual(["Create overlay.dtso?"]);
             expect(await outcome_json(outcome)).toMatchObject({ ready: false });
             expect(outcome_text(outcome)).toContain("Workspace configured");
@@ -257,7 +338,7 @@ if (import.meta.vitest) {
         try {
             // The store checks only that the path exists; it is the setup that wants a Linux tree.
             for (const [key, value] of [["linux", root], ["devicetree", dts], ["workfile", path.join(root, "work", "o.dtso")]] as const) { await settings.set(key, value); }
-            await create_setup({ home: root, ensure: current })(session);
+            await create_setup({ home: root, ensure: current, ...tools(ready) })(session);
             expect(prompter.asked[0]).toBe("Linux source tree");
             expect(stdout.text).toContain(`linux is ${root}, which is not a Linux source tree.`);
             expect(settings.get("linux")).toBe(linux);
@@ -269,7 +350,7 @@ if (import.meta.vitest) {
     test("setup — stopped at the base, the tree is kept: exit 130", async () => {
         const { root, linux, settings, session, done } = workspace(({ linux }) => [linux]);
         try {
-            const outcome = await create_setup({ home: root, ensure: built })(session);
+            const outcome = await create_setup({ home: root, ensure: built, ...tools(ready) })(session);
             expect(outcome.kind).toBe("cancelled");
             expect(outcome_text(outcome)).toBe("Stopped. What was answered is saved; run aa again to go on.");
             expect(settings.get("linux")).toBe(linux);
@@ -283,11 +364,60 @@ if (import.meta.vitest) {
         const { root, linux, work, settings, session, done } = workspace(({ linux }) => [linux, "manual", "../base.dts", "overlay"]);
         try {
             const failing: Ensure = () => Promise.resolve({ ok: true, value: { ok: false, rebuilt: true, message: "Compiling binding schemas failed:\nbad binding" } });
-            const outcome = await create_setup({ home: root, ensure: failing })(session);
+            const outcome = await create_setup({ home: root, ensure: failing, ...tools(ready) })(session);
             expect(outcome.kind).toBe("refused");
             expect(outcome_text(outcome)).toBe("Compiling binding schemas failed:\nbad binding\nFix the problem, then run 'aa config --reload' to build the binding caches and 'aa init' to create the workfile.");
             expect(fs.existsSync(path.join(work, "overlay.dtso"))).toBe(false);
             expect(settings.get("workfile")).toBe(path.join(work, "overlay.dtso"));
+        } finally {
+            done();
+        }
+    });
+
+    test("setup — dt-schema missing: the problem and its hint, pipx offered and run, then the tools are checked again", async () => {
+        const { root, linux, dts, work, settings, session, prompter, stdout, done } = workspace(() => [true]);
+        try {
+            for (const [key, value] of [["linux", linux], ["devicetree", dts], ["workfile", path.join(work, "overlay.dtso")]] as const) { await settings.set(key, value); }
+            fs.writeFileSync(path.join(work, "overlay.dtso"), "/dts-v1/;\n/plugin/;\n/ {\n};\n");
+            const installed: (readonly string[])[] = [];
+            const install: Install = (_session, commands) => { installed.push(commands); return Promise.resolve(); };
+            const outcome = await create_setup({ home: root, ensure: current, ...tools(no_dt_schema, ready), install })(session);
+            expect(prompter.asked).toEqual([`Install dt-schema ${DT_SCHEMA_VERSION} with pipx now?`]);
+            expect(installed).toEqual([dt_schema_commands()]);
+            expect(outcome.kind).toBe("answer");
+            expect(stdout.text).toContain("✓ dtc: 1.7.0\n✗ dt-schema: dt-mk-schema not found on PATH\n  Install dt-schema.\n\n");
+            expect(stdout.text).toContain(`✓ cpp: 13.2.0\n✓ dt-schema: ${DT_SCHEMA_VERSION}\n✓ linux: ${linux}`);
+        } finally {
+            done();
+        }
+    });
+
+    test("setup — pipx declined or not there: Check the tools again?, and no refuses before any step", async () => {
+        const declined = workspace(() => [false, true, false]);
+        try {
+            const outcome = await create_setup({ home: declined.root, ensure: built, ...tools(no_dt_schema) })(declined.session);
+            expect(declined.prompter.asked).toEqual([`Install dt-schema ${DT_SCHEMA_VERSION} with pipx now?`, "Check the tools again?", "Check the tools again?"]);
+            expect(outcome.kind).toBe("refused");
+            expect(await outcome_json(outcome)).toMatchObject({ ok: false, error_type: "tool-missing" });
+            expect(outcome_text(outcome)).toBe("Install the tools above, then run 'aa' again.");
+            expect(declined.settings.get("linux")).toBeUndefined();
+        } finally {
+            declined.done();
+        }
+        const without_pipx = workspace(() => [false]);
+        try {
+            await create_setup({ home: without_pipx.root, ensure: built, ...tools(no_dt_schema), pipx: () => false })(without_pipx.session);
+            expect(without_pipx.prompter.asked).toEqual(["Check the tools again?"]);
+        } finally {
+            without_pipx.done();
+        }
+    });
+
+    test("setup — stopped at a tools question: exit 130", async () => {
+        const { root, session, done } = workspace();
+        try {
+            const outcome = await create_setup({ home: root, ensure: built, ...tools(no_dt_schema) })(session);
+            expect(outcome.kind).toBe("cancelled");
         } finally {
             done();
         }

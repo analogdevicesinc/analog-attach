@@ -1,6 +1,7 @@
 // A tiny Linux workspace for the backend's tests through the front end's `main`: a fixture
-// Linux tree with two bindings, a base devicetree, an overlay, caches and a bundled
-// dt-schema in temp directories, so nothing depends on a real kernel checkout.
+// Linux tree with two bindings, a base devicetree, an overlay, caches and stand-ins for the
+// tools on PATH (dtc, and a dt-schema installation) in temp directories, so nothing depends on
+// a real kernel checkout or on what the machine has installed.
 
 import * as fs from "node:fs";
 import os from "node:os";
@@ -12,6 +13,57 @@ import type { Registry } from "../../../front/registry";
 import { PromptCancelled, type Prompter } from "../../../interface/backend-interface";
 
 export const LINUX_REGISTRY: Registry = { linux: () => import("../index").then(module => module.backend) };
+
+/**
+ * A stand-in for dtc, dt-mk-schema and dt-validate: prints a version, writes the file after `-o`
+ * or `--json-output` (`diagnostics.json` next to it, else `[]`), and fails when a file named
+ * `fail` is next to it.
+ */
+export const FAKE_TOOL = `#!/bin/sh
+here=$(dirname "$0")
+if [ "$1" = "--version" ]; then echo "fake 1.0"; exit 0; fi
+if [ -e "$here/fail" ]; then echo "fake failure: $(basename "$0")" >&2; exit 1; fi
+previous=""
+for word in "$@"; do
+    case "$previous" in
+        -o|--json-output)
+            diagnostics="$here/diagnostics.json"
+            case "$word" in *full-error.json) [ -e "$here/full-diagnostics.json" ] && diagnostics="$here/full-diagnostics.json" ;; esac
+            if [ -e "$diagnostics" ]; then cat "$diagnostics" > "$word"; else printf '[]' > "$word"; fi ;;
+    esac
+    previous="$word"
+done
+exit 0
+`;
+
+/** The dt-schema version the fake installation reports. */
+export const FAKE_DT_SCHEMA_VERSION = "2026.9";
+
+/**
+ * The Python of the fake dt-schema installation: answers the probe (`-c`) with the package
+ * directory under `root` and `version`, and runs a script it is the interpreter of with sh.
+ * dt-mk-schema names it on its first line, as pip writes it.
+ */
+const fake_python = (root: string, version: string): string => `#!/bin/sh
+if [ "$1" = "-c" ]; then printf '%s\n' '${JSON.stringify({ root, version })}'; exit 0; fi
+exec /bin/sh "$@"
+`;
+
+/**
+ * The fake tools in `bin`, each FAKE_TOOL: dtc, dt-validate, and a dt-schema installation of
+ * `version` (`python3`, a `dt-mk-schema` it runs, the package under `site_packages`).
+ * dt-mk-schema's interpreter is itself a script, which Linux runs.
+ */
+export function write_fake_tools(bin: string, site_packages: string, version = FAKE_DT_SCHEMA_VERSION): void {
+    fs.mkdirSync(bin, { recursive: true });
+    for (const directory of ["schemas", "meta-schemas"]) {
+        fs.mkdirSync(path.join(site_packages, "dtschema", directory), { recursive: true });
+    }
+    const python = path.join(bin, "python3");
+    fs.writeFileSync(python, fake_python(site_packages, version), { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, "dt-mk-schema"), FAKE_TOOL.replace(/^#!.*\n/, `#!${python}\n`), { mode: 0o755 });
+    for (const name of ["dtc", "dt-validate"]) { fs.writeFileSync(path.join(bin, name), FAKE_TOOL, { mode: 0o755 }); }
+}
 
 export const BASE_DTS = `/dts-v1/;
 / {
@@ -164,8 +216,12 @@ export interface LinuxFixture {
     /** The cwd of a run, with `overlay.dtso`. */
     readonly project: string;
     readonly home: string;
-    /** A package root with an (empty) bundled dt-schema. */
+    /** A package root, with no assets. */
     readonly package_root: string;
+    /** The fake tools (`write_fake_tools`), first on PATH during a run. */
+    readonly tools: string;
+    /** The fake dt-schema installation's package directory: `<site_packages>/dtschema`. */
+    readonly site_packages: string;
     /** The fixture Linux tree. */
     readonly linux: string;
     /** The project's state directory, where the Linux backend keeps its caches. */
@@ -189,15 +245,16 @@ export function create_linux_fixture(): LinuxFixture {
     const project = path.join(base, "project");
     const home = path.join(base, "home");
     const package_root = path.join(base, "package");
+    const tools = path.join(base, "tools", "bin");
+    const site_packages = path.join(base, "tools", "site-packages");
     const linux = path.join(base, "linux");
     const bindings_directory = path.join(linux, "Documentation", "devicetree", "bindings");
     const entries: Record<string, string> = {};
 
     fs.mkdirSync(project);
     fs.mkdirSync(home);
-    for (const directory of ["schemas", "meta-schemas"]) {
-        fs.mkdirSync(path.join(package_root, "bundled", "linux", "dt-schema", "dtschema", directory), { recursive: true });
-    }
+    fs.mkdirSync(package_root);
+    write_fake_tools(tools, site_packages);
     fs.mkdirSync(bindings_directory, { recursive: true });
     fs.mkdirSync(path.join(linux, "include"), { recursive: true });
     fs.writeFileSync(path.join(base, "base.dts"), BASE_DTS);
@@ -214,7 +271,7 @@ export function create_linux_fixture(): LinuxFixture {
     write_binding(path.join("iio", "accel", "adi,adxl000.yaml"), ADXL_YAML, ["adi,adxl000"]);
 
     const fixture: LinuxFixture = {
-        base, project, home, package_root, linux,
+        base, project, home, package_root, tools, site_packages, linux,
         state_directory,
         write_settings(values) {
             fs.mkdirSync(path.join(project, ".analog-attach"), { recursive: true });
@@ -222,8 +279,7 @@ export function create_linux_fixture(): LinuxFixture {
         },
         write_binding,
         write_caches() {
-            const dt_schema = path.join(package_root, "bundled", "linux", "dt-schema");
-            const stamp = { generated_at: Date.now() + 60_000, linux, dt_schema };
+            const stamp = { generated_at: Date.now() + 60_000, linux, dt_schema: site_packages, dt_schema_version: FAKE_DT_SCHEMA_VERSION };
             fs.mkdirSync(state_directory(), { recursive: true });
             fs.writeFileSync(path.join(state_directory(), "compat-index.json"), JSON.stringify({ ...stamp, entries }));
             fs.writeFileSync(path.join(state_directory(), "validation.json"), "{}");
@@ -237,6 +293,8 @@ export function create_linux_fixture(): LinuxFixture {
             const tty = options.prompter !== undefined;
             const stdout = capture_stream(false);
             const stderr = capture_stream(false);
+            const search_path = process.env["PATH"];
+            process.env["PATH"] = `${tools}${path.delimiter}${search_path ?? ""}`;
             const code = await main(argv, {
                 registry: options.registry ?? LINUX_REGISTRY,
                 streams: { stdout, stderr },
@@ -246,7 +304,7 @@ export function create_linux_fixture(): LinuxFixture {
                 environment: {},
                 claude_installed: () => false,
                 package_root,
-            });
+            }).finally(() => { process.env["PATH"] = search_path; });
             return { code, stdout: stdout.text, stderr: stderr.text };
         },
         remove() {

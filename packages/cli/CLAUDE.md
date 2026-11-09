@@ -10,10 +10,12 @@ numbered decisions are in `docs/merged-cli-design.md`; the observable behaviour 
 
 ## Commands
 
-- `yarn build`: `scripts/bundle-dt-schema.sh` (the Linux backend's bundled dt-schema and tools, see
-  below), then `tsc -p src/tsconfig.json` for the type check (errors block the build), then `tsup`
-  for `dist/cli.js` and its chunks, then a copy of attach-no-os-lib's `src/codegen/templates` to
-  `bundled/noos/templates`.
+- `yarn build`: `tsc -p src/tsconfig.json` for the type check (errors block the build), then `tsup`
+  for `dist/cli.js` and its chunks, then `bundled/` afresh: `scripts/dt-mk-schema.py` to
+  `bundled/linux/` and attach-no-os-lib's `src/codegen/templates` to `bundled/noos/templates`.
+- The Linux backend's tools are the system's, as users install them (see *System tools* below):
+  `dtc` from the package manager, and `pipx install dtschema==2026.9`, then `pipx inject dtschema
+  ruamel.yaml.clib`. attach-lib's tests, the functional tests and CI need them on PATH too.
 - `yarn test --run`: Vitest (inline `import.meta.vitest` blocks plus the `*.test.ts` files under
   `src/`). `yarn lint`: ESLint on `src`. `yarn clean`: `dist`, `tsconfig.tsbuildinfo`,
   `node_modules`.
@@ -235,9 +237,9 @@ that gets them cannot fail because of the configuration.
   false, outcome }`. It resolves `build-dir` against `project_root` (`build_folder`). The resources
   it can parse:
   - `linux`: the checked Linux tree alone (`list context`).
-  - `bindings`: the Linux tree has `Documentation/devicetree/bindings/` and `include/`, and the
-    bundled dt-schema exists.
-  - `tools`: the bundled dtc and dt-* binaries.
+  - `bindings`: the Linux tree has `Documentation/devicetree/bindings/` and `include/`, and
+    dt-schema 2026.9 is installed (`parse_dt_schema`, looked up once per load).
+  - `tools`: dtc, the `dt-mk-schema` command (`mk_schema_command`) and dt-validate, from PATH.
   - `base`: the DTS, run through `preprocess-command` into `<state_dir>/preprocessed.dts` on every
     invocation, then parsed.
   - `overlay`: a `Workfile` parsed against the base, with `print()` / `save()` honouring
@@ -268,7 +270,7 @@ that gets them cannot fail because of the configuration.
     `select` (naming conventions such as `arm/qcom-soc.yaml`), then a fallback. Check a change
     to it against the whole tree (the old and new index of `~/linux_rpi`), not only the tests.
   - Only three paths call it: `config linux <path>`, `config --reload` (`reload_caches`, which
-    checks the Linux tree, bundled dt-schema and tools first) and the setup run (`ensure_caches`,
+    checks the Linux tree and the installed dt-schema first) and the setup run (`ensure_caches`,
     which skips the build when `caches_current` says both are current). Progress goes through
     `session.progress`; `progress.ts` only formats the duration.
   - `parse_bindings` fails with a `config --reload` hint when either file is missing, so a command
@@ -387,25 +389,34 @@ With `output` `full`, `build` writes the base with the overlay applied instead o
 - `{output}` / `{dtbo}` of `build-command` / `deploy-command` name the `.dtb`; no `.dts` is
   written for them.
 
-### Bundled dt-schema and tools
+### System tools
 
-The backend's `assets_dir` is `bundled/linux/`. It holds:
-- `dt-schema/`: the dt-schema YAML schemas used by the binding parser;
-- `tools/`: PyInstaller-built binaries of `dt-mk-schema` and `dt-validate`, plus a statically
-  linked `dtc` (v1.8.1, built without libyaml).
+The backend ships no tools (their licences: dtc is GPL, dt-schema pulls in GPL code). It runs what
+is on PATH, looked up on every run (`config/tools.ts`, spec COM-118 / COM-119):
+- `find_dtc`: `dtc`, 1.6.0 or later (`DTC_MINIMUM`); a version it can't read is taken.
+- `find_dt_schema`: `dt-mk-schema`, whose first line names its Python (`script_interpreter`:
+  `#!<path>`, `#!/usr/bin/env <name>`, pip's long-path `#!/bin/sh` form). That Python answers a
+  probe (`importlib`, without importing dtschema) with the directory holding the `dtschema`
+  package (`DtSchemaInstall.root`, `Bindings.dt_schema`, which the binding parser reads) and its
+  version. Only `DT_SCHEMA_VERSION` (2026.9) is taken; attach-lib's `vitest.globalSetup.ts` and
+  `corpus/overlays/corpus.mjs` pin the same, so bump them together.
+- `find_dt_validate`: `dt-validate`.
+- `find_preprocessor`: the first word of `preprocess-command` (`cpp` by default), found when its
+  `--version` runs; no version is required. `parse_base` reports it on `preprocess-command`.
+- A problem is a `ToolProblem` with the install command as its hint (`install_command` per
+  `SystemTool`, dtc or cpp, from `/etc/os-release`; `dt_schema_hint` with pipx); `workspace.ts`
+  turns it into a `tool-missing` configuration error. `check_tools(program, preprocess_command)`
+  is the setup run's report.
+- `mk_schema_command`: the installed Python on `<assets_dir>/dt-mk-schema.py` (the build copies
+  `scripts/dt-mk-schema.py` there), else the installed `dt-mk-schema`. The script runs
+  dt-schema's per-file `process_schema` on a process pool, then hands the results to the
+  upstream loop, so the output stays dt-schema's own.
+- The cache stamps carry `dt_schema` and `dt_schema_version`: another installation makes the
+  caches stale.
 
-`scripts/bundle-dt-schema.sh` builds them on demand. It clones dt-schema at a pinned commit into
-`dt-schema/` and dtc into `dtc/` (both gitignored, like `bundled/`), and runs as part of
-`yarn build`.
-- `dt-mk-schema` is built from `scripts/dt-mk-schema.py`. It runs dt-schema's per-file
-  `process_schema` on a process pool, then hands the results to the upstream loop, so the output
-  stays dt-schema's own.
-- The venv gets `ruamel.yaml.clib`: without the C loader, loading YAML is most of the run.
-- `tools/.recipe` holds a hash of the script and the entry point. Changing either rebuilds the
-  tools on the next `yarn build`; otherwise the script exits early.
-
-`getBundledDtSchemaPath` / `getBundledToolsPath` (`commands/skill/utilities.ts`) resolve them from
-`assets_dir`.
+Tests never use the machine's tools: the fixture (`testing/fixture.ts`, `write_fake_tools`) puts
+a fake dt-schema 2026.9 (a `python3` that answers the probe, a `dt-mk-schema` it runs) and fake
+`dtc` / `dt-validate` first on PATH for each `run`.
 
 ### Overlay syntax
 
@@ -462,6 +473,10 @@ The hidden `__list` of attach-linux is withdrawn. `complete.ts` calls the data f
 
 The Linux `setup` (`commands/setup/command.ts`, spec `setup.md`) runs from the front end's bare run
 once the backend is linux.
+- It first checks the tools (`step_tools`, SETUP-100+: dtc, the preprocessor, dt-schema):
+  `✓` lines, or each problem with its hint, once the offer to run the pipx commands
+  (`pipx_install`, output via `session.progress`), then `Check the tools again?` until they are
+  there or the user says no (a refusal). dtc and cpp are never installed. Tests inject `check_tools`, `pipx` and `install` (`SetupOptions`).
 - Like the noos setup, it walks the Linux tree, the base devicetree and the workfile (`run_steps`
   with `step_linux`, `step_context`, `step_overlay` in `setup.ts`, through `session.prompter`).
   - A setting that is set and valid is skipped (`✓ linux: <path>`); a set but invalid one is

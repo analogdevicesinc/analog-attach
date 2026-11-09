@@ -35,7 +35,8 @@ arguments.
 ## 3. Resources
 
 The command needs the bindings (with `validation.json`, 02-common.md §8.4),
-the bundled tools, the base and the overlay (COM-070; §8.2, §8.3). With
+the tools (dtc, dt-schema and its dt-validate, 02-common.md COM-118 and
+COM-119), the base and the overlay (COM-070; §8.2, §8.3). With
 `--full` it runs `preprocess-command` on the full tree too.
 
 ## 4. The validation tree
@@ -74,13 +75,13 @@ number; the other `<`, `>` and `&` are literal devicetree syntax.
 
 ## 5. Running the tools
 
-**VALIDATE-010** The CLI shall compile the validation tree with the bundled
-dtc into `.analog-attach/linux/temp.dtb` (`<dtc> -I dts -O dtb -o <temp.dtb>
+**VALIDATE-010** The CLI shall compile the validation tree with the dtc
+on PATH into `.analog-attach/linux/temp.dtb` (`<dtc> -I dts -O dtb -o <temp.dtb>
 <temp.dts>`). If dtc fails, then the CLI shall report its standard error
 (VALIDATE-013) and not run dt-validate.
 
 **VALIDATE-011** The CLI shall delete `.analog-attach/linux/error.json` when it
-exists, then run the bundled dt-validate as `<dt-validate> -s
+exists, then run the dt-validate on PATH as `<dt-validate> -s
 <validation.json> <temp.dtb> --json-output <error.json>`. A non-zero exit
 status isn't a failure when `error.json` was written: dt-validate exits
 non-zero when it finds errors.
@@ -121,7 +122,7 @@ BUILD-013's or BUILD-014's text after `Build failed: `, written alone in
 human mode.
 
 **VALIDATE-042** The CLI shall then compile the preprocessed full tree with
-the bundled dtc into `.analog-attach/linux/full.dtb` and run dt-validate on it
+dtc into `.analog-attach/linux/full.dtb` and run dt-validate on it
 into `.analog-attach/linux/full-error.json`, as VALIDATE-010 to VALIDATE-013
 do for the validation tree; a tool failure there is reported the same way.
 

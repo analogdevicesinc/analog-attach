@@ -537,9 +537,6 @@ describe("the Linux backend through main", () => {
 
     test("build: a success line, then the .dtbo's path two spaces in, as noos writes it", async () => {
         configure();
-        const tools = path.join(fixture.package_root, "bundled", "linux", "tools");
-        fs.mkdirSync(tools, { recursive: true });
-        for (const name of ["dtc", "dt-mk-schema", "dt-validate"]) { fs.writeFileSync(path.join(tools, name), "#!/bin/sh\nexit 0\n", { mode: 0o755 }); }
         const result = await run(["build"]);
         expect(result).toEqual({ code: 0, stdout: `Build completed successfully\n\n  ${path.join(project, "build", "overlay.dtbo")}\n`, stderr: "" });
     });

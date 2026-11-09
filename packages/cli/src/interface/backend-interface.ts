@@ -140,7 +140,7 @@ export interface Session {
      * first writes.
      */
     readonly state_dir: string;
-    /** Where the backend's bundled files are (Linux: dt-schema, dtc, dt-validate). */
+    /** Where the backend's bundled files are (Linux: the parallel `dt-mk-schema.py`; noos: the codegen templates). */
     readonly assets_dir: string;
     /**
      * Undefined when nothing may be asked: `--json`, `--quiet`, not a terminal. A backend
@@ -581,7 +581,7 @@ export interface Backend<R extends Responses = Responses> {
 
 /**
  * The registry the front end has: one loader per backend, imported only when that
- * backend is active, so a no-OS run never loads attach-lib or the bundled dt-schema.
+ * backend is active, so a no-OS run never loads attach-lib.
  *
  *   export const BACKENDS: Registry = {
  *       linux: () => import("../backends/linux/index").then(module => module.backend),

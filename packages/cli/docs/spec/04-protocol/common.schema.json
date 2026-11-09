@@ -151,7 +151,7 @@
             "properties": {
               "field": {
                 "type": "string",
-                "description": "The setting at fault (linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, ...) or the resource: compat-index, validation.json, dt-schema, tools, deploy."
+                "description": "The setting at fault (linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, ...) or the resource: compat-index, validation.json, dtc, dt-schema, deploy."
               },
               "kind": {
                 "enum": [

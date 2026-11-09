@@ -211,8 +211,8 @@ is that directory.
 
 Each command needs some of the resources of the workspace: the settings,
 and the backend's own. Where the backend is linux, they are the bindings
-(the Linux tree and the caches), the bundled tools, the base and the
-workfile. Its chapter says which. Where the backend is noos, a command reads
+(the Linux tree, the installed dt-schema and the caches), the tools (dtc and
+dt-schema, §8.4), the base and the workfile. Its chapter says which. Where the backend is noos, a command reads
 its settings as it goes instead (§8.5).
 
 **COM-070** When a command needs workspace resources, the CLI shall check all
@@ -232,9 +232,9 @@ of several fields merged into one (§8.1). A problem's `error_type` is
 `missing-setting` for a setting with no value; `workfile-missing` for a
 workfile that doesn't exist; `invalid-source` for a `linux` that isn't a Linux
 tree; `parse-error` for a base or workfile that doesn't parse; `tool-missing`
-for a `preprocess-command`, scp or sshpass not on PATH; `tool-failed` for a
-base whose preprocessing fails; `install-incomplete` for the bundled dt-schema
-or tools missing; `cache-missing` for a binding cache missing (§8.4);
+for a `preprocess-command`, dtc, dt-schema, scp or sshpass not on PATH, or a
+dtc or dt-schema the CLI doesn't take (COM-118, COM-119); `tool-failed` for a
+base whose preprocessing fails; `cache-missing` for a binding cache missing (§8.4);
 `not-generated` for a `deploy` whose build output is missing; and
 `invalid-setting` for any other value a setting can't take.
 
@@ -266,7 +266,7 @@ error, `warning: <reason>; run 'analog-attach config --reload' to rebuild
 them.`, and go on. `<reason>` is `The binding caches were built for <old>,
 not <new>` when a stamp names another Linux tree, else `The binding caches
 are older than the bindings`, also when the cause is a stamp that names
-another dt-schema or has no `generated_at` number. A `validation.stamp.json`
+another dt-schema directory or version, or has no `generated_at` number. A `validation.stamp.json`
 that is missing gives no warning. (Open issue C-9.)
 
 ### 8.1 Settings
@@ -336,7 +336,7 @@ them:
 | `preprocess-command` | string | no | `cpp -nostdinc -undef -x assembler-with-cpp -P -I {linux}/include -o {output} {input}` | `C preprocessor command to resolve macros in the base devicetree; {input}/{output}/{linux} are substituted` |
 | `interview` | `true` or `false` | no | `true` | `On a terminal, ask for the parent of 'add' and for the required properties a new node lacks (true/false)` |
 | `output` | one of `overlay`, `full` | no | `overlay` | `What 'build' makes and 'deploy' copies: overlay (default, a .dtbo) or full (the base with the overlay applied, a .dts and its .dtb)` |
-| `build-command` | string | no | — | `Override the 'build' step with this command, run at the base of the project; {workfile}/{output} are substituted (unset: compile with the bundled dtc)` |
+| `build-command` | string | no | — | `Override the 'build' step with this command, run at the base of the project; {workfile}/{output} are substituted (unset: compile with dtc)` |
 | `build-dir` | string: a folder, relative to the directory that holds `.analog-attach/` unless absolute (`~` the home directory) | no | `build` | `Folder 'build' writes its output to and 'deploy' takes it from, relative to the project unless absolute` |
 | `deploy-command` | string | no | — | `Override the 'deploy' step with this command, run at the base of the project; {dtbo} is substituted (unset: copy over SSH and reboot)` |
 | `deploy-ip` | string | no | — | `IP address or hostname of the remote device to deploy to` |
@@ -513,7 +513,15 @@ Linux tree for it. Where it doesn't, the base doesn't need `linux`.
 **COM-093** Before preprocessing, the CLI shall run `<tool> --version`, where
 `<tool>` is the command's first word. If that fails to start or exits non-zero,
 then loading shall report `preprocess-command: <tool> not found on PATH
-(needed to preprocess <devicetree>)`. (Open issue C-4.)
+(needed to preprocess <devicetree>)`, with `error_type` `tool-missing`. Its hint
+is `Install cpp: '<command>'.` when the tool is `cpp` (the default), `<command>`
+being `sudo apt install cpp` for debian or ubuntu, `sudo dnf install cpp` for
+fedora, rhel or centos, `sudo pacman -S gcc` for arch, `sudo zypper install
+cpp` for suse or opensuse (by `/etc/os-release`, as COM-118) and `xcode-select
+--install` on macOS, elsewhere `Install cpp, the C preprocessor, with your
+package manager.`; for another tool it is `Install <tool>, or set
+preprocess-command to another command.`. No version is checked. (Open issue
+C-4.)
 
 **COM-094** If the command exits non-zero, then loading shall report
 `devicetree: preprocessing <devicetree> failed:` followed by a newline and the
@@ -581,19 +589,21 @@ Example, the same overlay in both syntaxes:
 };
 ```
 
-### 8.4 Binding caches and bundled resources
+### 8.4 Binding caches and tools
 
 Where the backend is linux:
 
 **COM-110** The CLI shall keep two binding caches under `.analog-attach/linux/`:
-`compat-index.json`, an object `{ generated_at, linux, dt_schema, entries }`
-whose `entries` map each compatible string to the binding YAML that lists
-it; and `validation.json`, the output of `dt-mk-schema -j` over the Linux
-tree's bindings, with `validation.stamp.json` `{ generated_at, linux,
-dt_schema }` next to it. `generated_at` is in milliseconds since the epoch.
-The CLI shall derive `entries` from `validation.json`: the strings of each
-Linux tree binding's processed `compatible` property, the bundled
-dt-schema's own schemas left out. When several bindings list a string, the
+`compat-index.json`, an object `{ generated_at, linux, dt_schema,
+dt_schema_version, entries }` whose `entries` map each compatible string to
+the binding YAML that lists it; and `validation.json`, the output of
+`dt-mk-schema -j` over the Linux tree's bindings, with
+`validation.stamp.json` `{ generated_at, linux, dt_schema, dt_schema_version
+}` next to it. `generated_at` is in milliseconds since the epoch; `dt_schema`
+is the directory that holds the installed `dtschema` package and
+`dt_schema_version` its version (COM-119). The CLI shall derive `entries`
+from `validation.json`: the strings of each Linux tree binding's processed
+`compatible` property, dt-schema's own schemas left out. When several bindings list a string, the
 one named after it (`net/snps,dwmac.yaml` for `snps,dwmac`) wins; then one
 that names the device (lists it first); then one that has its own `select`
 and lists it first (a naming convention such as `arm/qcom-soc.yaml`); then
@@ -619,11 +629,11 @@ has succeeded with a non-empty JSON output, and write its stamp, then
 previous pair stays.
 
 **COM-114** Before a build, the CLI shall check the `linux` field (COM-126 to
-COM-128), the bundled dt-schema and the bundled tools (COM-117), and report
-their problems as configuration errors without building anything.
+COM-128) and the installed dt-schema (COM-119), and report their problems as
+configuration errors without building anything.
 
 **COM-115** When a command needs the bindings and the Linux tree and the
-bundled dt-schema are fine, if `compat-index.json` is missing, unreadable or
+installed dt-schema are fine, if `compat-index.json` is missing, unreadable or
 has no `entries`, or `validation.json` is missing, then loading shall report
 for each `{ field: "compat-index" | "validation.json", kind: "missing",
 message: "<file> not found or unreadable in <state directory>" }`
@@ -631,22 +641,61 @@ with the hint `Run 'analog-attach config --reload' to build the binding
 caches.`
 
 **COM-116** The CLI shall treat a cache as current when its stamp exists,
-has a numeric `generated_at`, names the configured Linux tree and the bundled
-dt-schema (when it names them), and is no older than every file and
-directory under the Linux tree's `Documentation/devicetree/bindings/` and
-under the bundled dt-schema (`.git` directories skipped). A cache that isn't
+has a numeric `generated_at`, names the configured Linux tree and the
+installed dt-schema's directory and version (when it names them), and is no
+older than every file and directory under the Linux tree's
+`Documentation/devicetree/bindings/` and under the installed `dtschema`
+package (`.git` directories skipped). A cache that isn't
 current only gets the warning of COM-081, and none when
 `validation.stamp.json` is missing (open issue C-9).
 
-**COM-117** The CLI shall find its bundled resources next to its own
-installation, under `bundled/linux/`. If `dt-schema/dtschema/schemas` or
-`…/meta-schemas` is missing there, then loading shall report `{ field:
-"dt-schema", kind: "missing", message: "Bundled dt-schema not found at
-<root>" }`. If any of `dtc`, `dt-mk-schema`, `dt-validate` is missing from
-its `tools/`, then loading shall report `{ field: "tools", kind: "missing",
-message: "Bundled tools not found: <paths>" }`. Both have the hint `The
-analog-attach installation is incomplete; rebuild it
-(scripts/bundle-dt-schema.sh).`
+**COM-117** *Withdrawn.* (dt-schema, dtc and dt-validate were bundled with
+the installation, under `bundled/linux/`, and a missing one was an
+incomplete installation. The CLI now runs the ones installed on the system,
+COM-118 and COM-119, and ships none.)
+
+**COM-118** The CLI shall run the `dtc` it finds on PATH, on every run that
+needs the tools. If there is none, then loading shall report `{ field: "dtc",
+kind: "missing", error_type: "tool-missing", message: "dtc not found on PATH"
+}` with the hint `Install dtc: '<command>'.`. If `dtc --version` gives a
+version older than 1.6.0, then loading shall report `{ field: "dtc", kind:
+"invalid", error_type: "tool-missing", message: "dtc <version> is too old;
+analog-attach needs 1.6.0 or later" }` with the hint `Install dtc 1.6.0 or
+later: '<command>'.`; a version it doesn't print readably is taken.
+`<command>` is `sudo apt install device-tree-compiler` where
+`/etc/os-release`'s `ID` or `ID_LIKE` names debian or ubuntu, `sudo dnf
+install dtc` for fedora, rhel or centos, `sudo pacman -S dtc` for arch, `sudo
+zypper install dtc` for suse or opensuse, and `brew install dtc` on macOS;
+elsewhere the hint is `Install dtc, the devicetree compiler, with your
+package manager.` (`Install dtc 1.6.0 or later, …` when it is too old).
+
+**COM-119** The CLI shall take dt-schema 2026.9 alone, found through the
+`dt-mk-schema` on PATH, on every run that needs the bindings or the tools:
+the Python that the script's first line names (`#!<path>`, `#!/usr/bin/env
+<name>` looked up on PATH, or pip's `#!/bin/sh` line followed by `'''exec'
+<path>`) gives the directory that holds its `dtschema` package and its
+version, without importing it. The binding parser reads the schemas of that
+package. The CLI shall run `dt-mk-schema` as that Python on
+`dt-mk-schema.py` of its installation (`bundled/linux/`), which gives the
+same output faster, or as the `dt-mk-schema` found when the installation has
+no such file, and the `dt-validate` it finds on PATH. Loading shall report
+these problems, with `field` `dt-schema` and `error_type` `tool-missing`:
+
+| Problem | `kind` | `message` |
+|---|---|---|
+| no `dt-mk-schema` on PATH | `missing` | `dt-mk-schema not found on PATH` |
+| no Python named on its first line | `invalid` | `Can't tell which Python runs <dt-mk-schema>` |
+| the Python has no `dtschema` package | `missing` | `<python> (which runs <dt-mk-schema>) can't load the dtschema package` |
+| another version | `invalid` | `dt-schema <version> is installed (<directory>); analog-attach needs 2026.9` |
+| no `dt-validate` on PATH | `missing` | `dt-validate not found on PATH` |
+
+Their hint is `Install dt-schema 2026.9: 'pipx install dtschema==2026.9',
+then 'pipx inject dtschema ruamel.yaml.clib'.`, followed before the period
+by ` (and 'pipx ensurepath' when pipx's bin directory isn't on PATH)` when
+`dt-mk-schema` or `dt-validate` isn't on PATH. For another version it is
+`Install dt-schema 2026.9 in its place: 'pipx install --force
+dtschema==2026.9', then 'pipx inject dtschema ruamel.yaml.clib'.`. The tools'
+problems come in the order dtc, dt-schema (`dt-mk-schema`), dt-validate.
 
 ### 8.5 The no-OS workspace
 

@@ -3,7 +3,7 @@
 Compiles the overlay into a binary `.dtbo`, or, where the `output` setting
 is `full`, writes the base devicetree with the overlay applied and compiles
 it into a `.dtb` (for boards that boot a full devicetree only). A shared
-command: §2 to §4 as the linux backend does it (with the bundled dtc or the `build-command`
+command: §2 to §4 as the linux backend does it (with the dtc on PATH or the `build-command`
 setting), §5 as the noos backend does it (the generated project, built with
 CMake or the `build-command` setting).
 
@@ -29,11 +29,12 @@ command takes no arguments or options.
 | Build folder | The `build-dir` setting: `build` in the directory that holds `.analog-attach/` when unset, a relative value resolved the same way (02-common.md §8.1). |
 | Output file | In the build folder, the overlay file's name with `.dtso` replaced by `.dtbo`, or with `.dtbo` appended when it doesn't end in `.dtso` (`overlay.dtso` → `<build folder>/overlay.dtbo`, `my.dts` → `<build folder>/my.dts.dtbo`). Where `output` is `full`, `.dtb` in place of `.dtbo` (`<build folder>/overlay.dtb`, `<build folder>/my.dts.dtb`). |
 | Full devicetree file | Where `output` is `full`: in the build folder, the overlay file's name with `.dtso` replaced by `.dts`, or with `.dts` appended (`<build folder>/overlay.dts`, `<build folder>/my.dts.dts`). |
-| Bundled dtc | The `dtc` binary in the installation's `bundled/tools/` (v1.8.1). |
+| dtc | The `dtc` on PATH, 1.6.0 or later (02-common.md COM-118). |
 
 ## 3. Resources
 
-The command needs the bundled tools, the base and the overlay (COM-070;
+The command needs the tools (dtc, and dt-schema with its dt-validate,
+02-common.md COM-118 and COM-119), the base and the overlay (COM-070;
 02-common.md §8.2 for the base, §8.3 for the overlay). The overlay has to
 parse against the base even though dtc compiles the file on its own. With
 `build-command` set it needs only the `workfile` setting (BUILD-007).
@@ -41,14 +42,14 @@ parse against the base even though dtc compiles the file on its own. With
 ## 4. Requirements
 
 **BUILD-001** When the workspace can't be loaded, the CLI shall report it per
-COM-071 or COM-072 and compile nothing. A missing bundled tool is the problem
-`{ "field": "tools", "kind": "missing", "message": "Bundled tools not found:
-<paths>" }`, with the hint `The analog-attach installation is incomplete;
-rebuild it (scripts/bundle-dt-schema.sh).`.
+COM-071 or COM-072 and compile nothing. A dtc that isn't on PATH is the
+problem `{ "field": "dtc", "kind": "missing", "error_type": "tool-missing",
+"message": "dtc not found on PATH" }`, with the hint that says how to install
+it (COM-118).
 
 **BUILD-002** Where `output` is `overlay`, the CLI shall run the shell command `"<dtc>" -@ -I dts -O dtb
--o "<output file>" "<overlay file>"`, `<dtc>` being the bundled dtc's
-absolute path. Each value is put in double quotes, so paths may contain
+-o "<output file>" "<overlay file>"`, `<dtc>` being the absolute path of the
+dtc found on PATH. Each value is put in double quotes, so paths may contain
 spaces.
 
 **BUILD-003** Where `output` is `overlay`, the CLI shall compile the overlay file as it is on disk: it
