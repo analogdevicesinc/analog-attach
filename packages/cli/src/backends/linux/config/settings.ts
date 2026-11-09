@@ -183,7 +183,7 @@ export function linux_settings(program: string = DEFAULT_PROGRAM): SettingSpec[]
             category: BUILD,
             type: "string",
             required: false,
-            description: "Override the 'build' step with this command, run at the base of the project; {workfile}/{output} are substituted (unset: compile with the bundled dtc)",
+            description: "Override the 'build' step with this command, run at the base of the project; {workfile}/{output} are substituted (unset: compile with dtc)",
         },
         {
             key: "build-dir",

@@ -25,7 +25,7 @@ against the source and the built CLI. Where the behaviour looks unintended, the
 requirement still states it, and the chapter lists it under *Open issues*.
 
 Out of scope: the internals of the backends and of attach-lib, the content of
-the bundled dt-schema, and anything that isn't observable from outside the
+dt-schema, and anything that isn't observable from outside the
 process.
 
 ## 2. Documents

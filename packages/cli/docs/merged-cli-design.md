@@ -120,7 +120,7 @@ The file covers:
    by the linux backend".
 3. **The backend is picked before routing.** The bin reads the settings, loads the
    backend with a dynamic `import()` and builds the route map. Help then matches the
-   active backend, and a no-OS run never loads attach-lib or the bundled dt-schema.
+   active backend, and a no-OS run never loads attach-lib.
    With no backend set, the bare `aa` asks for one first, and every other command
    points to `aa config backend <linux|noos>` (D-12, C-01).
 4. **Completion is split.** The front end completes route and flag names. For a
@@ -224,9 +224,11 @@ The other shared responses (`import`, `delete`, `validate`, `build`, `deploy`, a
   or `session.say`, notes and warnings into `session.warn`, the response into a thunk
   where it is costly. The change is mechanical but touches every command, and it is
   most of the work.
-- **Bundled assets.** `getBundledDtSchemaPath` and the bundled tool paths resolve
-  relative to the Linux CLI's `dist/`. They break once the Linux backend is bundled
-  into `aa`, so the asset root has to be passed in.
+- **Bundled assets.** `getBundledDtSchemaPath` and the bundled tool paths resolved
+  relative to the Linux CLI's `dist/`, so the asset root was passed in
+  (`Session.assets_dir`). The tools are no longer bundled: dtc and dt-schema are the
+  user's, found on PATH (spec COM-118, COM-119), and the Linux assets hold only the
+  parallel `dt-mk-schema.py`.
 - **Undecided settings.** The `SettingSpec` design depended on two open questions:
   whether keys are scoped per backend (`linux.devicetree` or a flat `devicetree`), and
   K-01 (`overlay` → `workfile`). Both are settled: the keys are sectioned per backend

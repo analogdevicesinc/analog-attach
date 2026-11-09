@@ -290,8 +290,7 @@ the CLI shall answer `Nothing to rebuild: the <id> backend keeps no caches`
 or `Nothing to rebuild: no backend is set`.
 
 **CONFIG-021** Where the backend is linux, with `--reload`, the CLI shall
-check the `linux` field, the bundled dt-schema and the bundled tools
-(COM-114), report their problems per COM-071 or COM-072, and otherwise build
+check the `linux` field and the installed dt-schema (COM-114), report their problems per COM-071 or COM-072, and otherwise build
 the caches (COM-112, COM-113), even when they are current.
 
 **CONFIG-022** When the build succeeds, the CLI shall write `Rebuilt the

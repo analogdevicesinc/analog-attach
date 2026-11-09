@@ -7,7 +7,6 @@ import type { Outcome, Session } from "../../../interface/backend-interface";
 import type { ErrorType } from "../../../interface/error-types";
 import { project_root } from "../../shell";
 import type { ConfigRefusal } from "../protocol/types";
-import { getBundledDtSchemaPath, getBundledToolsPath } from "../commands/skill/utilities";
 import { cache_warning, load_compat_index, validation_schema_path } from "./cache";
 import { is_tool_available, run_preprocess } from "../utilities";
 import {
@@ -24,6 +23,7 @@ import {
     type Settings,
     setup_hint,
 } from "./settings";
+import { find_dt_schema, find_dt_validate, find_dtc, find_preprocessor, mk_schema_command, type DtSchemaInstall, type ToolProblem } from "./tools";
 
 // Parse, don't validate: each resource below is produced only from settings
 // that have been checked all the way down (the Linux tree has its bindings and
@@ -33,7 +33,9 @@ import {
 
 export interface Bindings {
     linux: string;
+    /** The directory holding the installed `dtschema` package (COM-119). */
     dt_schema: string;
+    dt_schema_version: string;
     /** `validation.json`, the `dt-mk-schema -j` output: it types the properties a binding leaves untyped. */
     processed_schema: string;
     /** The directory with the compat index (`session.state_dir`). */
@@ -44,7 +46,7 @@ export interface Bindings {
 export interface WorkspaceContext {
     /** Derived files and the binding caches (`session.state_dir`). */
     state_dir: string;
-    /** The bundled dt-schema and tools (`session.assets_dir`). */
+    /** The backend's own files (`session.assets_dir`): our parallel `dt-mk-schema.py`. */
     assets_dir: string;
     /** The name hints use (`session.program`). */
     program: string;
@@ -54,9 +56,11 @@ export function workspace_context(session: Pick<Session, "state_dir" | "assets_d
     return { state_dir: session.state_dir, assets_dir: session.assets_dir, program: session.program };
 }
 
+/** The tools on PATH (COM-118, COM-119). */
 export interface Tools {
     dtc: string;
-    dt_mk_schema: string;
+    /** The command and its first arguments (`mk_schema_command`). */
+    dt_mk_schema: readonly string[];
     dt_validate: string;
 }
 
@@ -99,8 +103,6 @@ export interface Resources {
 
 export type Need = keyof Resources;
 export type Workspace<N extends Need> = { settings: Settings; context: WorkspaceContext } & Pick<Resources, N>;
-
-const bundle_hint = (program: string): string => `The ${program} installation is incomplete; rebuild it (scripts/bundle-dt-schema.sh).`;
 
 /** Where `build` writes the overlay's `.dtbo`: in `build_directory`, the file named after the overlay (`overlay.dtso` → `overlay.dtbo`). */
 export function derive_dtbo_path(overlay: string, build_directory: string): string {
@@ -183,13 +185,15 @@ export function parse_linux(settings: Settings, program: string): ConfigResult<s
     return problem === undefined ? linux : fail(invalid_setting("linux", problem, program, "invalid-source"));
 }
 
-export function parse_dt_schema(context: Pick<WorkspaceContext, "assets_dir" | "program">): ConfigResult<string> {
-    const root = getBundledDtSchemaPath(context.assets_dir);
-    const complete = ["schemas", "meta-schemas"].every(directory => fs.existsSync(path.join(root, "dtschema", directory)));
-    if (!complete) {
-        return fail({ field: "dt-schema", kind: "missing", error_type: "install-incomplete", message: `Bundled dt-schema not found at ${root}`, hint: bundle_hint(context.program) });
-    }
-    return { ok: true, value: root };
+/** A tool problem as a configuration error of `field`. */
+function tool_error(field: string, { kind, message, hint }: ToolProblem): ConfigError {
+    return { field, kind, error_type: "tool-missing", message, hint };
+}
+
+/** The installed dt-schema (COM-119): the schemas the parser reads, and what runs dt-mk-schema. */
+export function parse_dt_schema(context: Pick<WorkspaceContext, "program">): ConfigResult<DtSchemaInstall> {
+    const found = find_dt_schema(context.program);
+    return found.ok ? found : fail(tool_error("dt-schema", found.problem));
 }
 
 export const reload_hint = (program: string): string => `Run '${program} config --reload' to build the binding caches.`;
@@ -209,31 +213,37 @@ export function parse_bindings(
     settings: Settings,
     context: WorkspaceContext,
     linux_tree: () => ConfigResult<string> = () => parse_linux(settings, context.program),
-    bundled_dt_schema: () => ConfigResult<string> = () => parse_dt_schema(context),
+    installed_dt_schema: () => ConfigResult<DtSchemaInstall> = () => parse_dt_schema(context),
 ): ConfigResult<Bindings> {
     const linux = linux_tree();
-    const dt_schema = bundled_dt_schema();
+    const dt_schema = installed_dt_schema();
     if (!linux.ok || !dt_schema.ok) { return { ok: false, errors: failures(linux, dt_schema) }; }
     const caches = parse_caches(context);
     if (!caches.ok) { return caches; }
     return {
         ok: true,
-        value: { linux: linux.value, dt_schema: dt_schema.value, processed_schema: validation_schema_path(context.state_dir), state_dir: context.state_dir },
+        value: {
+            linux: linux.value, dt_schema: dt_schema.value.root, dt_schema_version: dt_schema.value.version,
+            processed_schema: validation_schema_path(context.state_dir), state_dir: context.state_dir,
+        },
     };
 }
 
-export function parse_tools(context: Pick<WorkspaceContext, "assets_dir" | "program">): ConfigResult<Tools> {
-    const directory = getBundledToolsPath(context.assets_dir);
-    const tools: Tools = {
-        dtc: path.join(directory, "dtc"),
-        dt_mk_schema: path.join(directory, "dt-mk-schema"),
-        dt_validate: path.join(directory, "dt-validate"),
-    };
-    const missing = Object.values(tools).filter(tool => !fs.existsSync(tool));
-    if (missing.length > 0) {
-        return fail({ field: "tools", kind: "missing", error_type: "install-incomplete", message: `Bundled tools not found: ${missing.join(", ")}`, hint: bundle_hint(context.program) });
-    }
-    return { ok: true, value: tools };
+/** dtc, dt-mk-schema and dt-validate, from PATH (COM-118, COM-119). */
+export function parse_tools(
+    context: Pick<WorkspaceContext, "assets_dir" | "program">,
+    installed_dt_schema: () => ConfigResult<DtSchemaInstall> = () => parse_dt_schema(context),
+): ConfigResult<Tools> {
+    const dtc = find_dtc(context.program);
+    const dt_schema = installed_dt_schema();
+    const dt_validate = find_dt_validate();
+    const errors = [
+        ...(dtc.ok ? [] : [tool_error("dtc", dtc.problem)]),
+        ...failures(dt_schema),
+        ...(dt_validate.ok ? [] : [tool_error("dt-schema", dt_validate.problem)]),
+    ];
+    if (!dtc.ok || !dt_schema.ok || !dt_validate.ok) { return { ok: false, errors }; }
+    return { ok: true, value: { dtc: dtc.value.path, dt_mk_schema: mk_schema_command(dt_schema.value, context.assets_dir), dt_validate: dt_validate.value } };
 }
 
 /**
@@ -250,9 +260,10 @@ export function parse_base(settings: Settings, linux: () => ConfigResult<string>
         return { ok: false, errors: failures(source, ...(linux_result === undefined ? [] : [linux_result])) };
     }
 
-    const tool = command.trim().split(/\s+/)[0] ?? "";
-    if (!is_tool_available(`${tool} --version`)) {
-        return fail(invalid_setting("preprocess-command", `${tool} not found on PATH (needed to preprocess ${source.value})`, program, "tool-missing"));
+    const preprocessor = find_preprocessor(command);
+    if (!preprocessor.ok) {
+        const { message, hint } = preprocessor.problem;
+        return fail({ ...invalid_setting("preprocess-command", `${message} (needed to preprocess ${source.value})`, program, "tool-missing"), hint });
     }
 
     fs.mkdirSync(context.state_dir, { recursive: true });
@@ -320,14 +331,17 @@ function parse_deploy(settings: Settings, program: string): ConfigResult<DeployT
 export function open_workspace<N extends Need>(settings: Settings, needs: readonly N[], context: WorkspaceContext): ConfigResult<Workspace<N>> {
     const { program } = context;
     let linux_result: ConfigResult<string> | undefined;
+    let dt_schema_result: ConfigResult<DtSchemaInstall> | undefined;
     let base_result: ConfigResult<BaseTree> | undefined;
     const linux = (): ConfigResult<string> => (linux_result ??= parse_linux(settings, program));
+    // Looked up once: it runs a Python, and the bindings and the tools both need it.
+    const dt_schema = (): ConfigResult<DtSchemaInstall> => (dt_schema_result ??= parse_dt_schema(context));
     const base = (): ConfigResult<BaseTree> => (base_result ??= parse_base(settings, linux, context));
 
     const parsers: { [K in Need]: () => ConfigResult<Resources[K]> } = {
         linux,
-        bindings: () => parse_bindings(settings, context, linux),
-        tools: () => parse_tools(context),
+        bindings: () => parse_bindings(settings, context, linux, dt_schema),
+        tools: () => parse_tools(context, dt_schema),
         base,
         overlay: () => {
             const base_value = base();
@@ -401,7 +415,7 @@ export function load_workspace<N extends Need>(session: Session, needs: readonly
     if (!workspace.ok) { return { ok: false, outcome: config_errors_outcome(session, workspace.errors) }; }
     if (needs.includes("bindings" as N)) {
         const bindings = (workspace.value as Workspace<"bindings">).bindings;
-        const warning = cache_warning(bindings.linux, bindings.dt_schema, context.state_dir, context.program);
+        const warning = cache_warning(bindings, context.state_dir, context.program);
         if (warning !== undefined) { session.warn(`warning: ${warning}`); }
     }
     return { ok: true, workspace: workspace.value };
@@ -414,6 +428,7 @@ export function optional_bindings(workspace: Pick<Workspace<never>, "settings" |
 
 if (import.meta.vitest) {
     const { test, expect, beforeAll, afterAll } = import.meta.vitest;
+    const { install_hint } = await import("./tools");
 
     let root: string;
     let linux: string;
@@ -493,6 +508,23 @@ if (import.meta.vitest) {
         expect(result.errors[0]!.message).toContain("preprocessing");
     });
 
+    test("open_workspace - a preprocessor not on PATH: cpp with its install hint, another tool with the setting's", () => {
+        const original = process.env["PATH"];
+        process.env["PATH"] = path.join(root, "no-tools");
+        try {
+            const result = open(with_linux(), ["base"]);
+            expect(result.ok ? [] : result.errors).toEqual([{
+                field: "preprocess-command", kind: "invalid", error_type: "tool-missing",
+                message: `preprocess-command: cpp not found on PATH (needed to preprocess ${path.join(root, "base.dts")})`,
+                description: expect.any(String) as string, hint: install_hint("cpp"),
+            }]);
+            const own = open(with_linux({ "preprocess-command": "mypp {input} {output}" }), ["base"]);
+            expect(own.ok ? undefined : own.errors[0]?.hint).toBe("Install mypp, or set preprocess-command to another command.");
+        } finally {
+            process.env["PATH"] = original;
+        }
+    });
+
     test("open_workspace - an overlay that does not parse is a config error", () => {
         const result = open(with_linux({ workfile: "bad.dtso" }), ["overlay"]);
         expect(fields(result)).toEqual(["workfile"]);
@@ -516,16 +548,28 @@ if (import.meta.vitest) {
         expect(fields(result)).toEqual(["deploy-user", "deploy-password", "workfile"]);
     });
 
-    test("open_workspace - the bundled dt-schema and tools are looked up in the assets directory", () => {
-        const result = open({}, ["tools"]);
-        expect(fields(result)).toEqual(["tools"]);
-        if (result.ok) { return; }
-        expect(result.errors[0]!.message).toContain(path.join(root, "assets", "tools"));
-        expect(result.errors[0]!.hint).toBe("The aa installation is incomplete; rebuild it (scripts/bundle-dt-schema.sh).");
+    test("open_workspace - the tools are looked up on PATH, each problem with its install hint", () => {
+        const original = process.env["PATH"];
+        process.env["PATH"] = path.join(root, "no-tools");
+        try {
+            const result = open({}, ["tools", "bindings"]);
+            if (result.ok) { throw new Error("expected errors"); }
+            // dt-schema's problem once, though the bindings and the tools both need it.
+            expect(result.errors.map(({ field, kind, error_type, message }) => ({ field, kind, error_type, message }))).toEqual([
+                { field: "dtc", kind: "missing", error_type: "tool-missing", message: "dtc not found on PATH" },
+                { field: "dt-schema", kind: "missing", error_type: "tool-missing", message: "dt-mk-schema not found on PATH" },
+                { field: "dt-schema", kind: "missing", error_type: "tool-missing", message: "dt-validate not found on PATH" },
+                { field: "linux", kind: "missing", error_type: "missing-setting", message: "Missing config field linux" },
+            ]);
+            expect(result.errors[1]!.hint).toMatch(/^Install dt-schema 2026\.9: 'pipx install dtschema==2026\.9'/);
+        } finally {
+            process.env["PATH"] = original;
+        }
     });
 
+    const installed: DtSchemaInstall = { root: "/dt-schema", version: "2026.9", python: "/venv/bin/python", dt_mk_schema: "/venv/bin/dt-mk-schema" };
     const bindings = (): ConfigResult<Bindings> =>
-        parse_bindings(settings_for(with_linux()), context(), undefined, () => ({ ok: true, value: "/dt-schema" }));
+        parse_bindings(settings_for(with_linux()), context(), undefined, () => ({ ok: true, value: installed }));
 
     const caches = (): void => {
         fs.mkdirSync(state_directory, { recursive: true });
@@ -545,7 +589,7 @@ if (import.meta.vitest) {
         caches();
         expect(bindings()).toEqual({
             ok: true,
-            value: { linux, dt_schema: "/dt-schema", processed_schema: path.join(state_directory, "validation.json"), state_dir: state_directory },
+            value: { linux, dt_schema: "/dt-schema", dt_schema_version: "2026.9", processed_schema: path.join(state_directory, "validation.json"), state_dir: state_directory },
         });
     });
 

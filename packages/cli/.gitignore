@@ -3,9 +3,7 @@ dist
 tsconfig.tsbuildinfo
 node_modules
 
-# The clones and output of scripts/bundle-dt-schema.sh
-dt-schema/
-dtc/
+# The build's assets (yarn build)
 bundled/
 
 # The Linux tree of the linux functional tests (test/functional/linux-tree.sh)

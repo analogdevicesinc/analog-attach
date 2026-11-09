@@ -240,7 +240,6 @@ if (import.meta.vitest) {
     const os = await import("node:os");
     const { DeviceTree } = await import("attach-lib");
     const { save_compat_index } = await import("./config/cache");
-    const { assets_directory, find_package_root } = await import("../../front/main");
 
     test("match_pattern_rule matches first regex-matching pattern and returns its rule", () => {
         const rules = [
@@ -341,14 +340,15 @@ if (import.meta.vitest) {
             const binding = path.join(linux, "Documentation", "devicetree", "bindings", "vendor,dev.yaml");
             fs.mkdirSync(path.dirname(binding), { recursive: true });
             fs.writeFileSync(binding, NVMEM_BINDING);
-            const dt_schema = path.join(assets_directory(find_package_root(), "linux"), "dt-schema");
-            save_compat_index({ "vendor,dev": binding }, linux, dt_schema, directory);
+            const dt_schema = path.join(directory, "dt-schema");
+            fs.mkdirSync(path.join(dt_schema, "dtschema", "schemas"), { recursive: true });
+            save_compat_index({ "vendor,dev": binding }, { linux, dt_schema, dt_schema_version: "2026.9" }, directory);
             fs.writeFileSync(path.join(directory, "validation.json"), JSON.stringify({ "generated-types": { properties: { "nvmem-cells": [{ type: "phandle-array" }] } } }));
 
             const base = DeviceTree.new_from_string(`/dts-v1/;\n/ { dev@0 { compatible = "vendor,dev"; }; };`);
             if (typeof base === "string") { throw new TypeError(base); }
             const node = base.node_at("/dev@0")!;
-            const bindings = { linux, dt_schema, processed_schema: path.join(directory, processed_name), state_dir: directory };
+            const bindings = { linux, dt_schema, dt_schema_version: "2026.9", processed_schema: path.join(directory, processed_name), state_dir: directory };
             const resolved = await resolve_node_binding(node, undefined, "", base, bindings);
             return "error" in resolved ? resolved.error : resolved.properties.find(property => property.key === "nvmem-cells")?.value._t;
         } finally {

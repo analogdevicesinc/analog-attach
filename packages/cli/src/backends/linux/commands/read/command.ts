@@ -428,7 +428,7 @@ if (import.meta.vitest) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tcompatible = "adi,ad7124-8";\n\t\tspi-max-frequency = <1000000>;\n\t};\n};`, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "install-incomplete", message: "no dt-schema" }] };
+        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "tool-missing", message: "no dt-schema" }] };
 
         const logs = [
             outcome_text(await read_target(text_session, overlay, no_bindings, "spi0/adc@0", "spi-max-frequency", { quiet: false })),
@@ -449,7 +449,7 @@ if (import.meta.vitest) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&i2c_arm {\n\tstatus = "okay";\n\thwmon@2e {\n\t\treg = <0x2e>;\n\t};\n};`, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "install-incomplete", message: "no dt-schema" }] };
+        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "tool-missing", message: "no dt-schema" }] };
         const human = async (path: string, property?: string): Promise<string[]> =>
             outcome_text(await read_target(text_session, overlay, no_bindings, path, property, { quiet: false })).split("\n");
 
@@ -512,7 +512,7 @@ if (import.meta.vitest) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tvref-supply = <&spi0>;\n\t\tspi-max-frequency = <1000000>;\n\t};\n};`, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "install-incomplete", message: "no dt-schema" }] };
+        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "tool-missing", message: "no dt-schema" }] };
         const run = async (json: boolean, property: string, quiet = false) =>
             read_target(json ? json_session : text_session, overlay, no_bindings, "spi0/adc@0", property, { quiet });
 

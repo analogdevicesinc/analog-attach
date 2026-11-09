@@ -1,4 +1,4 @@
-# build where the backend is linux: the overlay compiled into a .dtbo with the bundled dtc.
+# build where the backend is linux: the overlay compiled into a .dtbo with the dtc on PATH.
 
 # bats file_tags=eco:linux
 
@@ -18,17 +18,17 @@ run_config_error() {
 	assert_json '.ok' false
 }
 
-# `install_without_dtc`: a copy of the installation (dist, package.json, bundled dt-schema and
-# tools) without the bundled dtc; prints the path of its cli.js.
-install_without_dtc() {
-	local copy="$BATS_TEST_TMPDIR/install"
-	mkdir -p "$copy/bundled/linux/tools"
-	cp -r "$CLI_DIR/dist" "$CLI_DIR/package.json" "$copy/"
-	ln -s "$REPO_DIR/node_modules" "$copy/node_modules"
-	ln -s "$CLI_DIR/bundled/linux/dt-schema" "$copy/bundled/linux/dt-schema"
-	ln -s "$CLI_DIR/bundled/linux/tools/dt-mk-schema" "$CLI_DIR/bundled/linux/tools/dt-validate" \
-		"$copy/bundled/linux/tools/"
-	echo "$copy/dist/cli.js"
+# `path_without <name>`: a PATH with everything of this one but <name>: one directory of links to
+# the files of its directories, the first of each name (ln leaves a taken name as it is).
+path_without() {
+	local bin="$BATS_TEST_TMPDIR/path-without-$1" directory directories
+	mkdir -p "$bin"
+	IFS=: read -ra directories <<<"$PATH"
+	for directory in "${directories[@]}"; do
+		[ -d "$directory" ] && ln -s "$directory"/* "$bin/" 2>/dev/null
+	done
+	rm -f "$bin/$1"
+	echo "$bin"
 }
 
 # `duplicate_labels`: an overlay that parses but dtc refuses: two nodes with one label.
@@ -42,7 +42,7 @@ duplicate_labels() {
 #   1. Create the overlay with init and add adi,adxl345 under spi0.
 #   2. Run build, with --json; check it succeeds (.ok true).
 #   3. Check build/overlay.dtbo exists and starts with the flattened devicetree magic d00dfeed.
-#   4. Decompile it with the bundled dtc; check it has the adxl345 compatible and a __fixups__
+#   4. Decompile it with dtc; check it has the adxl345 compatible and a __fixups__
 #      entry for spi0 on fragment@0's target.
 # bats test_tags=req:BUILD-01, req:BUILD-01-LNX, id:L0033
 @test "build compiles the overlay into a .dtbo in the build folder" {
@@ -56,7 +56,7 @@ duplicate_labels() {
 	# A flattened device tree: magic d00dfeed.
 	[ "$(head -c 4 "$dtbo" | od -An -tx1 | tr -d ' ')" = d00dfeed ]
 	# The added node is in it, and the reference to the base's spi0 is left for the loader.
-	run "$CLI_DIR/bundled/linux/tools/dtc" -I dtb -O dts "$dtbo"
+	run dtc -I dtb -O dts "$dtbo"
 	assert_output --partial 'compatible = "adi,adxl345";'
 	assert_output --partial '__fixups__'
 	assert_output --partial 'spi0 = "/fragment@0:target:0";'
@@ -69,7 +69,7 @@ duplicate_labels() {
 #   2. Add adi,adxl345 under spi0 and build again, with --json; check it succeeds (.ok true).
 #   3. Check build/overlay.dtbo differs from the copy and starts with the flattened devicetree magic
 #      d00dfeed.
-#   4. Decompile it with the bundled dtc; check it has the adxl345 compatible.
+#   4. Decompile it with dtc; check it has the adxl345 compatible.
 # bats test_tags=req:BUILD-01-LNX, id:L0034
 @test "build replaces an earlier .dtbo" {
 	with_overlay
@@ -84,7 +84,7 @@ duplicate_labels() {
 	assert_json '.ok' true
 	! cmp -s "$dtbo" "$BATS_TEST_TMPDIR/first.dtbo" || fail "overlay.dtbo is the first build's"
 	[ "$(head -c 4 "$dtbo" | od -An -tx1 | tr -d ' ')" = d00dfeed ]
-	run "$CLI_DIR/bundled/linux/tools/dtc" -I dtb -O dts "$dtbo"
+	run dtc -I dtb -O dts "$dtbo"
 	assert_output --partial 'compatible = "adi,adxl345";'
 }
 
@@ -107,25 +107,26 @@ duplicate_labels() {
 	assert_output --partial "Run 'analog-attach init' to create it"
 }
 
-# Description: build fails with a configuration error when the bundled dtc is missing, saying the
-# installation is incomplete.
+# Description: build fails with a configuration error when dtc isn't on PATH, saying how to
+# install it.
 # Steps:
 #   1. Create the overlay with init.
-#   2. Copy the installation without the bundled dtc.
-#   3. Run that copy's build, with --json; check it is refused, the error is on tools and
-#      names the missing dtc, and the hint says to rebuild the installation.
-#   4. Check no .dtbo was written.
+#   2. Run build, with --json, with a PATH that has everything but dtc; check it is refused
+#      with the type tool-missing, the error is on dtc and says it is not on PATH, and the hint
+#      says how to install dtc.
+#   3. Check no .dtbo was written.
 # bats test_tags=req:BUILD-02, id:L0036
-@test "build reports a bundled dtc that is missing" {
+@test "build reports a dtc that isn't on PATH" {
 	with_overlay
-	local cli
-	cli=$(install_without_dtc)
-	run --separate-stderr node "$cli" --json build
+	local bin
+	bin=$(path_without dtc)
+	PATH="$bin" run_json build
 	assert_success
 	assert_json '.ok' false
-	assert_json '.errors[0].field' tools
-	assert_json '.errors[0].message' "Bundled tools not found: $BATS_TEST_TMPDIR/install/bundled/linux/tools/dtc"
-	assert_json '.hints[0]' 'The analog-attach installation is incomplete; rebuild it (scripts/bundle-dt-schema.sh).'
+	assert_json '.error_type' tool-missing
+	assert_json '.errors[0].field' dtc
+	assert_json '.errors[0].message' 'dtc not found on PATH'
+	assert_json '.hints[0] | startswith("Install dtc")' true
 	[ ! -e "$PROJECT/build/overlay.dtbo" ]
 }
 
@@ -232,7 +233,7 @@ duplicate_labels() {
 	assert_line '&spi0 {'
 	assert_output --partial 'compatible = "adi,adxl345";'
 	[ "$(head -c 4 "$PROJECT/build/overlay.dtb" | od -An -tx1 | tr -d ' ')" = d00dfeed ]
-	run "$CLI_DIR/bundled/linux/tools/dtc" -I dtb -O dts "$PROJECT/build/overlay.dtb"
+	run dtc -I dtb -O dts "$PROJECT/build/overlay.dtb"
 	assert_output --partial '"raspberrypi,4-model-b"'
 	assert_output --partial 'compatible = "adi,adxl345";'
 	refute_output --partial '__fixups__'

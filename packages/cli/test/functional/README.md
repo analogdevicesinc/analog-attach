@@ -29,7 +29,9 @@ test/functional/run.sh --filter-tags id:N0012       # one test, by its ID
 test/functional/run.sh --require-steps              # fail on a test with no description, steps or preconditions
 ```
 
-Needs: bash, node, git, `jq` and `python3`. bats and its assertion libraries come with
+Needs: bash, node, git, `jq` and `python3`, and for the linux tests the tools users install
+(the CLI's README): `dtc` (1.6.0 or later) and dt-schema 2026.9 on PATH
+(`pipx install dtschema==2026.9`, then `pipx inject dtschema ruamel.yaml.clib`). bats and its assertion libraries come with
 `yarn install` (`bats`, `bats-support`, `bats-assert`, dev dependencies of this package).
 Yarn can't run bats itself (it runs a package's bin with node), so `run.sh` calls it with
 bash.
@@ -48,7 +50,7 @@ sparse: the bindings, the `dt-bindings` headers and the arm/arm64 broadcom devic
 the RPi overlays, about 90 MB in 15 s), then builds its binding caches once with the CLI
 (`config linux`) into `packages/cli/linux-adi-caches/`. Both are ignored by git. `run.sh` calls
 it before the linux tests; it does nothing when both are there and current, and rebuilds the
-caches when the tree or the bundled tools change. Each test copies the caches into its project.
+caches when the tree, the installed dt-schema or `scripts/dt-mk-schema.py` change. Each test copies the caches into its project.
 
 To move to a newer commit, change `COMMIT` in `linux-tree.sh` (the next run clones it again).
 `AA_LINUX=<checkout>` uses a tree of your own instead of the clone; the tests expect

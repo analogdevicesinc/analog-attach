@@ -13,7 +13,7 @@
 //     and extra command has an answer and a refusal (or configuration error) among them.
 //
 // Neither backend needs a real checkout: Linux runs in the tiny Linux tree of
-// backends/linux/testing/fixture.ts, with shell stand-ins for the bundled tools and sshpass;
+// backends/linux/testing/fixture.ts, with shell stand-ins for the tools on PATH and sshpass;
 // no-OS in attach-no-os-lib's fixtures (backends/noos/testing/fixture.ts).
 
 import * as fs from "node:fs";
@@ -25,7 +25,7 @@ import { BACKENDS, type Registry } from "./front/registry";
 import { build_routes, SHARED_ROUTES, type FrontEnd, type Route } from "./front/routes";
 import type { Backend, Commands, Completion, ExtraCommand, Slot } from "./interface/backend-interface";
 import { ERROR_TYPES } from "./interface/error-types";
-import { BASE_DTS, create_linux_fixture, IMPORTED, OVERLAY, type LinuxFixture } from "./backends/linux/testing/fixture";
+import { BASE_DTS, create_linux_fixture, IMPORTED, OVERLAY, write_fake_tools, type LinuxFixture } from "./backends/linux/testing/fixture";
 import { create_noos_fixture, FIXTURES, type NoosFixture } from "./backends/noos/testing/fixture";
 
 const PROTOCOL = path.resolve(import.meta.dirname, "../docs/spec/04-protocol");
@@ -309,28 +309,6 @@ function check_contract<F extends Harness>(contract: Contract<F>): void {
 // Linux
 // =====================================================================================
 
-/**
- * A stand-in for dtc, dt-mk-schema and dt-validate: prints a version, writes the file after `-o`
- * or `--json-output` (`diagnostics.json` next to it, else `[]`), and fails when a file named
- * `fail` is next to it.
- */
-const FAKE_TOOL = `#!/bin/sh
-here=$(dirname "$0")
-if [ "$1" = "--version" ]; then echo "fake 1.0"; exit 0; fi
-if [ -e "$here/fail" ]; then echo "fake failure: $(basename "$0")" >&2; exit 1; fi
-previous=""
-for word in "$@"; do
-    case "$previous" in
-        -o|--json-output)
-            diagnostics="$here/diagnostics.json"
-            case "$word" in *full-error.json) [ -e "$here/full-diagnostics.json" ] && diagnostics="$here/full-diagnostics.json" ;; esac
-            if [ -e "$diagnostics" ]; then cat "$diagnostics" > "$word"; else printf '[]' > "$word"; fi ;;
-    esac
-    previous="$word"
-done
-exit 0
-`;
-
 /** A stand-in for sshpass and scp: writes nothing, and fails when a file named `fail` is next to it. */
 const FAKE_COPY = `#!/bin/sh
 if [ -e "$(dirname "$0")/fail" ]; then echo "fake failure: $(basename "$0")" >&2; exit 1; fi
@@ -371,8 +349,8 @@ const FULL_DIAGNOSTICS = [
 
 interface LinuxHarness extends Harness {
     readonly linux: LinuxFixture;
-    /** The fake tools in the bundled tools directory; `fail` makes them fail. `full` is what dt-validate gives on the merged tree (validate --full), `diagnostics` otherwise. */
-    tools(options?: { fail?: boolean; diagnostics?: unknown[]; full?: unknown[] }): void;
+    /** The fake tools on PATH (the fixture's); `fail` makes them fail, `dt_schema_version` is the version their dt-schema says. `full` is what dt-validate gives on the merged tree (validate --full), `diagnostics` otherwise. */
+    tools(options?: { fail?: boolean; diagnostics?: unknown[]; full?: unknown[]; dt_schema_version?: string }): void;
     /** A fake `sshpass` (and `scp`, which deploy checks for) first on PATH, until the test ends. */
     sshpass(options?: { fail?: boolean }): void;
     /** The RPi overlay that adds an ad7124-8, in the tree's overlay directory. */
@@ -384,7 +362,7 @@ const original_path = process.env["PATH"];
 function create_linux_harness(): LinuxHarness {
     const linux = create_linux_fixture();
     linux.configure();
-    const write_tool = (directory: string, name: string, fail: boolean, script = FAKE_TOOL): void => {
+    const write_tool = (directory: string, name: string, fail: boolean, script: string): void => {
         fs.mkdirSync(directory, { recursive: true });
         fs.writeFileSync(path.join(directory, name), script, { mode: 0o755 });
         if (fail) { fs.writeFileSync(path.join(directory, "fail"), ""); }
@@ -397,9 +375,10 @@ function create_linux_harness(): LinuxHarness {
             process.env["PATH"] = original_path;
             linux.remove();
         },
-        tools({ fail = false, diagnostics, full } = {}) {
-            const directory = path.join(linux.package_root, "bundled", "linux", "tools");
-            for (const name of ["dtc", "dt-mk-schema", "dt-validate"]) { write_tool(directory, name, fail); }
+        tools({ fail = false, diagnostics, full, dt_schema_version } = {}) {
+            const directory = linux.tools;
+            if (dt_schema_version !== undefined) { write_fake_tools(directory, linux.site_packages, dt_schema_version); }
+            if (fail) { fs.writeFileSync(path.join(directory, "fail"), ""); }
             if (diagnostics !== undefined) { fs.writeFileSync(path.join(directory, "diagnostics.json"), JSON.stringify(diagnostics)); }
             if (full !== undefined) { fs.writeFileSync(path.join(directory, "full-diagnostics.json"), JSON.stringify(full)); }
         },
@@ -532,7 +511,7 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools(); } },
     { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools({ diagnostics: DIAGNOSTIC }); } },
     { route: "validate", argv: ["validate"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); } },
-    { route: "validate", argv: ["validate"], shape: "config-refusal" },
+    { route: "validate", argv: ["validate"], shape: "config-refusal", prepare: fixture => { fixture.tools({ dt_schema_version: "2026.6" }); } },
     {
         route: "validate", argv: ["validate", "--full"], shape: "answer",
         prepare: fixture => { settings_with(fixture, { "preprocess-command": "cp {input} {output}" }); fixture.tools({ diagnostics: DIAGNOSTIC, full: FULL_DIAGNOSTICS }); },
@@ -540,7 +519,7 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
 
     { route: "build", argv: ["build"], shape: "answer", prepare: fixture => { fixture.tools(); } },
     { route: "build", argv: ["build"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); } },
-    { route: "build", argv: ["build"], shape: "config-refusal" },
+    { route: "build", argv: ["build"], shape: "config-refusal", prepare: fixture => { fixture.tools({ dt_schema_version: "2026.6" }); } },
     { route: "build", argv: ["build"], shape: "answer", prepare: own_commands },
     { route: "build", argv: ["build"], shape: "answer", prepare: fixture => { fixture.tools(); full_output(fixture); } },
     { route: "build", argv: ["build"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); full_output(fixture); } },

@@ -2,7 +2,8 @@
 
 A bare `analog-attach` on a terminal sets up the project: it asks which
 backend the project targets when none is set, then runs the backend's setup.
-Where the backend is linux, that asks for the Linux tree, the base
+Where the backend is linux, that checks the tools on PATH (offering to
+install dt-schema with pipx), asks for the Linux tree, the base
 devicetree and the workfile's name, each only when it isn't set and valid,
 saving each answer at once, builds the binding caches, and then runs `init`,
 which keeps or creates the workfile (`init.md` INIT-018).
@@ -125,7 +126,7 @@ when the workfile's file exists, when step 3 named a new one (SETUP-092), or
 when the user answered yes to SETUP-093's question; then it shall run `init`
 (SETUP-041), which keeps or creates it. Otherwise it shall create nothing.
 
-**SETUP-035** The CLI shall run the steps (§8), then SETUP-032 to SETUP-034,
+**SETUP-035** The CLI shall check the tools (§8.6), run the steps (§8), then SETUP-032 to SETUP-034,
 in that order, and stop at the first failure. What was written before the
 failure stays: a failed cache build leaves the settings the steps saved.
 
@@ -154,14 +155,14 @@ Where the backend is linux:
 
 ### 8.1 The questions
 
-**SETUP-050** The CLI shall take the Linux tree (step 1), the devicetree
-(step 2) and the workfile (step 3), in that order, asking only for what
-SETUP-055 and SETUP-093 leave.
+**SETUP-050** Once the tools are there (§8.6), the CLI shall take the Linux
+tree (step 1), the devicetree (step 2) and the workfile (step 3), in that
+order, asking only for what SETUP-055 and SETUP-093 leave.
 
 **SETUP-051** Before the first question, the CLI shall write an empty line,
-`analog-attach setup`, a line of 19 `=`, an empty line, `This sets up the
-workspace: a Linux kernel source tree, a base device tree and the overlay
-file.` and an empty line. The lines between the steps are SETUP-030's.
+`analog-attach setup`, a line of 19 `=`, an empty line, `This checks the
+tools and sets up the workspace: a Linux kernel source tree, a base device
+tree and the overlay file.` and an empty line. The lines between the steps are SETUP-030's.
 
 **SETUP-052** *Withdrawn.* (Each step was asked with the configured value
 as its Enter default; a step whose setting is set and valid is now skipped,
@@ -169,7 +170,7 @@ SETUP-055.)
 
 **SETUP-053** At the line questions, Tab shall complete file system paths.
 
-**SETUP-054** When a question of the steps is stopped (Ctrl-C or Ctrl-D),
+**SETUP-054** When a question of the tools (§8.6) or of the steps is stopped (Ctrl-C or Ctrl-D),
 the CLI shall write `Stopped. What was answered is saved; run analog-attach
 again to go on.` to standard output and exit with status 130, as the noos
 setup does (SETUP-503). The settings already written stay, so the next run
@@ -271,6 +272,39 @@ and can be created (INIT-019), the CLI shall ask the confirmation `Create
 <file>?`, Enter default yes, `<file>` relative to the CWD when it is under
 it: yes makes the run ready, no doesn't. When it can't be created, the CLI
 shall ask nothing, and the run isn't ready.
+
+### 8.6 The tools
+
+**SETUP-100** Before step 1, the CLI shall look up dtc, the preprocessor of
+`preprocess-command` (its first word, `cpp` by default), dt-schema and
+dt-validate as a command does (02-common.md COM-093, COM-118, COM-119). When
+it finds no problem, it shall write `✓ dtc: <version>` (dtc's path when it
+prints no version), `✓ <preprocessor>: <version>` (the first `x.y.z` of its
+`--version`, else the tool as the setting names it) and `✓ dt-schema:
+<version>`, as SETUP-030 writes skipped steps, and go on to step 1.
+
+**SETUP-101** When it finds problems, the CLI shall write the `✓` line of
+each tool that has none, then for each problem `✗ <tool>: <message>`
+(yellow, `<tool>` being `dtc`, the preprocessor's file name, `dt-schema` or
+`dt-validate`) and its hint two spaces in, then an empty line. The messages
+and hints are those of COM-118 and COM-119, and for the preprocessor `<tool>
+not found on PATH` with COM-093's hint.
+
+**SETUP-102** When dt-schema or dt-validate has a problem and pipx is on
+PATH, the CLI shall ask the confirmation `Install dt-schema 2026.9 with pipx
+now?`, Enter default yes, once per run. Yes runs `pipx install
+dtschema==2026.9` (`pipx install --force dtschema==2026.9` when another
+version is installed, or when dt-validate is missing), then `pipx inject
+dtschema ruamel.yaml.clib`, in the CWD, their output on standard error under
+`Running '<command>'`, stopping at the first that fails with `'<command>'
+failed (exit status <n>)`; then the CLI shall look the tools up again
+(SETUP-100).
+
+**SETUP-103** Otherwise, the CLI shall ask the confirmation `Check the tools
+again?`, Enter default yes. Yes looks them up again (SETUP-100); no refuses
+(COM-040) with `Install the tools above, then run 'analog-attach' again.`,
+`error_type` `tool-missing`, before any step: nothing is saved. The CLI
+never installs dtc (open issue S-7).
 
 ## 9. Where the backend is noos
 
@@ -394,6 +428,12 @@ anything was written, although the settings answered before stay written
 (`✓ capi-path = …`, `✓ linux = …` was printed). A fix would be to exit 0 once something is saved, as the add
 interview does (`add.md` ADD-536).
 
+**S-7. dtc and cpp are only named, never installed.** Its install command needs
+root (`sudo apt install device-tree-compiler`), which the setup run doesn't
+ask for; the user runs it, then answers yes to `Check the tools again?`
+(SETUP-103). The same holds for cpp. A pipx bin directory that isn't on PATH yet (`pipx ensurepath`
+changes it for new shells only) isn't found on a check again either.
+
 ## 11. Examples
 
 ```
@@ -402,7 +442,19 @@ $ analog-attach
 analog-attach setup
 ===================
 
-This sets up the workspace: a Linux kernel source tree, a base device tree and the overlay file.
+This checks the tools and sets up the workspace: a Linux kernel source tree, a base device tree and the overlay file.
+
+✓ dtc: 1.7.0
+✓ cpp: 13.2.0
+✗ dt-schema: dt-mk-schema not found on PATH
+  Install dt-schema 2026.9: 'pipx install dtschema==2026.9', then 'pipx inject dtschema ruamel.yaml.clib' (and 'pipx ensurepath' when pipx's bin directory isn't on PATH).
+
+? Install dt-schema 2026.9 with pipx now? (Y/n) yes
+Running 'pipx install dtschema==2026.9'                                      (stderr)
+…
+✓ dtc: 1.7.0
+✓ cpp: 13.2.0
+✓ dt-schema: 2026.9
 
 Step 1: Linux kernel source tree
 …

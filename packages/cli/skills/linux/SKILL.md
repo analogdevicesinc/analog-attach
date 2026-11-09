@@ -33,6 +33,8 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 ## Prerequisites
 
+The CLI runs tools installed on the system, not shipped with it: `dtc` 1.6.0 or later, `cpp` (the default `preprocess-command`, for the base devicetree), and dt-schema 2026.9 exactly (its `dt-mk-schema` and `dt-validate`), all on PATH. A command that needs one and doesn't find it refuses with `error_type` `tool-missing`, an `errors` entry on `dtc`, `preprocess-command` or `dt-schema`, and the install command in `hints`. Show the user that command rather than running it: dtc's and cpp's need root (`sudo apt install device-tree-compiler`, `sudo dnf install dtc`, …), and dt-schema's is `pipx install dtschema==2026.9`, then `pipx inject dtschema ruamel.yaml.clib` (`--force` when another version is installed).
+
 Set up the workspace before using other commands. The settings are stored in `.analog-attach/config.json` (in the current directory, or the nearest one above that has `.analog-attach/`). A field can also be set for every project in `~/.config/analog-attach/config.json` with `config --global <key> <value>`; the local file wins. Derived files (the binding caches, the preprocessed base) live in `.analog-attach/linux/`.
 
 As an AI tool, pick the `linux` backend, set the two paths and the workfile's name with `config`, then create the workfile with `init`. None of them ask; a bare `analog-attach` on a terminal is an interactive setup meant for a person.
@@ -47,7 +49,7 @@ analog-attach --json init
 
 **Check the configuration first** with `config` (it needs nothing). Without a backend every other command stops with `No backend is set. Run 'analog-attach' on a terminal, or 'analog-attach config backend <linux>'.` (exit 2).
 
-Setting `linux` also builds the binding caches (the compat index and `validation.json`) from its bindings, which takes about a minute for the kernel tree (progress on stderr). Commands never rebuild them: when the bindings change, run `analog-attach config --reload` (no key). Until then commands warn on stderr that the caches look out of date; with a cache missing they fail with that hint. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
+Setting `linux` also builds the binding caches (the compat index and `validation.json`) from its bindings, which takes about a minute for the kernel tree (progress on stderr). Commands never rebuild them: when the bindings change, run `analog-attach config --reload` (no key). Until then commands warn on stderr that the caches look out of date; with a cache missing they fail with that hint. The binding schemas come from the installed dt-schema; installing another version makes the caches out of date.
 
 Every command checks the configuration it needs up front: `linux` must be a kernel tree (with `Documentation/devicetree/bindings/` and `include/`) with its caches built, `devicetree` must preprocess and parse, and `workfile` must parse against it. Unknown or invalid keys in config.json are errors. Problems are reported together, with a hint on how to fix them, as a refusal on stdout (exit 0). Under `--json` it has `ok: false`, `errors` (one per problem, its `field` the setting or resource at fault) and `hints`.
 
@@ -653,7 +655,7 @@ Sets `status = "okay"` or `status = "disabled"`. Commands of the `linux` backend
 
 ### 11. `build` - Compile Overlay
 
-**Purpose**: Compile the configured `.dtso` overlay into a `.dtbo` binary with the bundled `dtc`.
+**Purpose**: Compile the configured `.dtso` overlay into a `.dtbo` binary with the `dtc` on PATH.
 
 **Syntax**:
 ```bash

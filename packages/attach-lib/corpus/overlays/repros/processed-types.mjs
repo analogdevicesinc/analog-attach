@@ -3,7 +3,7 @@
 // output, which the CLI passes as `Bindings.processed_schema`, from its cache). The overlay corpus can't show such a
 // change: what it records comes from dt-validate and the lib's overlay checks, not from the binding property types.
 //   node corpus/overlays/repros/processed-types.mjs <binding path under Documentation/devicetree/bindings> <property> [--linux <dir>] [--processed <file>]
-// Reads attach-lib's dist/ (yarn build first) and the CLI's bundled dt-schema (packages/cli/bundled/linux/dt-schema).
+// Reads attach-lib's dist/ (yarn build first) and the dt-schema checkout of the tests (test/dt-schema).
 // --linux defaults to attach-lib's test/linux, --processed to the file `dt-mk-schema -j -o` leaves in its bindings
 // directory (processed-schema.json).
 import { existsSync } from "node:fs";
@@ -28,7 +28,7 @@ if (!existsSync(processed)) {
   process.exit(2);
 }
 const { Attach, Result } = await import(join(lib, "dist/index.js"));
-const dt_schema = resolve(lib, "../cli/bundled/linux/dt-schema");
+const dt_schema = join(lib, "test/dt-schema");
 const show = async (label, paths) => {
   const parsed = await Attach.parse(join(linux, "Documentation/devicetree/bindings", file), paths);
   if (Result.is_err(parsed)) { console.log(`${label}: ${parsed.error.stage}: ${parsed.error.message}`); return; }

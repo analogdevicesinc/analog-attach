@@ -1,7 +1,7 @@
 {
   "linux": "3a020df09ceee7cbeb1c3adce2cdc86d2af61353",
-  "dt_schema": "5687115902ba74c1cd80bdab4772cc2cdfa75778",
-  "processed_schema": "2c9cca499767",
+  "dt_schema": "01b5073abbeb732a04c22f01ac0370b951b20c0e",
+  "processed_schema": "591ec05c5ae7",
   "bindings": {
     "access-controllers/access-controllers.yaml": "6b46fc2db2f0",
     "arc/snps,archs-pct.yaml": "297f8e039aab",
@@ -3644,7 +3644,7 @@
     "soc/fsl/fsl,layerscape-dcfg.yaml": "23b70a533514",
     "soc/fsl/fsl,layerscape-scfg.yaml": "1c4026379e79",
     "soc/fsl/fsl,ls1028a-reset.yaml": "1b33e7382567",
-    "soc/fsl/fsl,qman-fqd.yaml": "835e8e255df2",
+    "soc/fsl/fsl,qman-fqd.yaml": "0517acbbd8ee",
     "soc/fsl/fsl,qman-portal.yaml": "d7a9f2e4631a",
     "soc/fsl/fsl,qman.yaml": "eaff1047cc92",
     "soc/fsl/fsl,rcpm.yaml": "e667ed05808f",

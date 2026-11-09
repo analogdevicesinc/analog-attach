@@ -12,7 +12,7 @@
           "node2",
           "ts@38"
         ],
-        "message": "ts@38 (edt,edt-ft5506): 'anyOf' conditional failed, one must be fixed:\n\t'interrupts' is a required property\n\t'interrupts-extended' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/input/touchscreen/edt-ft5x06.yaml"
+        "message": "ts@38 (edt,edt-ft5506): 'oneOf' conditional failed, one must be fixed:\n\t'interrupts' is a required property\n\t'interrupts-extended' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/input/touchscreen/edt-ft5x06.yaml"
       },
       {
         "path": [
