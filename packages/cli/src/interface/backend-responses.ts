@@ -38,7 +38,8 @@ export type PropertyType =
     | { kind: "number"; subtype: "int" | "float" }
     | { kind: "string" }
     | { kind: "bool" }
-    | { kind: "enum"; options: { value: string | number; display_string?: string }[] }
+    /** `list`: an option that is a whole list of values (`<1 2>`), whose `value` is them joined by a space. */
+    | { kind: "enum"; options: { value: string | number; list?: (string | number)[]; display_string?: string }[] }
     | { kind: "array"; items: PropertyType; min_items?: number; max_items?: number }
     | { kind: "tuple"; items: PropertyType[] };
 

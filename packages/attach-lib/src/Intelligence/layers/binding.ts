@@ -9,6 +9,10 @@ function enum_value(value: unknown, enum_type: AttachEnumType): PinnedValue | un
         // A whole list of strings is one option (a `compatible` with its fallback, `clock-names: [clkin1, s_axi_aclk]`)
         case AttachEnumType.STRING: { return { rows: [], strings: Array.isArray(value) ? value.map(String) : [String(value)] }; }
         case AttachEnumType.NUMBER: {
+            // A whole list of numbers is one row of them (`data-lanes = <1 2>`)
+            if (Array.isArray(value)) {
+                return value.every(entry => typeof entry === "bigint") ? { rows: [value] } : undefined;
+            }
             return typeof value === "bigint" || typeof value === "number" ? { rows: [[BigInt(value)]] } : undefined;
         }
         // Phandle and macro enums are filled in from the devicetree, so a
@@ -118,7 +122,7 @@ if (import.meta.vitest) {
 
     const devicetree = DeviceTree.new_from_string("/dts-v1/;\n/ { };");
     if (typeof devicetree === "string") { throw new TypeError(devicetree); }
-    const enum_cell = (values: (bigint | string | string[])[], enum_type: AttachEnumType, default_value?: bigint | string): Cell =>
+    const enum_cell = (values: (bigint | string | string[] | bigint[])[], enum_type: AttachEnumType, default_value?: bigint | string): Cell =>
         ({ _t: "enum", enum: values, enum_type, ...(default_value === undefined ? {} : { default: default_value }) });
     const list_of = (item: Cell, minItems: number, maxItems: number): ResolvedProperty["value"] => ({ _t: "list", item, minItems, maxItems });
     const scalar_of = (cell: Cell, default_value?: bigint): ResolvedProperty["value"] => ({ _t: "scalar", cell, ...(default_value === undefined ? {} : { default: default_value }) });
@@ -138,6 +142,7 @@ if (import.meta.vitest) {
             { key: "adi,ref-microvolt", value: matrix_of(enum_cell([2_500_000n, 4_096_000n], AttachEnumType.NUMBER, 4_096_000n), 1, 1) },
             { key: "adi,refs-microvolt", value: matrix_of(enum_cell([2_500_000n, 4_096_000n], AttachEnumType.NUMBER), 1, 2) },
             { key: "adi,clock-names", value: list_of(enum_cell([["clkin1", "s_axi_aclk"], ["clkin1", "clkin2", "s_axi_aclk"]], AttachEnumType.STRING), 1, 1) },
+            { key: "data-lanes", value: list_of(enum_cell([[1n, 2n], [1n, 2n, 3n, 4n]], AttachEnumType.NUMBER), 1, 1) },
             { key: "interrupt-parent", value: list_of(enum_cell(["gpio"], AttachEnumType.PHANDLE), 1, 1) },
             { key: "vref-supply", value: { _t: "unknown" } },
         ],
@@ -186,6 +191,13 @@ if (import.meta.vitest) {
         expect(values("adi,clock-names").map(s => [s.strings, s.display])).toStrictEqual([
             [["clkin1", "s_axi_aclk"], `"clkin1", "s_axi_aclk"`],
             [["clkin1", "clkin2", "s_axi_aclk"], `"clkin1", "clkin2", "s_axi_aclk"`],
+        ]);
+    });
+
+    test("binding_layer — an option that is a whole list of numbers is suggested as one row of them", () => {
+        expect(values("data-lanes")).toStrictEqual([
+            { rows: [[1n, 2n]], display: "1 2", source: "binding" },
+            { rows: [[1n, 2n, 3n, 4n]], display: "1 2 3 4", source: "binding" },
         ]);
     });
 

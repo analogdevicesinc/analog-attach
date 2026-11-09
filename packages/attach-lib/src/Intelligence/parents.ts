@@ -125,7 +125,8 @@ export function extract_compatible(node: ParsedBinding): string[] | undefined {
         if (typeof entry === 'string') {
             compatible_accumulator.push(entry);
         } else if (Array.isArray(entry)) {
-            compatible_accumulator = [...compatible_accumulator, ...entry];
+            // A fallback list; a list of numbers is no compatible
+            compatible_accumulator = [...compatible_accumulator, ...entry.filter((value): value is string => typeof value === "string")];
         }
     }
 

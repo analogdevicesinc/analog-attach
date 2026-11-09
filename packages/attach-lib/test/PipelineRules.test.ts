@@ -2,9 +2,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
 
-import { Attach, Result, type ParsedBinding, type ResolvedProperty } from 'attach-lib';
+import { Attach, Result, type ParsedBinding, type ResolvedProperty, type SchemaPaths } from 'attach-lib';
 
 import { afterAll, describe, test, expect } from 'vitest';
+
+import { schema_paths } from './bindings';
 
 // The rules of the pipeline stages other than the fixups (references, `true` placeholders, allOf
 // redefinitions, if/then canaries, the `select: true` schemas), each seen through what `Attach.parse`
@@ -16,15 +18,18 @@ const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'attach-pipeline-'));
 
 afterAll(() => { fs.rmSync(directory, { recursive: true }); });
 
-/** Parses a binding with this body (after the `$id`, `title` and `maintainers` every binding has). */
-async function parse(name: string, body: string): Promise<Result<Attach, { stage: string, message: string }>> {
+/**
+ * Parses a binding with this body (after the `$id`, `title` and `maintainers` every binding has), against both trees
+ * without the processed schema unless `paths` says otherwise.
+ */
+async function parse(name: string, body: string, paths: SchemaPaths = { linux: linux_path, dt_schema: dt_schema_path }): Promise<Result<Attach, { stage: string, message: string }>> {
     const file = path.join(directory, `${name}.yaml`);
     fs.writeFileSync(file, `$id: http://devicetree.org/schemas/test/${name}.yaml#\n$schema: http://devicetree.org/meta-schemas/core.yaml#\ntitle: ${name}\nmaintainers: [someone]\n${body}`);
-    return Attach.parse(file, { linux: linux_path, dt_schema: dt_schema_path });
+    return Attach.parse(file, paths);
 }
 
-async function parsed(name: string, body: string): Promise<Attach> {
-    const result = await parse(name, body);
+async function parsed(name: string, body: string, paths?: SchemaPaths): Promise<Attach> {
+    const result = await parse(name, body, paths);
     if (Result.is_err(result)) { expect.fail(`${result.error.stage}: ${result.error.message}`); }
     return result.value;
 }
@@ -649,5 +654,48 @@ patternProperties:
     description: Not a node here
 `);
         expect(pattern(parsed_binding, '^__.*__$')).toMatchObject({ _t: 'unknown' });
+    });
+});
+
+describe('a choice of value lists', () => {
+    const lanes = (combinator: string) => `
+    ${combinator}:
+      - items:
+          - const: 1
+          - const: 2
+      - items:
+          - const: 1
+          - const: 2
+          - const: 3
+          - const: 4
+`;
+    // Two lanes or four: each option is the whole list
+    const whole_lists = {
+        _t: 'list',
+        item: { _t: 'enum', enum: [[1n, 2n], [1n, 2n, 3n, 4n]], enum_type: 'number' },
+        minItems: 1,
+        maxItems: 1,
+    };
+
+    test('an anyOf of value lists is one list of whole values', async () => {
+        // arducam,64mp's `data-lanes`: no type of its own, the name's (video-interfaces.yaml's) from the processed schema
+        const { parsed_binding } = await parsed('lanes-anyof', `
+properties:
+  compatible:
+    const: x,y
+  data-lanes:
+${lanes('anyOf')}`, schema_paths);
+        expect(property(parsed_binding, 'data-lanes')).toStrictEqual(whole_lists);
+    });
+
+    test('a oneOf of value lists beside an array type is the same', async () => {
+        const { parsed_binding } = await parsed('lanes-oneof', `
+properties:
+  compatible:
+    const: x,y
+  data-lanes:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+${lanes('oneOf')}`);
+        expect(property(parsed_binding, 'data-lanes')).toStrictEqual(whole_lists);
     });
 });

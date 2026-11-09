@@ -165,10 +165,14 @@ function to_bigint(value: unknown): bigint | undefined {
     return typeof value === "number" && Number.isInteger(value) ? BigInt(value) : undefined;
 }
 
-/** An enum option as the lib holds it: whole numbers as bigints, strings and string lists as they are. */
+/** An enum option as the lib holds it: whole numbers as bigints, strings and string lists as they are, a list of whole numbers as bigints. */
 function to_option(value: unknown): EnumOption | undefined {
     if (typeof value === "string") { return value; }
-    if (Array.isArray(value) && value.every(entry => typeof entry === "string")) { return value as string[]; }
+    if (Array.isArray(value)) {
+        if (value.every(entry => typeof entry === "string")) { return value as string[]; }
+        const numbers = value.map(entry => to_bigint(entry));
+        return value.length > 0 && numbers.every(entry => entry !== undefined) ? numbers : undefined;
+    }
     return to_bigint(value);
 }
 
@@ -262,6 +266,12 @@ function described<T extends object>(schema: Schema, type: T): T & { description
     return typeof description === "string" ? { ...type, description } : type;
 }
 
+/** The branches a value takes one of: the `oneOf`, else the `anyOf`. */
+function choice_of(object: Schema): unknown[] | undefined {
+    const branches = Array.isArray(object["oneOf"]) ? object["oneOf"] : object["anyOf"];
+    return Array.isArray(branches) ? branches : undefined;
+}
+
 /** The most options of a `compatible` we list; a larger product is left to what `dtType` says. */
 const MAX_ENUM_OPTIONS = 512;
 
@@ -270,24 +280,25 @@ const bound_of = (schema: Schema, keyword: "minItems" | "maxItems", fallback: nu
     number_of(schema, keyword) ?? fallback;
 
 /**
- * A `oneOf` of lists whose entries are each an `enum` / `const` (the values a `compatible` can take, the fallback
- * lists among them; `clock-names: [clkin1, s_axi_aclk]` or `[clkin1, clkin2, s_axi_aclk]`) is one list of one such
- * value, each option a whole list. Each list a branch admits is an option, from its `minItems` up to all of its
- * entries, that the property's own bounds allow too: `interconnect-names: {maxItems: 2}` beside `[mdp0-mem, mdp1-mem,
- * cpu-cfg]` with `minItems: 2` is `[mdp0-mem, mdp1-mem]`. Not for a `compatible` (`whole_lists`), whose shorter lists
+ * A `oneOf` (or, without one, an `anyOf`) of lists whose entries are each an `enum` / `const` (the values a
+ * `compatible` can take, the fallback lists among them; `clock-names: [clkin1, s_axi_aclk]` or `[clkin1, clkin2,
+ * s_axi_aclk]`; `data-lanes: [1, 2]` or `[1, 2, 3, 4]`) is one list of one such value, each option a whole list.
+ * Branches of an `anyOf` that overlap give the same options once. Each list a branch admits is an option, from its
+ * `minItems` up to all of its entries, that the property's own bounds allow too: `interconnect-names: {maxItems: 2}`
+ * beside `[mdp0-mem, mdp1-mem, cpu-cfg]` with `minItems: 2` is `[mdp0-mem, mdp1-mem]`. Not for a `compatible` (`whole_lists`), whose shorter lists
  * drop the fallbacks it is written with: only the whole list of a branch is one, as the option is what to suggest.
  * An `enum` position gives one option per value (the first position varies slowest). Undefined when a position is
  * neither an `enum` nor a `const` (a `pattern`), when no list fits, or when there are more than `MAX_ENUM_OPTIONS`
  * options: a partial list would mislead the suggestions.
  */
 function fixed_size_enum_list(object: Schema, whole_lists: boolean): AttachType | undefined {
-    const oneOf = object["oneOf"];
-    if (!Array.isArray(oneOf)) { return undefined; }
+    const choices = choice_of(object);
+    if (choices === undefined) { return undefined; }
 
     // The values each position of each branch can take, and the lengths of the lists it admits, longest first
     const branches: { positions: unknown[][], lengths: number[] }[] = [];
 
-    for (const value of oneOf) {
+    for (const value of choices) {
         if (!is_schema(value) || value["type"] !== "array") { return undefined; }
         const items = value["items"];
         if (!Array.isArray(items)) { return undefined; }
@@ -614,7 +625,7 @@ function narrow_object(object: unknown, name?: string): AttachType {
         }
     }
 
-    if (Array.isArray(oneOf)) {
+    if (choice_of(object) !== undefined) {
         const enum_list = fixed_size_enum_list(object, name === "compatible");
         if (enum_list !== undefined) { return enum_list; }
     }
@@ -650,11 +661,13 @@ function get_enum_type(options: unknown): AttachEnumType.STRING | AttachEnumType
     }
 
     if (Array.isArray(options)) {
-        if (options.every((entry) => typeof entry === 'string')) {
+        // An option that is a whole list counts by its values
+        const values: unknown[] = options.flat();
+        if (values.every((entry) => typeof entry === 'string')) {
             return AttachEnumType.STRING;
         }
 
-        if (options.every((entry) => typeof entry === 'number' || typeof entry === 'bigint')) {
+        if (values.every((entry) => typeof entry === 'number' || typeof entry === 'bigint')) {
             return AttachEnumType.NUMBER;
         }
     }
@@ -718,6 +731,14 @@ function narrow_array_object(object: Schema, name?: string): AttachType & { _t: 
         return list(enum_cell(object["enum"], object["default"]));
     }
 
+    // A `oneOf` / `anyOf` of fixed lists of values says more than the `items` of the type beside it: a `compatible`
+    // with a `pattern`, `clock-names: {$ref: string-array, oneOf: [{items: [a, b]}, {items: [a, c, b]}]}`, and the
+    // `uint32-array` items of `data-lanes: {$ref: uint32-array, anyOf: [{items: [1, 2]}, {items: [1, 2, 3, 4]}]}`
+    if (choice_of(object) !== undefined) {
+        const enum_list = fixed_size_enum_list(object, name === "compatible");
+        if (enum_list?._t === "list" && !Array.isArray(enum_list.item) && enum_list.item._t === "enum" && enum_list.item.enum.length > 0) { return enum_list; }
+    }
+
     // Integer array with definition in items
     if (is_number_schema(items)) {
         return list(number_cell(items, object["default"]), type_size(items));
@@ -734,13 +755,6 @@ function narrow_array_object(object: Schema, name?: string): AttachType & { _t: 
     }
 
     const unique = object["uniqueItems"] === true ? { unique: true } : {};
-
-    // A `oneOf` of fixed lists of values says more than the string `items` of the type beside it: a `compatible` with a
-    // `pattern`, `clock-names: {$ref: string-array, oneOf: [{items: [a, b]}, {items: [a, c, b]}]}`
-    if (Array.isArray(object["oneOf"])) {
-        const enum_list = fixed_size_enum_list(object, name === "compatible");
-        if (enum_list?._t === "list" && !Array.isArray(enum_list.item) && enum_list.item._t === "enum" && enum_list.item.enum.length > 0) { return enum_list; }
-    }
 
     // String array with type inside items object, an `items` `oneOf` of values its options (clock.yaml's string
     // `clock-names` items over the binding's)

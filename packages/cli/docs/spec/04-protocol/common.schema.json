@@ -324,10 +324,23 @@
                     "type": [
                       "string",
                       "number"
-                    ]
+                    ],
+                    "description": "The option as list value gives it and update takes it. For an option that is a whole list (list), its values joined by a space: a string because the option is a list of values, not because the property is a string (LIST-079)."
+                  },
+                  "list": {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    },
+                    "minItems": 1,
+                    "description": "Only when the option is a whole list of values written all at once (a compatible with its fallbacks, data-lanes' <1 2>): the list itself, its numbers as numbers (LIST-079)."
                   },
                   "display_string": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "How the option is shown. A whole list is written as the devicetree writes it: <1 2> for numbers, \"a\", \"b\" for strings."
                   }
                 },
                 "additionalProperties": false

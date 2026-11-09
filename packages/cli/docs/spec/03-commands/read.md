@@ -156,7 +156,9 @@ order:
    description, the line is `(<binding file name>)` alone.
 2. `Allowed: <allowed>`, when the binding restricts the value, and the
    property isn't a phandle. `<allowed>` is the `const` as JSON, or the enum
-   options joined by ` | `, or the range as `<min>..<max>`, `>= <min>` or
+   options joined by ` | ` (an option that is a whole list, LIST-079, as the
+   devicetree writes it: `<0 20000>`, `"raspberrypi,4-model-b",
+   "brcm,bcm2711"`), or the range as `<min>..<max>`, `>= <min>` or
    `<= <max>`. A range that only states the limits of an 8, 16, 32 or 64-bit
    signed or unsigned cell gives no line.
 3. `Default: <default>`, the binding's default as JSON, when it has one.

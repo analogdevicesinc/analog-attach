@@ -7,8 +7,11 @@ export enum AttachEnumType {
     NUMBER = "number",
 }
 
-/** One option of an enum: a number, a string, or (compatible fallbacks like `["adi,adxl346", "adi,adxl345"]`) a whole list of strings. */
-export type EnumOption = bigint | string | string[];
+/**
+ * One option of an enum: a number, a string, or a whole list of either (compatible fallbacks like
+ * `["adi,adxl346", "adi,adxl345"]`, `data-lanes`' `[1, 2]`), a value written all at once.
+ */
+export type EnumOption = bigint | string | string[] | bigint[];
 
 /** One value of a property: a single cell or string. */
 export type Cell =

@@ -5,7 +5,6 @@
   "cases": {
     "type-gap": [
       "arm/cpus.yaml:cpu-release-addr ours unknown, dt-schema uint32|uint64",
-      "media/i2c/arducam,64mp.yaml:port/endpoint/data-lanes ours unknown, dt-schema uint32-array",
       "mux/gpio-mux.yaml:idle-state ours unknown, dt-schema int32|uint32",
       "pinctrl/allwinner,sun4i-a10-pinctrl.yaml:^([rs]-)?(([a-z0-9]{3,}|[a-oq-z][a-z0-9]*?)?-)+?(p[a-ilm][0-9]*?-)??pins?$/pins ours unknown, dt-schema string-array|uint32-array",
       "pinctrl/awinic,aw9523-pinctrl.yaml:-pins$/pins ours list(any), dt-schema string-array|uint32-array",

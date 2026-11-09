@@ -6,12 +6,15 @@ import {
     type AttachType,
     type Cell,
     type DTNode,
+    type EnumOption,
     type DTProperty as AttachDTProperty,
     type DTValue,
     type CellArrayElement,
 } from "attach-lib";
 
 import type { Node, Property, Types, PropertyValue } from "./types";
+
+type EnumOptionType = Extract<Types, { kind: "enum" }>["options"][number];
 import { item_bounds } from "../item-count";
 
 export function convert_node(node: DTNode): Node {
@@ -106,6 +109,21 @@ function item_counts(value: AttachType): { min_items?: number; max_items?: numbe
     return { min_items: bounds.min, ...(bounds.max === undefined ? {} : { max_items: bounds.max }) };
 }
 
+/**
+ * One option of an enum. An option that is a whole list (a `compatible` with its fallbacks, `data-lanes`' `<1 2>`) is
+ * one value written all at once: `value` is its values joined by a space, as `list value` gives it and `update` takes
+ * it, a string because the option is a list, not because the property is one; `list` is the list itself, and
+ * `display_string` the list as the devicetree writes it.
+ */
+function enum_option(option: EnumOption, enum_type: AttachEnumType): EnumOptionType {
+    if (Array.isArray(option)) {
+        const values = option.map(entry => typeof entry === "bigint" ? Number(entry) : entry);
+        const display_string = typeof option[0] === "bigint" ? `<${values.join(" ")}>` : values.map(entry => `"${entry}"`).join(", ");
+        return { value: values.join(" "), list: values, display_string };
+    }
+    return enum_type === AttachEnumType.NUMBER ? { value: Number(option) } : { value: String(option) };
+}
+
 /** The protocol type of one value: a cell or a string. */
 function cell_to_protocol_type(cell: Cell): Types {
     switch (cell._t) {
@@ -113,10 +131,7 @@ function cell_to_protocol_type(cell: Cell): Types {
             return { kind: "string" };
         }
         case "enum": {
-            return {
-                kind: "enum",
-                options: cell.enum.map(v => cell.enum_type === AttachEnumType.NUMBER ? { value: Number(v) } : { value: String(v) }),
-            };
+            return { kind: "enum", options: cell.enum.map(option => enum_option(option, cell.enum_type)) };
         }
         case "number":
         case "any": {
@@ -207,6 +222,26 @@ if (import.meta.vitest) {
         expect(attach_type_to_protocol_type(one(3n, 3n))).toEqual({ kind: "number", subtype: "int" });
         expect(attach_type_to_protocol_type(one("a", "a"))).toEqual({ kind: "string" });
         expect(attach_type_to_protocol_type(one(undefined, 3n))).toEqual({ kind: "enum", options: [{ value: 3 }] });
+    });
+
+    test("attach_type_to_protocol_type — an option that is a whole list is its values joined, with the list beside", () => {
+        const whole = (options: (bigint[] | string[])[], enum_type: AttachEnumType): AttachType =>
+            ({ _t: "list", item: { _t: "enum", enum: options, enum_type }, minItems: 1, maxItems: 1 });
+        expect(attach_type_to_protocol_type(whole([[1n, 2n], [1n, 2n, 3n, 4n]], AttachEnumType.NUMBER))).toEqual({
+            kind: "enum",
+            options: [
+                { value: "1 2", list: [1, 2], display_string: "<1 2>" },
+                { value: "1 2 3 4", list: [1, 2, 3, 4], display_string: "<1 2 3 4>" },
+            ],
+        });
+        expect(attach_type_to_protocol_type(whole([["raspberrypi,4-model-b", "brcm,bcm2711"]], AttachEnumType.STRING))).toEqual({
+            kind: "enum",
+            options: [{
+                value: "raspberrypi,4-model-b brcm,bcm2711",
+                list: ["raspberrypi,4-model-b", "brcm,bcm2711"],
+                display_string: `"raspberrypi,4-model-b", "brcm,bcm2711"`,
+            }],
+        });
     });
 
     test("attach_type_to_protocol_type — interrupts under a known parent count cells", () => {
