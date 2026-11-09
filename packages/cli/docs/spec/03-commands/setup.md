@@ -206,9 +206,13 @@ refused with `Path does not exist: <path>`, and when it isn't a Linux tree
 (COM-128) with `no <dir>/ under <path> (not a Linux source tree)`.
 
 **SETUP-062** When no tree is found, the CLI shall
-write `No Linux source trees found under ~.`, an empty line, `Tab-complete
-available. Path must contain Documentation/devicetree/bindings/ and
-include/.`, and ask the line question `Linux source path` of SETUP-061.
+write `No Linux source trees found under ~.`, an empty line, `To get one,
+clone ADI's Linux kernel (the rpi-6.12.y branch, for the Raspberry Pi) in
+another terminal:`, `  git clone --depth 1 --branch rpi-6.12.y
+https://github.com/analogdevicesinc/linux.git ~/linux-adi` (the command
+cyan), an empty line, `Tab-complete available. Path must contain
+Documentation/devicetree/bindings/ and include/.`, and ask the line question
+`Linux source path` of SETUP-061. The CLI doesn't clone it itself.
 
 ### 8.3 Step 2: the base devicetree
 
