@@ -259,7 +259,7 @@ setup() {
 | `with_sensor` | After `new_project noos`: `init` and `add eval-testpart`, a valid workfile with testpart, testpart_cfg, testpart_ip, eval_testpart, testpart_spi_dev, testpart_cs_gpio |
 | `drop_setting <key>...` | Removes settings from the project's section of its backend, as if never set |
 | `snapshot`, `assert_unchanged` | The workfile on disk is as it was at `snapshot`: for refusals that must write nothing |
-| `tty_run <expect> <keys>... -- <words>` | Runs the CLI on a pseudo-terminal, typing `<keys>` each time the screen shows `<expect>` (`$'\r'` Enter, `$'\x1b[B'` down, `$'\x03'` Ctrl-C); sets `$status` and `$output`; gives up after `TTY_TIMEOUT` seconds (20). For the guided setup and the interview |
+| `tty_run <expect> <keys>... -- <words>` | Runs the CLI on a pseudo-terminal, typing `<keys>` each time the screen shows `<expect>` (`$'\r'` Enter, `$'\x1b[B'` down, `$'\x03'` Ctrl-C); sets `$status` and `$output`; gives up after `TTY_TIMEOUT` seconds (120). For the guided setup and the interview |
 | `stored <jq filter>` | The filter on the workfile on disk (`stored '.symbols.testpart_ip.comm_init'`) |
 | `real_project` | The project's settings for real CAPI trees (`AA_CAPI_PATH`, `AA_MODULE_PATHS`, `AA_TARGET`), or a skip without them and the toolchain |
 

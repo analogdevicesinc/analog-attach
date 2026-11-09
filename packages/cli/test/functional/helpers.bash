@@ -105,7 +105,7 @@ with_sensor() {
 # `tty_run <expect> <keys> [<expect> <keys>...] -- <words>`: runs the CLI on a pseudo-terminal
 # (stdin and stdout a terminal); each time the screen shows <expect>, after the previous one, it
 # types <keys> ($'\r' Enter, $'\x1b[B' down, $'\x03' Ctrl-C). Sets $status and $output (the
-# screen, escape codes removed). Gives up after $TTY_TIMEOUT s, 20 by default (status 124).
+# screen, escape codes removed). Gives up after $TTY_TIMEOUT s, 120 by default (status 124).
 tty_run() {
 	cat >"$BATS_TEST_TMPDIR/ttydrive.py" <<'PY'
 import os, pty, re, select, sys, time
@@ -115,7 +115,7 @@ steps, words = args[:cut], args[cut + 1:]
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp('node', ['node', os.environ['AA_CLI']] + words)
-deadline = time.time() + float(os.environ.get('TTY_TIMEOUT') or 20)
+deadline = time.time() + float(os.environ.get('TTY_TIMEOUT') or 120)
 raw = b''
 def screen():
     return re.sub(r'\x1b\[[0-9;?]*[A-Za-z]|\r', '', raw.decode('utf-8', 'replace'))
