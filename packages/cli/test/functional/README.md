@@ -343,6 +343,28 @@ an empty project to a built image:
   `AA_DEPLOY=1`;
 - then the fixture imported in a new project, generated and built again.
 
+The Linux ones, `e2e/linux-<part>-rpi4.bats` (L0360 to L0364), take a part on the Raspberry Pi
+4 base of the Linux tree (`linux-tree.sh`, which `run.sh e2e` prepares) from an empty overlay to
+a deployed `.dtbo`, each by another road:
+
+| File | Part | Road |
+|---|---|---|
+| `linux-adxl345-rpi4.bats` | ADXL345 on i2c1 | the binding's example, its unresolved `interrupt-parent` fixed |
+| `linux-adxl367-rpi4.bats` | ADXL367 on spi0 | the required template, moved to spidev0's chip select, spidev0 disabled |
+| `linux-ad5593r-rpi4.bats` | AD5593R on i2c1 | channel child nodes, one renamed to another channel |
+| `linux-ad7124-8-rpi4.bats` | AD7124-8 on spi1 | a `fixed-clock` the overlay adds, decimal channel numbers, a property deleted |
+| `linux-ad4130-rpi4.bats` | AD4130 on spi0 | the tree's `rpi-ad4130` overlay, a channel deleted and one added |
+
+Each story then compares the overlay with `e2e/fixtures/<part>-rpi4.dtso`, builds it, deploys it
+through a stand-in `deploy-command` (or to the Raspberry Pi of `AA_DEPLOY_IP`, with
+`AA_DEPLOY_USER` and `AA_DEPLOY_PASSWORD`, which it reboots), and imports the fixture in a new
+project, which must validate and build the same `.dtbo`. Their common steps are in
+`e2e/linux-helpers.bash`. They need only the Linux tree:
+
+```sh
+test/functional/run.sh e2e/linux-ad4130-rpi4.bats
+```
+
 When the definitions change on purpose (a new default, a renamed node), `AA_E2E_UPDATE=1`
 rewrites the fixture from the run. Review its diff before committing it: it is what the test
 checks against.
