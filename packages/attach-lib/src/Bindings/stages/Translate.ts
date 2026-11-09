@@ -532,6 +532,16 @@ function narrow_dt_array(object: Schema): AttachType | undefined {
     return described(object, { _t: "list" as const, item: typed_number_cell({}, dt_type), ...bounds(object), typeSize: size });
 }
 
+/**
+ * A property of a scalar integer type that the binding gives only `maxItems: 1` (at91rm9200-gpio's `#gpio-lines`):
+ * `items_size` makes it an array of one, but it is the one number its type gives, as with a `$ref: uint32`.
+ */
+function is_single_integer(object: Schema): boolean {
+    const dt_type = object[DT_TYPE];
+    return object["type"] === "array" && object["maxItems"] === 1 && !("items" in object)
+        && typeof dt_type === "string" && /^u?int(8|16|32|64)$/.test(dt_type);
+}
+
 // TODO: handle objects
 /** `name`: the property's, when the schema is one's (a `compatible` reads its `oneOf` of lists apart). */
 function narrow_object(object: unknown, name?: string): AttachType {
@@ -545,7 +555,7 @@ function narrow_object(object: unknown, name?: string): AttachType {
         return narrow_matrix(object, dt_type);
     }
 
-    switch (object["type"]) {
+    switch (is_single_integer(object) ? "integer" : object["type"]) {
         case "array": {
             const row = matrix_row(object);
 

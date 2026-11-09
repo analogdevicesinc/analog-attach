@@ -585,3 +585,34 @@ properties:
         expect(parsed_binding.properties.map(p => p.key)).toContain('x,max-state');
     });
 });
+
+describe('a single integer of a scalar type', () => {
+    // at91rm9200-gpio's `#gpio-lines: {maxItems: 1}`: `items_size` makes it an array of one, the name's type a uint32
+    test('a property of a scalar integer type given only maxItems: 1 is the scalar its type gives', async () => {
+        const { parsed_binding } = await parsed('single-integer', `
+properties:
+  compatible:
+    const: x,y
+  "#foo-cells":
+    maxItems: 1
+    default: 32
+`);
+        expect(property(parsed_binding, '#foo-cells')).toStrictEqual({
+            _t: 'scalar',
+            cell: { _t: 'number', minimum: 0n, maximum: 0xFF_FF_FF_FFn },
+            typeSize: 32,
+            default: 32n,
+        });
+    });
+
+    test('with maxItems: 2 it stays a list', async () => {
+        const { parsed_binding } = await parsed('two-integers', `
+properties:
+  compatible:
+    const: x,y
+  "#foo-cells":
+    maxItems: 2
+`);
+        expect(property(parsed_binding, '#foo-cells')?._t).toBe('list');
+    });
+});
