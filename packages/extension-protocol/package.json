@@ -22,7 +22,7 @@
     "attach-lib": "*"
   },
   "devDependencies": {
-    "@types/node": "20.x",
+    "@types/node": "22.x",
     "typescript": "^5.7.2"
   }
 }

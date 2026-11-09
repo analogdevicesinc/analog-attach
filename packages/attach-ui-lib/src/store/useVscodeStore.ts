@@ -21,7 +21,7 @@ interface PendingRequest {
     messageId: string;
     resolve: (value: any) => void;
     reject: (error: Error) => void;
-    timeout: NodeJS.Timeout;
+    timeout: ReturnType<typeof setTimeout>;
 }
 
 interface VscodeState {

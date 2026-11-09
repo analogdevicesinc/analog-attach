@@ -25,15 +25,15 @@
     "coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "@types/node": "20.x",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@types/node": "22.x",
+    "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^9.39.2",
     "eslint-plugin-unicorn": "^60.0.0",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.54.0",
-    "vite": "^7.3.1",
+    "vite": "^7.3.8",
     "vite-plugin-dts": "^4.5.4",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "eta": "^3.5.0"

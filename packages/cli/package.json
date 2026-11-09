@@ -14,7 +14,7 @@
     "analog-attach": "dist/cli.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "scripts/bundle-dt-schema.sh && tsc -p src/tsconfig.json && tsup --silent && rm -rf bundled/noos/templates && mkdir -p bundled/noos && cp -r ../attach-no-os-lib/src/codegen/templates bundled/noos/templates && rm -rf bundled/gui && mkdir -p bundled/gui && cp -r ../gui/src/index.html ../gui/src/core ../gui/src/ecosystems bundled/gui/",
@@ -59,10 +59,10 @@
     "yaml": "^2.8.3"
   },
   "devDependencies": {
-    "@types/node": "25.x",
+    "@types/node": "22.x",
     "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.72.1",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.12",
     "ajv": "^8.17.1",
     "attach-lib": "*",
     "attach-no-os-lib": "workspace:*",
@@ -71,8 +71,8 @@
     "bats-support": "0.3.0",
     "eslint": "^9.31.0",
     "eslint-plugin-unicorn": "^60.0.0",
-    "tsup": "^6.7.0",
+    "tsup": "^8.5.1",
     "typescript": "~6.0.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.12"
   }
 }

@@ -38,7 +38,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 25
+          node-version: 26
           cache: yarn
 
       - name: Enable Corepack
@@ -73,7 +73,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 25
+          node-version: 26
 
       - name: Download CLI package
         uses: actions/download-artifact@v4

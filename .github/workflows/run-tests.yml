@@ -16,9 +16,15 @@ concurrency:
 # Two jobs that share nothing, side by side: the unit tests of every package, and the
 # functional tests of the CLI (packages/cli/test/functional) with their requirements report.
 jobs:
+  # On the oldest Node the CLI supports (its engines, >=22) and on the current LTS, so a change
+  # that needs a newer Node fails here rather than for a user.
   unit:
-    name: Unit tests
+    name: Unit tests (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 26]
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -37,7 +43,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
           cache: yarn
 
       - name: Enable Corepack
@@ -72,7 +78,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 26
           cache: yarn
 
       # The workbooks (test-spec.xlsx, test-report.xlsx) need openpyxl, and the manual and planned
