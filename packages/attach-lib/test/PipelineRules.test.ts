@@ -699,3 +699,53 @@ ${lanes('oneOf')}`);
         expect(property(parsed_binding, 'data-lanes')).toStrictEqual(whole_lists);
     });
 });
+
+describe('a list of strings by their pattern', () => {
+    // cy8c95x0's `pins`: dt-schema types the name both string-array and uint32-array, so it has no type
+    test('items of a pattern are strings, with the counts', async () => {
+        const { parsed_binding } = await parsed('pins-pattern', `
+properties:
+  compatible:
+    const: x,y
+  pins:
+    items:
+      pattern: '^gp([0-7][0-7])$'
+    minItems: 1
+    maxItems: 60
+`, schema_paths);
+        expect(property(parsed_binding, 'pins')).toStrictEqual({ _t: 'list', item: { _t: 'string' }, minItems: 1, maxItems: 60 });
+    });
+
+    test('items of an anyOf of a pattern and strings are strings, and so are positions of a pattern', async () => {
+        // k210-fpioa's `pins`
+        const { parsed_binding } = await parsed('pins-anyof', `
+properties:
+  compatible:
+    const: x,y
+  pins:
+    items:
+      anyOf:
+        - pattern: '^IO_[0-9]+$'
+        - enum: [A0, A1]
+  x,pair:
+    items:
+      - pattern: '^a'
+      - pattern: '^b'
+`, schema_paths);
+        expect(property(parsed_binding, 'pins')).toStrictEqual({ _t: 'list', item: { _t: 'string' } });
+        expect(property(parsed_binding, 'x,pair')).toStrictEqual({ _t: 'list', item: [{ _t: 'string' }, { _t: 'string' }], minItems: 2, maxItems: 2 });
+    });
+
+    test('a type of numbers wins over the pattern', async () => {
+        // `data-lanes` is a uint32-array by the processed schema
+        const { parsed_binding } = await parsed('lanes-pattern', `
+properties:
+  compatible:
+    const: x,y
+  data-lanes:
+    items:
+      pattern: '^[0-9]$'
+`, schema_paths);
+        expect(property(parsed_binding, 'data-lanes')).toMatchObject({ _t: 'list', item: { _t: 'number' }, typeSize: 32 });
+    });
+});

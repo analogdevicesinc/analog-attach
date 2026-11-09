@@ -455,8 +455,24 @@ function typed_number_cell(schema: Schema, dt_type: string, default_value?: unkn
 }
 
 /**
+ * A schema of no type that only a string meets: a `pattern` (cy8c95x0's `pins: {items: {pattern: '^gp…'}}`), or an
+ * `anyOf` of patterns and string `enum`s (k210-fpioa's). dt-validate ignores a `pattern` on a number, but the binding
+ * asks for strings.
+ */
+function is_pattern_string(definition: unknown): boolean {
+    if (!is_schema(definition) || "type" in definition) { return false; }
+    if (typeof definition["pattern"] === "string") { return true; }
+    const branches = definition["anyOf"];
+    return Array.isArray(branches) && branches.length > 0 && branches.every(branch => is_schema(branch)
+        && !("type" in branch)
+        && (typeof branch["pattern"] === "string"
+            || (Array.isArray(branch["enum"]) && branch["enum"].every(entry => typeof entry === "string"))));
+}
+
+/**
  * The cell of one position of an `items` list: what it allows (an `enum`, a `const`, a number schema), else what the
- * property's `dtType` says it holds (a string of a `pattern`, a number of a `{description}`). Undefined when neither.
+ * property's `dtType` says it holds (a string of a `pattern`, a number of a `{description}`), else a string when only
+ * one meets it (`is_pattern_string`). Undefined when none.
  */
 function position_cell(definition: unknown, dt_type: unknown): Cell | undefined {
     if (!is_schema(definition)) { return undefined; }
@@ -468,6 +484,7 @@ function position_cell(definition: unknown, dt_type: unknown): Cell | undefined 
     }
     if (is_number_schema(definition)) { return number_cell(definition); }
     if (typeof dt_type === "string" && STRING_TYPES.has(dt_type)) { return { _t: "string" }; }
+    if (is_pattern_string(definition)) { return { _t: "string" }; }
 
     return undefined;
 }
@@ -779,6 +796,11 @@ function narrow_array_object(object: Schema, name?: string): AttachType & { _t: 
     const size = integer_array_size(dt_type);
     if (typeof dt_type === "string" && size !== undefined) {
         return list(typed_number_cell(item ?? {}, dt_type, object["default"]), { typeSize: size });
+    }
+
+    // Entries of a pattern, with no type of the name's to say numbers
+    if (is_pattern_string(item ?? only)) {
+        return list({ _t: "string" }, unique);
     }
 
     // Array of whatever
