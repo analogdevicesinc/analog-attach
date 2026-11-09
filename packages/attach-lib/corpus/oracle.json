@@ -1,7 +1,7 @@
 {
   "linux": "3a020df09ceee7cbeb1c3adce2cdc86d2af61353",
-  "dt_schema": "5687115902ba74c1cd80bdab4772cc2cdfa75778",
-  "processed_schema": "2c9cca499767",
+  "dt_schema": "01b5073abbeb732a04c22f01ac0370b951b20c0e",
+  "processed_schema": "591ec05c5ae7",
   "cases": {
     "type-gap": [
       "arm/cpus.yaml:cpu-release-addr ours unknown, dt-schema uint32|uint64",

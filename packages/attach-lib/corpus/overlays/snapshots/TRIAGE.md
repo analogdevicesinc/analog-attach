@@ -1,9 +1,9 @@
 # Corpus baseline
 
-Generated 2026-10-22 by the CLI's `yarn corpus`, regenerated 2026-10-29 by `yarn workspace attach-lib corpus:overlays` with the same results: the 435 RPi overlays of `analogdevicesinc/linux` at `16bea53d3413` (`rpi-6.12.y`), against that tree's `bcm2711-rpi-4-b.dts`.
+Generated 2026-10-22, last accepted 2026-11-09 for dt-schema 2026.9 (one message changed, `anyOf` → `oneOf` in `edt-ft5406`; the counts below stayed the same): the 435 RPi overlays of `analogdevicesinc/linux` at `16bea53d3413` (`rpi-6.12.y`), against that tree's `bcm2711-rpi-4-b.dts`.
 The script fetches that commit itself (shallow, sparse) into `~/.cache/attach-corpus`; the pin is `LINUX_COMMIT` in `corpus/overlays/corpus.mjs`.
 `yarn workspace attach-lib corpus:overlays:diff [filter]` reruns and lists new and removed errors, crashes, changed parse results and changed warnings (exit 1 on a regression).
-Both call attach-lib's built `dist/` (build it first) and the CLI's bundled dtc / dt-mk-schema / dt-validate.
+Both call attach-lib's built `dist/` (build it first) and the cpp, dtc, dt-mk-schema and dt-validate on PATH (dt-schema 2026.9).
 
 | | overlays |
 |---|---|
@@ -23,5 +23,5 @@ Both call attach-lib's built `dist/` (build it first) and the CLI's bundled dtc 
 
 - No error is classified as "our bug" yet. Doing that means taking a sample of each class in the second row and checking it against the binding.
 - The 7 raw-bytes properties that appear in some schema (57 errors): check whether the node's own binding defines them.
-- A full-tree reference isn't possible: dt-validate crashes on the whole merged tree (`KeyError: '/'` in dtschema's `fixup_gpios`), which is why validate checks a stand-in tree.
+- The corpus validates the stand-in tree only, not the base with the overlay applied, which the CLI's `validate --full` also checks (VALIDATE-040).
 - No minimal `.dtso` repros under `test/fixtures/corpus/`, no bisect script, and `list value` output isn't snapshotted.
