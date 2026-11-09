@@ -26,14 +26,25 @@ function defined_in_its_node(binding: unknown, path: string[]): boolean {
 }
 
 /**
+ * Whether `definition` is a node that holds the placeholder of its own name (rk3399-pcie's INTx node
+ * `interrupt-controller: {type: object, properties: {interrupt-controller: true}}`): the node the `true` sits in, not
+ * what it stands for.
+ */
+function holds_own_placeholder(definition: unknown, name: string): boolean {
+    const properties = is_schema(definition) ? definition["properties"] : undefined;
+    return is_schema(properties) && properties[name] === true;
+}
+
+/**
  * The first definition of `name` in `schema`, depth first: one in a `properties` table, at any depth, and not in an
- * `if` / `then` / `else`. Undefined when there is none.
+ * `if` / `then` / `else`, nor a node holding a `true` of the name (`holds_own_placeholder`). Undefined when there is
+ * none.
  */
 function first_definition(schema: unknown, name: string, in_properties = false): unknown {
     if (typeof schema !== "object" || schema === null) { return undefined; }
 
     const own = in_properties && Object.hasOwn(schema, name) ? (schema as Record<string, unknown>)[name] : undefined;
-    if (own !== undefined && typeof own !== "boolean") { return own; }
+    if (own !== undefined && typeof own !== "boolean" && !holds_own_placeholder(own, name)) { return own; }
 
     for (const [key, entry] of Object.entries(schema)) {
         if (key === "if" || key === "then" || key === "else") { continue; }
@@ -60,8 +71,8 @@ function with_definitions(value: unknown, definitions: Map<string, unknown>, pat
 
 /**
  * The binding with each `properties: { name: true }` its node doesn't define otherwise replaced by the first
- * definition of the name in the files it references (in their order), dereferenced again.
- * TODO: handle recursive definitions
+ * definition of the name in the files it references (in their order), dereferenced again. A `true` none defines stays,
+ * for the `dt_type` fixup to type by its name (`interrupt-controller` a `flag`).
  */
 export async function resolve_properties(
     reference_resolved: ResolvedBinding,

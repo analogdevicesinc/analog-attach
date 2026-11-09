@@ -231,6 +231,39 @@ properties:
 `);
         expect(property(parsed_binding, 'spi-max-frequency')).toStrictEqual({ _t: 'unknown' });
     });
+
+    test('a `true` property inside the node of the same name is not that node', async () => {
+        // rk3399-pcie's INTx node: the flag is dt-schema's, not the node it sits in
+        const { parsed_binding } = await parsed('placeholder-own-node', `
+properties:
+  compatible:
+    const: x,y
+  interrupt-controller:
+    type: object
+    properties:
+      '#interrupt-cells':
+        const: 1
+      interrupt-controller: true
+`);
+        const node = property(parsed_binding, 'interrupt-controller');
+        if (node?._t !== 'node') { expect.fail(`expected a node, got ${JSON.stringify(node)}`); }
+        expect(node.properties.find(p => p.key === 'interrupt-controller')?.value).toStrictEqual({ _t: 'flag' });
+    });
+
+    test('a `true` property takes a node a referenced schema defines', async () => {
+        // graph.yaml's `port`, referenced under a child node
+        const { parsed_binding } = await parsed('placeholder-node', `
+properties:
+  compatible:
+    const: x,y
+  port: true
+patternProperties:
+  "^dev@[0-9]$":
+    type: object
+    $ref: /schemas/graph.yaml#
+`);
+        expect(property(parsed_binding, 'port')).toMatchObject({ _t: 'node' });
+    });
 });
 
 describe('redefinitions', () => {
