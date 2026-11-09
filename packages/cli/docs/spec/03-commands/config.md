@@ -117,8 +117,8 @@ empty line and its hint follow. On a terminal the key is bold and
 **CONFIG-016** While in human mode, when showing every setting, the CLI
 shall write `Local:  <file>` and `Global: <file>` (the settings files, the
 home directory written `~`), an empty line, then for each category in order
-(`General` for `backend`; where the backend is linux, `Workspace` and
-`Deploy`; where it is noos, `Sources`, `Target`, `Workfile`, `Project` and
+(`General` for `backend`; where the backend is linux, `Workspace`, `Build`
+and `Deploy`; where it is noos, `Sources`, `Target`, `Workfile`, `Project` and
 `Build`) the line `  <category>` and one line per setting: two spaces, `*`
 for a required setting or a space, a space, the key padded to the longest
 key plus two, the value (`(not set)` when unset) padded to the longest
@@ -175,9 +175,9 @@ when it has one.
 
 **CONFIG-102** If the file to write can't be read or isn't a JSON object
 (COM-121), or the setting is the backend's and the file's active section
-isn't an object (COM-134), then the CLI shall report its message as a
-refused value: `<file>: <id>: must be an object — <description>`. (Open
-issue CF-4.)
+isn't an object (COM-134), then the CLI shall report its message as an
+input error, as text in both modes: `<file>: <id>: must be an object —
+<description>`. (Open issues CF-4, CF-10.)
 
 **CONFIG-107** If the setting isn't a `path_list` and more than one
 `<value>` is given, then the CLI shall report `<key> takes one value; got
@@ -380,9 +380,6 @@ for the guided setup.` (COM-501, CONFIG-014).
 
 **CF-2. `deploy-password` is shown in the clear,** in both modes.
 
-**CF-3.** *Fixed.* (`(default)` hid an explicit setting. The shown value now
-names its source, CONFIG-013.)
-
 **CF-4. A settings file that isn't JSON is an input error here and goes
 unreported elsewhere.** `config` reports it (CONFIG-005, CONFIG-102), every
 other command reads the file as empty (`02-common.md` C-3).
@@ -398,26 +395,17 @@ file` (COM-127). Nor is a `.dts` or `.dtso` extension checked.
 while the file gets the absolute path. `linux` and a new `workfile` are
 echoed absolute (CONFIG-111, CONFIG-121).
 
-**CF-8.** *Fixed.* (Switching backends left the other backend's keys in the
-flat file, where they were unknown keys that made `config` refuse to show
-anything. Each backend's settings are now in their own section, COM-131,
-COM-135, CONFIG-112.)
-
 **CF-9. The table's hints aren't merged.** With `linux` and `devicetree`
 unset, `config` writes two setup hints (`Run 'analog-attach' on a terminal,
 or 'analog-attach config linux <path>', to set up a workspace.` and the same
 for `devicetree`), where a command's configuration errors merge them into one
 (`02-common.md` §8.1).
 
-**CF-10. An unreadable file is an input error, a refused value a refusal.**
-A file that can't be read or written (CONFIG-102) exits 2 on standard error
-in both modes, as text even under `--json` (not a `config-error` object). A
-value the setting can't take (CONFIG-103 to CONFIG-106) is a refusal since
-COM-043: status 0, `ok: false` under `--json`, as CONFIG-122, CONFIG-123 and
-CONFIG-023 are (`02-common.md` C-11).
-
-**CF-11. (Resolved.)** `target` set before `capi-path` refused with an empty
-list of options; it now names the settings to check (CONFIG-501).
+**CF-10. A settings file that can't be written is an input error in text.**
+Setting or resetting with a file that can't be read or written (CONFIG-102,
+CONFIG-200) exits 2 on standard error, as text even under `--json`, where
+showing gives a `config-error` object (CONFIG-005) and a refused value is a
+refusal (COM-043). See `02-common.md` C-11.
 
 **CF-12. `capi-path` takes a module checkout the setup refuses.** `config
 capi-path` accepts any directory with a `module.yml` (CONFIG-503), while the
@@ -493,7 +481,6 @@ $ analog-attach --json config overlay-syntax label --global
 ```
 $ analog-attach config overlay-syntax xml
 overlay-syntax: "xml" is not one of fragment | label — Output syntax for the overlay file: fragment (default) or label (&spi0 { … })
-                                                   (stderr, exit 2)
 ```
 
 ```
@@ -508,7 +495,6 @@ $ analog-attach config linux /tmp
 linux: no Documentation/devicetree/bindings/ under /tmp (not a Linux source tree) — Path to Linux kernel source tree (setting it builds the binding caches)
 
 Run 'analog-attach' on a terminal, or 'analog-attach config linux <path>', to set up a workspace.
-                                                   (stderr, exit 2)
 ```
 
 ```
@@ -625,12 +611,10 @@ $ analog-attach config target othersoc
 Set target = othersoc
 $ analog-attach config bootstrap yes
 bootstrap: "yes" is not true or false — After 'add', fill in every value and node that leaves no room for choice (true/false)
-                                                   (stderr, exit 2)
 $ analog-attach config capi-path /tmp
 capi-path: /tmp is not a capi checkout (it has no module.yml) — Path to the root of the capi repository
 
 Run 'analog-attach config capi-path <path>', or 'analog-attach' on a terminal for the guided setup.
-                                                   (stderr, exit 2)
 $ analog-attach --json config --reload
 {"ok":true,"message":"Nothing to rebuild: the noos backend keeps no caches","severity":"info"}
 ```

@@ -1,8 +1,6 @@
 /**
  * The interface between the `analog-attach` front end and an ecosystem backend (linux, noos).
  *
- * See packages/cli/docs/merged-cli-design.md.
- *
  * The split:
  *
  * - The front end owns what a user sees: argv and the grammar of the shared commands, help,

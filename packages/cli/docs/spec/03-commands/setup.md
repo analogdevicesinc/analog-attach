@@ -416,12 +416,6 @@ that the path exists (`config.md` CONFIG-104), the configured value must be a
 file with any extension (COM-127), and the manual entry must end in `.dts` but
 may be a directory (SETUP-072).
 
-**S-3.** *Fixed.* (A refusal after saving didn't say what was saved; each
-saved answer is now written `✓ <key> = <value>`, SETUP-030.)
-
-**S-4.** *Fixed.* (The line-based `.dts` filter for runs off a terminal was
-dead code; the search question replaced both filters.)
-
 **S-5. The two cancellations are worded differently.** Stopping the backend
 question writes `Cancelled.` (SETUP-023), stopping a question of a backend's
 steps `Stopped. What was answered is saved; …` (SETUP-054, SETUP-503).

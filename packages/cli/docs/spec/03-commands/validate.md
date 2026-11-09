@@ -390,29 +390,14 @@ fragment without an `interrupt-parent` label a controller with
 `#interrupt-cells = <1>`, so a correct two-cell `interrupts` (inherited from
 `gpio`) is reported as `too long`.
 
-**V-4.** *Fixed.* (The response had no `ok`, `message` or `severity`, and a
-tool failure was an error with `path: []`. The response now carries them
-(VALIDATE-021), and a tool failure is a refusal (VALIDATE-013).)
-
 **V-5. Exit status 0 with errors.** `validate` can't fail a script or a CI
 step (VALIDATE-027).
 
-**V-6. Tool paths aren't quoted.** The dtc and dt-validate commands
-(VALIDATE-010, VALIDATE-011) put their paths in the shell command unquoted,
-unlike `build`. A workspace or installation path with a space breaks them.
-
-**V-7.** *Fixed.* (`update` wrote its address warnings to standard error in
-human mode and `add` and `rename` to standard output. All three use standard
-error now, VALIDATE-114.)
-
-**V-8.** *Fixed.* (With errors there was no summary line. The output ends with
-`<n> error(s), <m> warning(s)` now, VALIDATE-026.)
-
 **V-9. Without `--full`, properties set on a fragment's target aren't
 validated.** VALIDATE-003 copies only the nodes of a body, not its own
-properties. With `&spi0 { cs-gpios = "foo"; status = "okay"; };` as the
-whole overlay, `validate` says `No errors!`: `cs-gpios` isn't in `temp.dts`,
-and dt-validate never sees it. A wrong `status`, `pinctrl-0` or `cs-gpios` on
+properties. With `&spi0 { status = "bogus"; };` as the whole overlay,
+`validate` says `No errors!`: `status` isn't in `temp.dts`, and dt-validate
+never sees it. A wrong `status`, `pinctrl-0` or `cs-gpios` on
 a base node passes. `validate --full` checks them (§5.1), at the cost of a
 second dt-validate run on the whole tree.
 
@@ -459,6 +444,12 @@ interrupts: [[0], [4]] is too long\n\tfrom schema $id:
 http://devicetree.org/schemas/iio/accel/adi,adxl345.yaml`. The file is a
 scratch file of the CLI's (VALIDATE-028), not one the user wrote. Human mode
 (VALIDATE-024) shows dt-validate's `message`, without either.
+
+**V-17. A malformed `*-gpios` stops `--full`.** With `&spi0 { cs-gpios =
+"foo"; };`, dt-validate's GPIO fixup reads the string as a phandle and fails
+(`KeyError: 1718578944`, the bytes of `foo`), so `validate --full` refuses
+with `tool-failed` and dt-validate's traceback (VALIDATE-013) instead of a
+finding. Plain `validate` says `No errors!` (V-9).
 
 ## 10. Examples
 

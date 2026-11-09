@@ -214,8 +214,7 @@ could have, as the base and the overlay together have it, in two groups:
 When the binding is narrowed by the node's data (`if`/`then`), the narrowed
 lists are used. Without a binding there's only the `set` group. The node is
 found per COMPL-054, so a label-first path to a node the workfile doesn't
-have (`read spi0/spidev@0 <Tab>`) offers nothing (open issue CO-12). A name
-the binding lists twice is offered twice (open issue CO-13).
+have (`read spi0/spidev@0 <Tab>`) offers nothing (open issue CO-12).
 
 **COMPL-061** The CLI shall describe a property the narrowed binding requires
 by `required`.
@@ -486,9 +485,6 @@ CO-15).
 
 ## 12. Open issues
 
-**CO-1.** *Fixed.* (Only the first value of `update` completed. The later
-ones continue the suggestions, COMPL-065.)
-
 **CO-2. Path roots are only the entry points.** Every node-path positional,
 including `update`, `move`'s destination and `list property`, offers only the
 overlay's fragment targets before the first `/`. A base label the overlay
@@ -496,19 +492,9 @@ doesn't target yet (`spi1`, `i2c1`) is never offered, though every command
 accepts it. Absolute paths (`/…`) do reach the whole tree.
 
 **CO-3. Nothing completes before an overlay exists.** Node paths, properties,
-values, and the children after `add --parent spi0/` all need the overlay
-loaded, so a workspace without one completes none of them. Only `add
---parent`'s roots and the device, template and overlay-file sources work.
-
-**CO-4.** *Fixed.* (The hidden `ui` was offered. It is gone, and
-COMPL-022 offers the commands the help lists.)
-
-**CO-5.** *Fixed.* (`config <key>` always completed a file name. The value
-now completes by the setting, COMPL-080.)
-
-**CO-6.** *Fixed.* (`completion <unknown shell>` exited 0 with no JSON
-response. It is an input error now, COMPL-101, and a known shell answers
-JSON, COMPL-100.)
+values, and `add --parent` (its roots too, COMPL-052) all need the overlay
+loaded, so a workspace without one completes none of them. Only the device,
+template and overlay-file sources work.
 
 **CO-7. zsh sorts the ungrouped candidates.** The stub passes `-V` (keep the
 order) only to the `_describe` of a group. The ungrouped candidates, which
@@ -527,15 +513,10 @@ would be for the engine to keep every partial stem ending in one of those
 characters, since fish's `complete` has no per-candidate way to suppress the
 space.
 
-**CO-9.** *Fixed.* (`list` completion counted its positionals from the
-wrong word. The route is read from the words that aren't options, COMPL-034.)
-
-**CO-10. Nothing completes a directory name.** `init --linux` was the only
-position completed with `__ANALOG_ATTACH_COMPLETE_DIRS__` (COMPL-012); `config
-linux` completes a file name like the other paths (COMPL-080).
-
-**CO-11.** *Fixed.* (`completion --install` had no JSON response. It has
-one, COMPL-156.)
+**CO-10. Directory settings complete file names.** `config linux`, and where
+the backend is noos `config capi-path`, `module-paths` and `project-path`,
+complete file names (COMPL-080), though each takes a directory. Only `generate
+--project-template` and `--output` complete directory names (COMPL-530).
 
 **CO-12. Node paths miss base nodes under a label.** The base lookup of
 COMPL-054 reads `spi0/spidev@0` as one label name, so `read spi0/spidev@0
@@ -545,9 +526,6 @@ base's children only, where every `list` path with `&` is not found
 (`list.md` L-1). A fix would be to look the base node up as `read` does
 (resolve the label-first path to an absolute one first). (This was
 `__list.md` IL-3.)
-
-**CO-13.** *Closed.* `read spi1 <Tab>` (an RPi 4 base) listed `#address-cells`
-twice; the narrowed binding no longer names it twice (`list.md` L-7).
 
 **CO-14. A group alone completes no flag.** `list -<Tab>` and `skill
 -<Tab>` offer nothing (COMPL-034), though `--help` applies.

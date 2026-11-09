@@ -108,7 +108,7 @@ Moved adc to spi1 in /work/ad7124-8.dtso
 $ analog-attach move adc adc/channel@0
 Cannot move adc into itself or one of its descendants
 $ analog-attach move adc i2c1
-Cannot move adc under i2c1: adi,ad7124-8 goes under spi0, spi1 (see: analog-attach list parent adi,ad7124-8)
+Cannot move adc under i2c1: adi,ad7124-8 goes under spi, spi1, spi2, spi3, spi4, spi5, spi6 (see: analog-attach list parent adi,ad7124-8)
 $ analog-attach --json move adc/channel@0 adc
 {"ok":false,"message":"adc already has a child named channel@0","severity":"error","error_type":"name-taken"}
 ```

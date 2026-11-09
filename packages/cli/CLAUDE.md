@@ -5,8 +5,8 @@
 `@analog-attach/cli` is the `analog-attach` binary: a CLI for AI coding assistants (and people) to
 configure peripherals, with one backend per ecosystem. `linux` configures Linux device tree overlays
 (it wraps `attach-lib`); `noos` configures no-OS CAPI projects (it wraps `attach-no-os-lib`). Both
-libraries are bundled at build time. The project's `backend` setting picks one. The design and its
-numbered decisions are in `docs/merged-cli-design.md`; the observable behaviour is in `docs/spec/`.
+libraries are bundled at build time. The project's `backend` setting picks one. The observable
+behaviour is in `docs/spec/`.
 
 ## Commands
 

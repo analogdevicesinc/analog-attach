@@ -218,10 +218,10 @@ DELETE-010 counts only `__overlay__` bodies. `delete --force` also removes
 parameters.
 
 **D-3. No path checks.** `delete` skips GRM-020 to GRM-023, so `delete &adc`
-says `Not found: &adc` instead of `Use the bare form: adc`, and `delete
-adc//channel@0` deletes `adc/channel@0` instead of reporting `empty segment
-in path: adc//channel@0`. `move`, `rename`, `enable` and `disable` do the
-same (`01-grammar.md` G-1).
+says `Not found: &adc. Did you mean adc, …?` instead of `Use the bare form:
+adc`, and `delete adc//channel@0` deletes `adc/channel@0` instead of reporting
+`empty segment in path: adc//channel@0`. `move`, `rename`, `enable` and
+`disable` do the same (`01-grammar.md` G-1).
 
 **D-4. A base node is refused in two ways.** `delete spi0` says the node is
 part of the base when the overlay has a fragment for it, and `Not found:

@@ -482,10 +482,6 @@ property`.
 
 ## 11. Open issues
 
-**U-1.** *Fixed.* (`update` wrote its warnings to standard error and `add`
-to standard output in human mode. Every command now writes them to standard
-error, COM-022.)
-
 **U-2. The flag refusal has no property name.** UPDATE-030's message reads
 ``spi-cpol is a flag: `update <path> ` sets it, `delete <path> ` clears it``:
 the commands it suggests lack the property.

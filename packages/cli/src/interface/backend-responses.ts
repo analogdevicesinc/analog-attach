@@ -1,14 +1,12 @@
 /**
  * The --json responses of the commands, shared by the `analog-attach` front end and the
  * ecosystem backends (linux, noos). Imported by backend-interface.ts.
- *
- * See packages/cli/docs/merged-cli-design.md.
  */
 
 // The base shapes. A backend may return a subtype (more fields, narrower types): its own
 // map extends `Responses`, and its schemas in docs/spec/04-protocol extend the base ones
-// with `allOf`. Where the two CLIs disagree today, the base below is a choice, marked
-// ALIGN; merged-cli-design.md lists them.
+// with `allOf`. Where the two old CLIs disagreed, the base below is a choice, marked
+// ALIGN.
 //
 // Optional or required: a field is required where both backends always have it, optional
 // where either may lack it.

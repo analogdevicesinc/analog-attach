@@ -118,9 +118,9 @@ config-option   = %s"--reset" / %s"--reload" / %s"--global"
                                         ; which combine: 03-commands/config.md §2
 
 skill           = %s"skill" B ( skill-install / skill-uninstall )
-skill-install   = %s"install" B skill-name *( B %s"--force" )
-skill-uninstall = %s"uninstall" B skill-name
-skill-name      = element               ; one of the backend's skills (SKILL-002)
+skill-install   = %s"install" [ B skill-name ] *( B %s"--force" )
+skill-uninstall = %s"uninstall" [ B skill-name ]
+skill-name      = element               ; one of the backend's skills (SKILL-021)
 
 completion      = %s"completion" [ B shell ] *( B completion-opt )
 completion-opt  = %s"--install" / %s"--uninstall"   ; not both (COMPL-154)

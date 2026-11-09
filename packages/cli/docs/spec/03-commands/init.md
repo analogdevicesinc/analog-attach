@@ -175,7 +175,7 @@ module repositories that define chips, the human text of INIT-504 ends with
 module repository defines a chip and point at `config module-paths`.
 
 None other. (I-1 to I-6 were about the options and the questions; the ones that
-still apply are `setup.md` S-1 to S-3. I-7, a bare `analog-attach` with its
+still apply are `setup.md` S-1 and S-2. I-7, a bare `analog-attach` with its
 output redirected running `init`, was fixed by SETUP-001.)
 
 ## 7. Examples

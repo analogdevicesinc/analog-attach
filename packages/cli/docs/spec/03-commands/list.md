@@ -358,9 +358,9 @@ values.
 
 **LIST-079** When the binding's options for a string property are fallback
 lists (the root's `compatible`: `["raspberrypi,4-model-b",
-"brcm,bcm2711"]`), the CLI shall offer each list as one string, its strings
-joined by `,` (`raspberrypi,4-model-b,brcm,bcm2711`, displayed in double
-quotes). The check of LIST-073 then fails each of them and adds the note
+"brcm,bcm2711"]`), the CLI shall offer each list as one value, its strings
+joined by a space (`raspberrypi,4-model-b brcm,bcm2711`, displayed
+`"raspberrypi,4-model-b", "brcm,bcm2711"`). The check of LIST-073 then fails each of them and adds the note
 `Values for property compatible are <options>`, `<options>` being every
 option as JSON (`[["raspberrypi,400","brcm,bcm2711"],…]`). (Open issue
 L-10.)
@@ -589,11 +589,12 @@ neither, `No suggestions.`
 ## 12. Open issues
 
 **L-1. `list` paths skip the path checks.** `list property &spi0` says `Node
-not found: &spi0` where every other command says `Use the bare form: spi0`
-(GRM-021); `spi0//spidev@0` resolves; a path with a space is "not found".
-`list property <path> a/b` reads `<path>/a` as the node and `b` as the
-property, where GRM-030 would refuse it. The completion of `&spi0/` is the
-exception: it offers the base's children (`05-completion.md` CO-12).
+not found: &spi0` where `read`, `update` and `add --parent` say `Use the bare
+form: spi0` (GRM-021); `spi0//spidev@0` resolves; a path with a space is "not
+found". `list property <path> a/b` looks up a property named `a/b` (`Property
+a/b not found in <compatible> binding`), where GRM-030 would refuse it. The
+completion of `&spi0/` is the exception: it offers the base's children
+(`05-completion.md` CO-12).
 
 **L-3. A multi-line description is indented on its first line only** in
 `list devices <compatible>`, and one that ends in a newline leaves an empty
@@ -610,32 +611,29 @@ mode shows `const`, `min` and `max`; the JSON `property` has `required`,
 `set` and `default` (LIST-054), but no const or range.
 
 **L-6. `list parent` with an unknown compatible isn't a refusal.** It is `ok:
-true` with severity `warn` (COM-050 says `info`), while `add` refuses the same
-compatible with the same message (ADD-013).
-
-**L-7.** *Closed.* Vendor SPI properties came back after narrowing; the
-narrowed binding now leaves them out too (LIST-038). `list property spi0` no
-longer lists `#address-cells` twice.
+true` with severity `warn` and error type `unknown-device-type` (LIST-090),
+while `add` refuses the same compatible with the same message (ADD-013).
 
 **L-8. `list value` and `add` disagree on phandle candidates.** `list value adc
 interrupt-parent` gives `gicv2` and `gpio`; `add`'s `missing_required` for
 the same property also gives `aon_intr` marked `disabled` (LIST-078).
 
 **L-9. `list devices` leaves out property patterns.** `list devices
-adi,adt7475` says `4 properties, 1 child node patterns`, and its JSON
+adi,adt7475` says `6 properties, 1 child node patterns`, and its JSON
 `device` has no entry for `^adi,bypass-attenuator-in[0-4]$`,
 `^adi,pin(5|10)-function$` or `^adi,pin(9|14)-function$`, which `list
 property` of such a node lists (LIST-034). A fix would be a `patterns` list
 in `device`, described like `properties`, and a count in the human line.
 
-**L-10. Fallback compatibles are offered as one joined string.** `list value
-/ compatible` (an RPi 4 base) offers `raspberrypi,4-model-b,brcm,bcm2711`,
-each value with the note `Values for property compatible are [[…]]`
-(LIST-079). Passed to `update / compatible`, it writes `compatible =
-"raspberrypi,4-model-b,brcm,bcm2711";`, one string, not the two the binding
-asks for. The binding layer (attach-lib `enum_value`) turns each option with
-`String(option)`. A fix would be to keep a fallback list's strings apart in
-the suggestion, and check and write them as a list of strings.
+**L-10. Fallback compatibles fail the binding's check.** `list value /
+compatible` (an RPi 4 base) offers each fallback list as its strings joined by
+a space (`raspberrypi,4-model-b brcm,bcm2711`, displayed
+`"raspberrypi,4-model-b", "brcm,bcm2711"`), each with the note `Values for
+property compatible are [[…]]` (LIST-079). Passed to `update / compatible`, it
+writes the two strings the binding asks for, but warns `compatible takes 1
+value, got 2` and `compatible takes one of raspberrypi,400,brcm,bcm2711, …,
+got raspberrypi,4-model-b`: the value check reads each option as one string. A
+fix would be to check a fallback list as a list of strings.
 
 **L-11. The `list property` input error names no node.** `list property
 testpart x` says `'analog-attach read <node> x' describes one property`,

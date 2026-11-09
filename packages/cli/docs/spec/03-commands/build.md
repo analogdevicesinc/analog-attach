@@ -246,10 +246,11 @@ for still compiles. It is up to the user to run `validate` first.
 **B-3. `--clean` is ignored with `build-command`.** The command runs as it
 is, without a word: `build --clean` doesn't delete the build directory.
 
-**B-4. Two wordings for an unset `capi-path`.** `build` and `deploy` say
+**B-4. Three wordings for an unset `capi-path`.** `build` and `deploy` say
 `capi-path is not configured. Run: analog-attach config capi-path <path>`,
-where every other command says `Setting "capi-path" is not configured. Run:
-analog-attach config capi-path <value>` (`02-common.md` COM-512).
+`init` adds `, or analog-attach for the guided setup` (INIT-509), and the
+other commands say `Setting "capi-path" is not configured. Run: analog-attach
+config capi-path <value>` (`02-common.md` COM-512).
 
 **B-5. dtc's errors in a full build cite the preprocessed file.** dtc reads
 `build.preprocessed.dts`, which `-P` leaves without line markers, so an

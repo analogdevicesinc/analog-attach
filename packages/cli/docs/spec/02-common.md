@@ -57,7 +57,7 @@ Exceptions:
 
 | Command | Differs from | How | Issue |
 |---|---|---|---|
-| `config` | COM-040, COM-072 | a problem with a settings file is an input error on standard error with status 2, not a refusal (`config.md` CONFIG-102, CONFIG-118); a value it can't store is a refusal (COM-043) | — |
+| `config` | COM-040, COM-072 | a problem with a settings file is an input error on standard error with status 2, not a refusal (`config.md` CONFIG-005, CONFIG-102, CONFIG-200); a value it can't take is a refusal (COM-043) | — |
 
 ## 3. Input errors
 
@@ -187,7 +187,7 @@ standard output and exit with status 130. (`add` and the setup run,
 |---|---|
 | 0 | The command answered: a success, or a refusal (COM-040, COM-041). Also `--help`, `--version` and `__complete`. A configuration error of a command (COM-071, COM-072). |
 | 1 | An error the CLI doesn't handle (COM-130), in both modes. |
-| 2 | Both modes: an input error (COM-031). `config`: a settings file it can't read or a value it can't store, in both modes (`config.md`). |
+| 2 | Both modes: an input error (COM-031). `config`: a settings file it can't read or write, in both modes (`config.md`). |
 | 130 | A question was stopped before anything was written (COM-060). |
 
 **COM-130** If a command throws an error, then the CLI shall write the
@@ -197,8 +197,9 @@ error, if anything: in JSON mode no response. (`skill install` with a
 read-only home, a `preprocess-command` that writes no output.)
 
 A JSON client MUST read `ok` to tell success from refusal. The exit status
-only separates "the CLI answered" (0) from "the request was malformed or the
-workspace unusable" (2) and "the command failed without answering" (1).
+only separates "the CLI answered" (0) from "the command line was malformed, or
+`config` couldn't read or write a settings file" (2) and "the command failed
+without answering" (1). An unusable workspace is a refusal (COM-071, COM-072).
 
 ## 8. Workspace loading
 
@@ -749,11 +750,6 @@ failed, although input errors exit 2 on standard error in both modes
 (COM-031). A fix would be: refusals and configuration errors exit 1 and write
 to standard error.
 
-**C-2.** *Fixed.* (`--json` with `--help` or `--version` printed nothing.
-`analog-attach --json add --help` and `--json --version` now print the help
-and the version on standard output with status 0; `analog-attach --json`
-alone writes the usage to standard error with status 2, GRM-008.)
-
 **C-3. Only `config` reports the problems of the settings files.** `config`
 shows the problems of COM-121 to COM-123 and COM-132 to COM-134 (`config.md`
 CONFIG-005, CONFIG-102). Every
@@ -775,16 +771,13 @@ goes through `preprocess-command` but the workfile doesn't (COM-100), so a
 workfile with `#include <dt-bindings/…>` or a macro doesn't load. Every write
 reprints the file from the tree (COM-103), dropping comments a user added.
 
-**C-7.** *Fixed.* (Read responses had no `ok`, `message` or `severity`; they
-now carry them alongside the node or property, READ-012.)
-
 **C-8. `read` loads the workspace before checking its arguments.** It calls
 the loader first and applies GRM-020 to GRM-023 and GRM-030 after (COM-030).
 `analog-attach --json read '&spi0'` in a workspace with nothing configured
-writes the configuration errors (exit 2) instead of `Use the bare form:
-spi0`, and `analog-attach read 'a b'` preprocesses the base before saying `a
-path is one token (join segments with /)`. A fix would be to check the
-arguments first, as `update` and `add` do.
+gives the configuration refusal (COM-071, status 0) instead of the input error
+`Use the bare form: spi0` (status 2), and `analog-attach read 'a b'`
+preprocesses the base before saying `a path is one token (join segments with
+/)`. A fix would be to check the arguments first, as `update` and `add` do.
 
 **C-9. Some stale caches aren't reported, or are reported wrongly.**
 COM-081 is silent when `validation.stamp.json` is missing although the cache
@@ -802,12 +795,13 @@ parses that old file as the base; one without it fails with the read error
 (COM-130). A fix would be to delete the output before running the command and
 to report a missing output as `devicetree: preprocessing <devicetree> failed`.
 
-**C-11. A configuration error is an input error under one command and a
-refusal under another.** A command's configuration errors are a refusal on
-standard output with status 0 (COM-071, COM-072), while `config` writes its
-own (a settings file it can't read, a value it can't store) to standard error
-with status 2, as a `config-error` object or as text under `--json`
-(`config.md` CONFIG-118).
+**C-11. A configuration error is an input error under `config` and a refusal
+under the other commands.** A command's configuration errors are a refusal on
+standard output with status 0 (COM-071, COM-072), while `config` writes a
+settings file it can't read to standard error with status 2: as a
+`config-error` object when it shows the settings (`config.md` CONFIG-005), and
+as text, even under `--json`, when it sets or resets one (CONFIG-102,
+CONFIG-200). A value it can't take is a refusal, as elsewhere (COM-043).
 
 **C-12. No-OS configuration problems come one at a time.** Where the backend
 is noos, an unset `capi-path`, a missing workfile or an unknown chip is a

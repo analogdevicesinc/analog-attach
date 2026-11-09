@@ -333,7 +333,7 @@ export interface CompletionResponse extends CommonResponse {
 
 /**
  * `completion [shell] [--install|--uninstall]`. A shell it doesn't know, or can't tell from
- * `$SHELL`, is an input error (attach-cli's CO-6 fix). The script is the text; under
+ * `$SHELL`, is an input error (COMPL-101). The script is the text; under
  * `--json` it is the response's `script`.
  */
 export function run_completion(shell: string | undefined, options: { install: boolean; uninstall: boolean }, place: CompletionPlace): Outcome<CompletionResponse> {

@@ -233,7 +233,5 @@ Deploy completed successfully
 
 ```
 $ analog-attach --json deploy --probe nope
-Unknown probe 'nope'. Supported: openocd, jlink
+{"ok":false,"message":"Unknown probe 'nope'. Supported: openocd, jlink","severity":"error","error_type":"unknown-choice"}
 ```
-
-(standard error, status 2.)

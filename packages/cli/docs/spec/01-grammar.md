@@ -300,15 +300,15 @@ marked *noos* where it is noos.
 | `deploy` | | noos: `--probe <probe>` |
 | `generate` (noos) | | `--output <directory>`, `--project-template <template>` |
 | `completion` | `[shell]` | `--install`, `--uninstall` |
-| `skill install` | `<name>` | `--force` |
-| `skill uninstall` | `<name>` | |
+| `skill install` | `[name]` | `--force` |
+| `skill uninstall` | `[name]` | |
 
 Positionals shown as `[…]` are optional for the grammar. What a command does
 without them is in its chapter: `read` with no path prints the workfile,
 `delete` with no path previews deleting all of it, `add` reports `Missing:
 compatible (add <compatible>)`, `enable`, `disable` and `update` report
-`Missing: path`. `list` alone, and `skill` alone, print their usage with
-status 0. Where the backend is linux, `list value` with a member reports the
+`Missing: path`, and `skill install` and `skill uninstall` list the skills.
+`list` alone, and `skill` alone, print their usage with status 0. Where the backend is linux, `list value` with a member reports the
 input error `A member is not supported by the linux backend: <member>`. Where the backend is noos, `list
 property` with a property is the input error of `03-commands/list.md`
 LIST-522, and `update` with more than two values that of UPDATE-501.
@@ -320,9 +320,6 @@ LIST-522, and `update` with more than two values that of UPDATE-501.
 GRM-023 (a trailing `/` still works, GRM-024): `&spi0` gives a not-found
 message instead of `Use the bare form`, and `spi0//x` resolves. `update`
 skips GRM-030 (`update.md` U-5).
-
-**G-2.** *Fixed.* (`-V` couldn't be an option's value. The version flag is
-now `-v` or `--version`, and only as the first element, GRM-015.)
 
 **G-3. Some elements that look like flags are positionals.** stricli reads
 an element as a flag only when it is `-` and a letter or `--` and two or more

@@ -111,8 +111,9 @@ number, marked *withdrawn*.
 
 Behaviour that looks unintended is still specified as it is, and listed at
 the end of its chapter as an open issue: `<letter(s)>-<n>`, unique within
-the chapter (`C-1` in `02-common.md`, `U-1` in `update.md`). Another chapter
-cites it with the file: `update.md` U-1.
+the chapter (`C-1` in `02-common.md`, `U-2` in `update.md`). Another chapter
+cites it with the file: `update.md` U-2. A fixed issue is dropped; its ID
+isn't used again.
 
 ### 3.4 Messages
 

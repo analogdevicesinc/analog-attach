@@ -8,8 +8,8 @@ noos backend's `analog-attach-noos`).
 ## 1. Synopsis
 
 ```
-analog-attach skill install <name> [--force]
-analog-attach skill uninstall <name>
+analog-attach skill install [<name>] [--force]
+analog-attach skill uninstall [<name>]
 ```
 
 Grammar: rule `skill` in `01-grammar.abnf`.
@@ -17,7 +17,7 @@ Grammar: rule `skill` in `01-grammar.abnf`.
 | Argument | Meaning | Default |
 |---|---|---|
 | `install`, `uninstall` | The action. Another word is an unknown command (GRM-004); `skill` alone writes its usage (GRM-018). | |
-| `<name>` | The skill: one of the backend's (SKILL-021). Required. | |
+| `<name>` | The skill: one of the backend's (SKILL-021). Without it, the skills are listed (SKILL-022). | |
 | `--force` | With `install`: install over an installed skill. | off |
 
 ## 2. Terms
@@ -113,12 +113,6 @@ absolute. A refusal is the common refusal (COM-040). Schema:
 
 ## 8. Open issues
 
-**S-2.** *Fixed.* (`--json` was ignored: both actions wrote their human text.
-They now answer JSON, SKILL-030.)
-
-**S-3.** *Fixed.* (An empty `HOME` installed into the CWD. The home is now
-the account's when `HOME` is unset.)
-
 **S-4. `skill uninstall` removes the whole directory.** Files the user added
 next to the skill's are deleted with it, while `skill install` keeps them
 (SKILL-003).
@@ -147,7 +141,7 @@ $ analog-attach --json skill uninstall analog-attach-linux
 $ analog-attach skill uninstall analog-attach-linux
 Skill analog-attach-linux is not installed.
 $ analog-attach skill install foo
-Unknown skill: foo. Skills of the linux backend: analog-attach-linux   (stderr, exit 2)
+Unknown skill: foo. Skills of the linux backend: analog-attach-linux
 $ analog-attach skill uninstall analog-attach-linux --force
 No flag registered for --force                         (stderr, exit 2)
 ```

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "config.schema.json",
   "title": "config responses",
-  "description": "Standard output of config in JSON mode: showing (CONFIG-015), setting (CONFIG-130), resetting (CONFIG-202), --reload (CONFIG-022), or a refusal. Problems with the settings files and refused values go to standard error (CONFIG-102, CONFIG-118). config is the front end's: the same shape for every backend; only the fields differ.",
+  "description": "Standard output of config in JSON mode: showing (CONFIG-015), setting (CONFIG-130), resetting (CONFIG-202), --reload (CONFIG-022), or a refusal: a value the setting can't take (CONFIG-103 to CONFIG-106, CONFIG-500 to CONFIG-504), a linux whose caches weren't built (CONFIG-122, CONFIG-123, CONFIG-023), or a --reload whose settings don't load (config-refusal, CONFIG-021). Problems with the settings files go to standard error with status 2: as config-error.schema.json when showing (CONFIG-005), as text when setting or resetting (CONFIG-102, CONFIG-200). config is the front end's: the same shape for every backend; only the fields differ.",
   "oneOf": [
     { "$ref": "#/$defs/fields" },
     { "$ref": "#/$defs/done" },
@@ -27,11 +27,11 @@
       "type": "object",
       "required": ["field_name", "category", "description", "type", "required", "default", "value", "source"],
       "properties": {
-        "field_name": { "type": "string", "description": "backend, or one of the backend's fields: linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, output, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password where the backend is linux; capi-path, module-paths, board, platform, workfile, bootstrap, interview, project-name, project-path, project-template, example, build-command, deploy-command, probe where it is noos (COM-500)." },
+        "field_name": { "type": "string", "description": "backend, or one of the backend's fields: linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, output, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password where the backend is linux; capi-path, module-paths, target, workfile, bootstrap, interview, project-name, project-path, project-template, example, build-command, deploy-command, probe, build-dir where it is noos (COM-500)." },
         "category": { "type": "string", "description": "The group the human table lists it under: General for backend; Workspace, Build and Deploy where the backend is linux; Sources, Target, Workfile, Project and Build where it is noos." },
         "description": { "type": "string" },
         "type": {
-          "description": "The kind; a setting with options gives them instead: a fixed list (overlay-syntax, output, probe; true and false for a noos bool), or the names the backend scans (noos board and platform, which are string when it finds none, CONFIG-510).",
+          "description": "The kind; a setting with options gives them instead: a fixed list (overlay-syntax, output, probe; true and false for a noos bool), or the names the backend scans (noos target, which is string when it finds none, CONFIG-510).",
           "oneOf": [
             { "enum": ["path", "path_list", "string", "numeric", "bool"] },
             {

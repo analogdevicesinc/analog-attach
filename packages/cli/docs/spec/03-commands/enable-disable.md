@@ -72,7 +72,11 @@ for `&spi0`, the second setting `status = "disabled"`, `enable spi0` writes
 still shows `"disabled"`. `update` writes to the fragment whose value
 applies (`update.md`). `enable` and `disable` should do the same.
 
-**E-2. The not-found message differs between modes, and from `read`'s.**
+**E-2. The not-found message differs between modes, and from `read`'s.** In
+human mode it is `Couldn't find node <path> in <base file> or <overlay file>`,
+in JSON mode `Not found: <path>`. Neither names the closest labels or the
+parent's children, as `read`, `update`, `delete`, `move` and `rename` do (`Not
+found: spi0/nope. spi0 has: …`).
 
 ## 7. Examples
 
