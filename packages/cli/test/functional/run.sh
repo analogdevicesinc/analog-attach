@@ -52,10 +52,11 @@ done
 # Relative to this folder, as the report names the files.
 [ ${#targets[@]} -eq 0 ] && targets=(noos linux conformity)
 
-# The Linux tree and its caches (linux-tree.sh), when the linux or conformity tests run.
+# The Linux tree and its caches (linux-tree.sh), when the linux, conformity or Linux end-to-end
+# tests run.
 for target in "${targets[@]}"; do
 	case "$target" in
-		linux | linux/* | conformity | conformity/*) "$here/linux-tree.sh" >/dev/null || exit 2; break ;;
+		linux | linux/* | conformity | conformity/* | e2e | e2e/linux-*) "$here/linux-tree.sh" >/dev/null || exit 2; break ;;
 	esac
 done
 

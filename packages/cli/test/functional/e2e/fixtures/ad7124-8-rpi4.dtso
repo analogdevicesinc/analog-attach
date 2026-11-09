@@ -1,0 +1,40 @@
+/dts-v1/;
+/plugin/;
+/ {
+	fragment@0 {
+		target = <&spi1>;
+		__overlay__ {
+			status = "okay";
+			ad7124_8: adi,ad7124-8@0 {
+				compatible = "adi,ad7124-8";
+				reg = <0>;
+				clocks = <&fixed_clock>;
+				clock-names = "mclk";
+				interrupt-parent = <&gpio>;
+				interrupts = <25 2>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				refin1-supply = <&vdd_3v3_reg>;
+				channel@0 {
+					reg = <0>;
+					diff-channels = <0 1>;
+					bipolar;
+				};
+				channel@10 {
+					reg = <10>;
+					diff-channels = <2 3>;
+				};
+			};
+		};
+	};
+	fragment@1 {
+		target-path = "/clocks";
+		__overlay__ {
+			fixed_clock: fixed-clock {
+				compatible = "fixed-clock";
+				#clock-cells = <0>;
+				clock-frequency = <614400>;
+			};
+		};
+	};
+};

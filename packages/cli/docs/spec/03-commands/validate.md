@@ -171,7 +171,7 @@ in the order of VALIDATE-020.
 node path split at `/` without empty segments, followed by its property path
 (`["node0", "adc@5", "reg"]`). An entry's `message` shall be dt-validate's
 `formatted` text when there is one (for an address warning with a hint,
-`<message>; <hint>`), and its `message` otherwise.
+`<message>; <hint>`), and its `message` otherwise. (Open issue V-16.)
 
 **VALIDATE-029** An entry's `error_type` (`02-common.md` COM-051) shall be
 `resource-conflict` for an address warning (§7); `missing-required` for a
@@ -379,7 +379,10 @@ to rebuild that mapping from the fragment order.
 **V-2. Unresolved references aren't reported.** A reference to a label that
 is in neither the base nor the overlay passes dtc and gives misleading
 dt-validate errors (`interrupts: [[5], [1]] is too long`) instead of a message
-naming the reference (VALIDATE-030).
+naming the reference (VALIDATE-030). The first example of `adi,adxl345.yaml`
+hits it: after `add adi,adxl345 --template example:1 --parent i2c1`, which
+lists `interrupt-parent → &gpio0` as unresolved, `validate` reports only
+`interrupts: [[0], [4]] is too long`.
 
 **V-3. The stand-in interrupt controller has one cell.** VALIDATE-005 gives a
 fragment without an `interrupt-parent` label a controller with
@@ -447,6 +450,14 @@ deletes both from the full tree: dt-schema's gpio fixup crashes on the RPi
 **V-15. Two path forms in one response.** With `--full`, JSON `path`s of the
 validation tree's diagnostics start with `node<N>` (V-1), and those of the
 full run with the absolute path (VALIDATE-044).
+
+**V-16. JSON messages name the scratch file.** dt-validate's `formatted` text
+(VALIDATE-022) starts with the file it checked and ends with the schema's
+`$id`: `.analog-attach/linux/temp.dtb: accelerometer@2a (adi,adxl345):
+interrupts: [[0], [4]] is too long\n\tfrom schema $id:
+http://devicetree.org/schemas/iio/accel/adi,adxl345.yaml`. The file is a
+scratch file of the CLI's (VALIDATE-028), not one the user wrote. Human mode
+(VALIDATE-024) shows dt-validate's `message`, without either.
 
 ## 10. Examples
 
