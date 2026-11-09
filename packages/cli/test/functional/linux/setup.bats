@@ -346,7 +346,8 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 # bats test_tags=req:CONFIG-08, id:L0299
 @test "the setup builds the binding caches when they aren't built, saying that it takes time" {
 	rm "$PROJECT/.analog-attach/linux/"*.json
-	tty_run "(Y/n)" $'\r' --
+	# Compiling the binding schemas takes more than tty_run's 20 s on a slow CI runner.
+	TTY_TIMEOUT=120 tty_run "(Y/n)" $'\r' --
 	assert_success
 	assert_output --partial "Indexing device bindings and compiling binding schemas..."
 	assert_output --regexp "Indexed [0-9]+ compatibles from [0-9]+ bindings"
