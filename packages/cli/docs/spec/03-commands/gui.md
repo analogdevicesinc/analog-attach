@@ -24,6 +24,9 @@ in the project folder, its arguments given as an array (no shell). The server's 
 | `GET /api/project`, `POST /api/project { dir, create? }` | the project folder (`POST` changes it; with `create: true` it makes the folder first, for a new project), whether it has project settings, and its `backend` |
 | `POST /api/run { args }` | one CLI run: `{ code, stdout, stderr, json? }`, `json` when stdout is JSON |
 | `POST /api/stream { args }` | one CLI run, its output as it comes, then `\0exit <code>` (build, deploy) |
+| `GET /api/claude` | whether Claude Code is there: `{ available, version? }` (GUI-009) |
+| `POST /api/claude { message, context? }` | one chat message: Claude Code's events as they come (stream-json, a JSON object per line), then `{"type":"gui_done","code":<n>}`; 409 while another is being answered |
+| `POST /api/claude/stop`, `POST /api/claude/reset` | stop the message being answered; forget the project's conversation |
 
 **GUI-004** The CLI shall run until it is stopped (Ctrl-C, SIGINT), then write `Stopped the GUI
 at <url>` and exit with status 0.
@@ -59,6 +62,24 @@ otherwise, the page opens on the part of the project's backend. **New project** 
 folder, made when it doesn't exist, and opens it on the setup; **Setup** in the header reopens
 it. The noos part creates the workfile (`init`) when there is none; the Linux part is a
 placeholder for now.
+
+**GUI-009** Where the backend is noos, the page shall have a **chat with Claude**: a ✦ Claude
+button in the console bar opens a panel where the user writes what to change. For each message the
+server runs the user's own Claude Code (`claude`, or `$ANALOG_ATTACH_CLAUDE`) headless in the
+project folder: `claude -p <message> --output-format stream-json --verbose
+--include-partial-messages --permission-mode dontAsk --allowedTools "Bash(analog-attach:*)"
+--disallowedTools "Bash(analog-attach gui:*)" --append-system-prompt <where it is>`, and
+`--resume <session>` for the next messages of the project's conversation. So:
+
+- Claude may run `analog-attach` commands, and nothing else: any other tool is refused at once
+  (`dontAsk`), never waiting for an approval nobody can give; the panel shows a refusal as one.
+- The `analog-attach` it runs is the GUI's own CLI: a script of that name, first on its PATH.
+- The panel shows Claude's text as it writes it, each command it runs with its output, and what
+  it cost; each command shows in the console too, marked ✦. After each command the part reads
+  the project again, so the change shows beside the chat.
+- It uses the user's Claude Code login; without Claude Code the panel says how to get it, and
+  without the `analog-attach-noos` skill it offers to install it (`skill install`).
+- Stop ends the answer; New chat forgets the conversation (the next message starts another).
 
 **GUI-006** Where the backend isn't noos, `gui` shall be left out of the help and of completion
 (GEN-03); typed, it still runs, and the page says it handles noos projects for now.

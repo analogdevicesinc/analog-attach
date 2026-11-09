@@ -131,3 +131,62 @@ gui_run() {
 	run curl -s --path-as-is "$GUI_URL/../../../etc/passwd"
 	assert_output --partial "not found"
 }
+
+# `stand_in_claude`: a `claude` for the chat ($ANALOG_ATTACH_CLAUDE), no real Claude. Each run
+# saves its arguments as run<n> in $CLAUDE_RUNS, runs `analog-attach --version` through PATH as
+# Claude would, and prints Claude-like stream-json events with what that answered.
+stand_in_claude() {
+	export CLAUDE_RUNS="$BATS_TEST_TMPDIR/claude-runs"
+	mkdir -p "$CLAUDE_RUNS"
+	cat >"$BATS_TEST_TMPDIR/claude" <<'SH'
+#!/bin/bash
+if [ "$1" = --version ]; then echo "9.9.9 (Claude Code)"; exit 0; fi
+printf '%s\n' "$@" >"$CLAUDE_RUNS/run$(ls "$CLAUDE_RUNS" | wc -l)"
+answer=$(analog-attach --version)
+echo '{"type":"system","subtype":"init","session_id":"stand-in-session"}'
+echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"analog-attach --version"}}]}}'
+jq -cn --arg answer "$answer" '{type: "user", message: {content: [{type: "tool_result", tool_use_id: "t1", content: $answer}]}}'
+echo '{"type":"result","subtype":"success","total_cost_usd":0}'
+SH
+	chmod +x "$BATS_TEST_TMPDIR/claude"
+	export ANALOG_ATTACH_CLAUDE="$BATS_TEST_TMPDIR/claude"
+}
+
+# Description: the GUI's chat runs Claude Code in the project, allowed analog-attach commands only,
+# with the GUI's own CLI; the next message continues the conversation, and a new chat starts over.
+# Steps:
+#   1. Put a stand-in claude in place, and start the GUI in the background.
+#   2. GET /api/claude; check Claude is available, with the stand-in's version.
+#   3. POST a message to /api/claude; check the answer streams the stand-in's events, its command
+#      answered with the CLI's own version (the GUI's analog-attach), then ends with gui_done 0.
+#   4. Check claude was run with -p and the message, --permission-mode dontAsk, --allowedTools
+#      Bash(analog-attach:*), analog-attach gui disallowed, and no --resume.
+#   5. POST a second message; check it was run with --resume stand-in-session.
+#   6. POST /api/claude/reset, then a third message; check it has no --resume.
+# bats test_tags=id:N0287
+@test "the GUI's chat runs Claude with analog-attach commands only, one conversation per project" {
+	need curl
+	stand_in_claude
+	start_gui
+	run gui_api /api/claude
+	assert_output '{"available":true,"version":"9.9.9 (Claude Code)"}'
+	run gui_api /api/claude '{"message":"what version is this?"}'
+	assert_line --index 0 '{"type":"system","subtype":"init","session_id":"stand-in-session"}'
+	[ "$(jq -sr '.[] | select(.type == "user") | .message.content[0].content' <<<"$output")" = "$(aa --version)" ] ||
+		fail "the command didn't run the GUI's CLI: $output"
+	[ "$(jq -sc '.[-1] | {type, code}' <<<"$output")" = '{"type":"gui_done","code":0}' ] || fail "no gui_done 0: $output"
+	run cat "$CLAUDE_RUNS/run0"
+	assert_line --index 0 -p
+	assert_line --index 1 "what version is this?"
+	assert_output --regexp $'--permission-mode\ndontAsk'
+	assert_output --regexp $'--allowedTools\nBash\\(analog-attach:\\*\\)'
+	assert_output --regexp $'--disallowedTools\nBash\\(analog-attach gui:\\*\\)'
+	refute_output --partial -- "--resume"
+	gui_api /api/claude '{"message":"and again?"}' >/dev/null
+	run cat "$CLAUDE_RUNS/run1"
+	assert_output --regexp $'--resume\nstand-in-session'
+	gui_api /api/claude/reset '{}' >/dev/null
+	gui_api /api/claude '{"message":"a new chat"}' >/dev/null
+	run cat "$CLAUDE_RUNS/run2"
+	refute_output --partial -- "--resume"
+}

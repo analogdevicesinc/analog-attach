@@ -41,7 +41,9 @@ async function open_setup() {
 	state.setup = true;
 	$("main").hidden = true;
 	$("setup").hidden = false;
-	$("header-actions").innerHTML = "";
+	// The part's buttons stay its own: hidden during the setup, shown again after.
+	$("header-actions").hidden = true;
+	$("console-actions").hidden = true;
 	set_chips(state.project?.backend ? `${state.project.backend} project` : "new project", { text: "setting up", kind: "warn" });
 	await run_setup({
 		root: $("setup"),
@@ -58,6 +60,8 @@ async function open_part() {
 	state.setup = false;
 	$("setup").hidden = true;
 	$("main").hidden = false;
+	$("header-actions").hidden = false;
+	$("console-actions").hidden = false;
 	const backend = state.project?.backend;
 	const ecosystem = ECOSYSTEMS[backend];
 	if (ecosystem === undefined) {
@@ -73,9 +77,11 @@ async function open_part() {
 	fresh.id = "main";
 	$("main").replaceWith(fresh);
 	$("header-actions").innerHTML = "";
+	$("console-actions").innerHTML = "";
 	const part = await ecosystem.mount({
 		main: $("main"),
 		header_actions: $("header-actions"),
+		console_actions: $("console-actions"),
 		project: state.project,
 		set_chips,
 		reload_project,

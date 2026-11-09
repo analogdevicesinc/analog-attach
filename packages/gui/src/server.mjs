@@ -20,6 +20,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { create_chat } from "./claude.mjs";
 
 export const DEFAULT_PORT = 5177;
 const PAGE_ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -69,6 +70,7 @@ export function start_gui({ cli, project, port = DEFAULT_PORT, root = PAGE_ROOT 
 	const token = crypto.randomBytes(24).toString("hex");
 	let origins = new Set();
 	const [command, ...prefix] = cli;
+	const chat = create_chat({ cli });
 
 	/** Run the CLI to completion: exit code, stdout, stderr, and stdout parsed when it is JSON. */
 	const run = args => new Promise(resolve => {
@@ -149,6 +151,26 @@ export function start_gui({ cli, project, port = DEFAULT_PORT, root = PAGE_ROOT 
 				return;
 			}
 
+			// The chat with Claude (claude.mjs): whether it is there, a message, stop, a new chat.
+			if (url.pathname === "/api/claude" && request.method === "GET") {
+				send(response, 200, await chat.status());
+				return;
+			}
+			if (url.pathname === "/api/claude" && request.method === "POST") {
+				const { message, context } = await read_body(request);
+				chat.answer(folder, message, context, response);
+				return;
+			}
+			if (url.pathname === "/api/claude/stop" && request.method === "POST") {
+				send(response, 200, { stopped: chat.stop() });
+				return;
+			}
+			if (url.pathname === "/api/claude/reset" && request.method === "POST") {
+				chat.reset(folder);
+				send(response, 200, { reset: true });
+				return;
+			}
+
 			// Long commands (build, deploy): the output as it comes, then a last line with the exit code.
 			if (request.method === "POST" && url.pathname === "/api/stream") {
 				const { args } = await read_body(request);
@@ -172,6 +194,7 @@ export function start_gui({ cli, project, port = DEFAULT_PORT, root = PAGE_ROOT 
 		}
 	});
 
+	server.on("close", () => chat.close());
 	return new Promise((resolve, reject) => {
 		server.once("error", reject);
 		server.listen(port, "127.0.0.1", () => {

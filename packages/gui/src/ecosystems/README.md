@@ -37,6 +37,7 @@ export async function mount(context) {
 |---|---|
 | `main` | The part's element: a fresh `<main>` for each project. Draw in it, and put the part's listeners on it (or below), never on `document`. Its grid layout is the noos one by default; set `main.style` for another |
 | `header_actions` | A `<span>` in the header for the part's own buttons (noos: Validate) |
+| `console_actions` | A `<span>` in the console bar, before Clear and Hide, for the part's buttons there (noos: ✦ Claude) |
 | `project` | `{ dir, settings, backend }`: the folder, whether it has project settings, its backend |
 | `set_chips(board, { text, kind })` | The header's two chips: the board, and the status (`kind`: `ok`, `warn`, `err`) |
 | `reload_project()` | After a change that may concern the core (a setting saved, the backend itself): the core reads the project again, and mounts another part when the backend changed |

@@ -1,0 +1,31 @@
+/* The noos part's chat with Claude (chat.mjs): a panel on the right, below the header. While it
+   is open, the views and the console make room for it. */
+.claude { position: fixed; top: 55px; right: 0; bottom: 0; width: 420px; background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; z-index: 8; }
+body.with-claude main, body.with-claude footer { margin-right: 420px; }
+.claude-bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.claude-bar .subtle { font-size: 12px; }
+.claude-notice { background: var(--warn-soft); color: var(--warn); padding: 8px 12px; font-size: 13px; }
+.claude-notice button { margin-left: 6px; padding: 2px 10px; }
+.claude-messages { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.claude-hint { color: var(--muted); font-size: 13px; }
+.claude-msg { border-radius: 10px; padding: 8px 12px; max-width: 92%; overflow-wrap: anywhere; }
+.claude-msg.user { align-self: flex-end; background: var(--accent-soft); }
+.claude-msg.assistant { align-self: flex-start; background: var(--panel-2); }
+.claude-msg.error { align-self: stretch; background: var(--err-soft); color: var(--err); }
+.claude-msg pre, .claude-cmd pre { background: var(--console-bg); color: var(--console-fg); border-radius: 6px; padding: 8px; overflow: auto; font-family: var(--mono); font-size: 12px; margin: 6px 0 0; white-space: pre-wrap; }
+.claude-table { border-collapse: collapse; margin: 6px 0; font-size: 12.5px; width: auto; }
+.claude-table th, .claude-table td { border: 1px solid var(--line); padding: 3px 8px; text-align: left; }
+.claude-msg code { font-family: var(--mono); font-size: 12.5px; background: var(--chip); border-radius: 4px; padding: 0 4px; }
+.claude-cmd { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; }
+.claude-cmd.done { border-left-color: var(--ok); }
+.claude-cmd.failed { border-left-color: var(--warn); }
+.claude-cmd.refused { border-left-color: var(--err); }
+.claude-cmd summary { color: var(--muted); cursor: pointer; font-size: 12px; margin-top: 4px; }
+.claude-refused { color: var(--err); font-size: 12px; margin-top: 4px; }
+.claude-meta { color: var(--muted); font-size: 11.5px; text-align: center; }
+.claude-input { border-top: 1px solid var(--line); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.claude-input textarea { width: 100%; resize: vertical; font: inherit; }
+@media (max-width: 900px) {
+	.claude { width: 100%; }
+	body.with-claude main, body.with-claude footer { margin-right: 0; }
+}

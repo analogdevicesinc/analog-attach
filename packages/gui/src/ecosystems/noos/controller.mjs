@@ -3,7 +3,8 @@
 // after the project setup; every action is an `analog-attach` command (../../core/ui.mjs).
 // See ../README.md for what a part of an ecosystem is given and gives back.
 
-import { $, cli, esc, first_line, log, shell_quote, stream, toast } from "../../core/ui.mjs";
+import { $, cli, esc, first_line, log, stream, toast } from "../../core/ui.mjs";
+import { mount_chat } from "./chat.mjs";
 
 export const title = "noos (CAPI)";
 export const about = "Firmware for a microcontroller board: no-OS drivers on CAPI, generated, built and flashed.";
@@ -62,6 +63,20 @@ export async function mount(context) {
 		await refresh();
 	};
 	bind_events();
+	mount_chat({
+		main,
+		button_area: context.console_actions,
+		// What Claude is told of the page: a noos project, and what the user is looking at.
+		context: () => [
+			"This is a noos (CAPI) project: follow the analog-attach-noos skill.",
+			state.selected ? `The user has the node ${state.selected} open in the GUI.` : "",
+		].join(" "),
+		changed: () => {
+			state.devices = null;
+			return refresh();
+		},
+		cli,
+	});
 	// The graph follows the theme.
 	window.addEventListener("aa-theme", () => { if (state.view === "graph") render_graph(); });
 	await refresh();
