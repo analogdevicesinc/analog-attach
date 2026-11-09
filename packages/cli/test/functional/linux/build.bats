@@ -234,7 +234,8 @@ duplicate_labels() {
 	assert_output --partial 'compatible = "adi,adxl345";'
 	[ "$(head -c 4 "$PROJECT/build/overlay.dtb" | od -An -tx1 | tr -d ' ')" = d00dfeed ]
 	run dtc -I dtb -O dts "$PROJECT/build/overlay.dtb"
-	assert_output --partial '"raspberrypi,4-model-b"'
+	# dtc 1.7.0 prints a string list as "a\0b", later ones as "a", "b"
+	assert_output --partial 'compatible = "raspberrypi,4-model-b'
 	assert_output --partial 'compatible = "adi,adxl345";'
 	refute_output --partial '__fixups__'
 }
