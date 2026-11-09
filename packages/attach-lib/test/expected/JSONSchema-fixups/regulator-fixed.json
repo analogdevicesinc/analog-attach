@@ -9,7 +9,38 @@
             ],
             "patternProperties": {
                 ".*-supply$": {
-                    "description": "Input supply phandle(s) for this node"
+                    "description": "Input supply phandle(s) for this node",
+                    "dtType": "phandle",
+                    "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
+                        "maxItems": 1,
+                        "minItems": 1,
+                        "type": "array"
+                    },
+                    "maxItems": 1,
+                    "minItems": 1,
+                    "type": "array"
                 },
                 "^regulator-state-(standby|mem|disk)$": {
                     "additionalProperties": false,

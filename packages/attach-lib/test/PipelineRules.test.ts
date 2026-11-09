@@ -616,3 +616,38 @@ properties:
         expect(property(parsed_binding, '#foo-cells')?._t).toBe('list');
     });
 });
+
+describe('selected patterns that are a node or a property', () => {
+    const pattern = (binding: ParsedBinding, key: string) => binding.property_patterns?.find(rule => rule.pattern === key)?.value;
+
+    // dt-core.yaml's `.*-supply$` is a node or a phandle: a binding's pattern of the key is the phandle
+    test('a binding\'s .*-supply$ pattern is the phandle of dt-core\'s', async () => {
+        const { parsed_binding } = await parsed('supply-pattern', `
+properties:
+  compatible:
+    const: x,y
+patternProperties:
+  ".*-supply$":
+    description: Input supply phandle(s) for this node
+`);
+        expect(pattern(parsed_binding, '.*-supply$')).toStrictEqual({
+            _t: 'matrix',
+            minItems: 1,
+            maxItems: 1,
+            rows: [{ _t: 'list', item: { _t: 'any' }, minItems: 1, maxItems: 1 }],
+            description: 'Input supply phandle(s) for this node',
+        });
+    });
+
+    test('a child-node pattern of dt-core\'s is merged into nothing', async () => {
+        const { parsed_binding } = await parsed('node-pattern', `
+properties:
+  compatible:
+    const: x,y
+patternProperties:
+  "^__.*__$":
+    description: Not a node here
+`);
+        expect(pattern(parsed_binding, '^__.*__$')).toMatchObject({ _t: 'unknown' });
+    });
+});

@@ -60,8 +60,9 @@ const loaded = new Map<string, Promise<SelectedDefinitions>>();
 /**
  * The properties of the schemas dt-validate applies to every node (`select: true`: dt-core.yaml, clock.yaml, iio.yaml,
  * nvmem-consumer.yaml, pinctrl-consumer.yaml), each dereferenced and fixed up in its file, as dt-schema processes every
- * schema on its own. Their own `properties` and the patterns of properties: not `$nodename`, nor the patterns of nodes,
- * nor an `if` / `then`. A file that doesn't dereference gives nothing. Read once per set of search paths.
+ * schema on its own. Their own `properties` and the patterns of properties (of a pattern that is a node or a property,
+ * the property: `property_patterns`): not `$nodename`, nor the patterns of nodes, nor an `if` / `then`. A file that
+ * doesn't dereference gives nothing. Read once per set of search paths.
  */
 export function selected_definitions(ctx: SchemaContext): Promise<SelectedDefinitions> {
     const key = ctx.search_paths.map(({ dir }) => dir).join("\n");
@@ -81,7 +82,7 @@ export function selected_definitions(ctx: SchemaContext): Promise<SelectedDefini
 
             const schema = apply_JSONSchema_fixups(dereferenced.value as DtBindingSchema, ctx.property_types);
             add_definitions(definitions.properties, schema.properties, name => name.startsWith("$"));
-            add_definitions(definitions.patterns, schema.patternProperties, (_, definition) => is_object_schema(definition));
+            add_definitions(definitions.patterns, property_patterns(schema.patternProperties));
         }
         return definitions;
     })();
@@ -123,6 +124,23 @@ function without_nodes(selected: unknown): unknown {
         else if (kept.length > 0) { result[key] = kept; }
     }
     return result;
+}
+
+/**
+ * The patterns of `table` that name properties, each without its node branches: dt-core.yaml's `.*-supply$` is a node
+ * or a phandle, so the phandle. A pattern of nodes only (`^__.*__$`, a `oneOf` of nodes) is left out.
+ */
+function property_patterns(table: unknown): Schema | undefined {
+    if (!is_schema(table)) { return undefined; }
+
+    const node_branches_only = (definition: Schema) => ["oneOf", "anyOf"].some(key => {
+        const branches = definition[key];
+        return Array.isArray(branches) && branches.length > 0 && branches.every(branch => is_object_schema(branch));
+    });
+    return Object.fromEntries(Object.entries(table).flatMap(([pattern, definition]) => {
+        const kept = without_nodes(definition);
+        return (is_schema(definition) && node_branches_only(definition)) || is_object_schema(kept) ? [] : [[pattern, kept]];
+    }));
 }
 
 /** `definition` merged with the definitions of it in the `select: true` schemas, `everywhere`. */
