@@ -2,7 +2,7 @@
 // the current directory. It starts the GUI's server on 127.0.0.1, which runs this same CLI for
 // every action of the page, opens the page in the browser, and runs until stopped (Ctrl-C).
 // The page is packages/gui's own when the CLI runs from the repository, else the copy bundled
-// with the CLI (`bundled/gui/index.html`). It handles noos projects for now: elsewhere, help and
+// with the CLI (`bundled/gui/`). It handles noos projects for now: elsewhere, help and
 // completion leave it out.
 
 import { spawn } from "node:child_process";
@@ -19,12 +19,13 @@ export interface GuiResponse extends CommonResponse {
 }
 
 /**
- * The page: the GUI package's own when the CLI runs from the repository (so an edit shows on a
- * reload, with no build), else the copy bundled with the CLI.
+ * The page's folder (index.html, core/, ecosystems/): the GUI package's own when the CLI runs
+ * from the repository (so an edit shows on a reload, with no build), else the copy bundled
+ * with the CLI.
  */
 function page(root: string): string | undefined {
-    const candidates = [path.join(root, "..", "gui", "src", "index.html"), path.join(root, "bundled", "gui", "index.html")];
-    return candidates.find(candidate => fs.existsSync(candidate));
+    const candidates = [path.join(root, "..", "gui", "src"), path.join(root, "bundled", "gui")];
+    return candidates.find(candidate => fs.existsSync(path.join(candidate, "index.html")));
 }
 
 /** Open a URL in the user's browser; nothing when no opener is there (the URL is printed anyway). */
@@ -42,10 +43,10 @@ function open_browser(url: string): void {
 async function run_gui(front: FrontEnd, root: string, port_text: string | undefined, server_only: boolean, session: Session): Promise<Outcome<GuiResponse>> {
     const port = port_text === undefined ? DEFAULT_PORT : Number(port_text);
     if (!Number.isInteger(port) || port < 0 || port > 65_535) { return input_error(`--port takes a port number (0 to 65535), got ${port_text ?? ""}`); }
-    const html = page(root);
-    if (html === undefined) { throw new Error(`The GUI's page is missing: no ${path.join(root, "bundled", "gui", "index.html")}`); }
+    const folder = page(root);
+    if (folder === undefined) { throw new Error(`The GUI's page is missing: no ${path.join(root, "bundled", "gui", "index.html")}`); }
     const cli = [process.execPath, path.join(root, "dist", "cli.js")];
-    const { server, url } = await start_gui({ cli, project: session.cwd, port, html });
+    const { server, url } = await start_gui({ cli, project: session.cwd, port, root: folder });
     session.warn(`${front.program} GUI on ${url}  (project: ${session.cwd}). Stop it with Ctrl-C.`);
     if (!server_only) { open_browser(url); }
     await new Promise<void>(resolve => {

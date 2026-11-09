@@ -23,23 +23,37 @@ start_gui() {
 	local tries
 	for tries in $(seq 1 50); do
 		GUI_URL=$(grep -o 'http://127\.0\.0\.1:[0-9]*' "$BATS_TEST_TMPDIR/gui.err" || true)
-		[ -n "$GUI_URL" ] && return 0
+		if [ -n "$GUI_URL" ]; then
+			# The API answers the GUI's own page only: the token the server wrote into it.
+			GUI_TOKEN=$(curl -s "$GUI_URL/" | grep -o 'name="aa-token" content="[^"]*"' | cut -d'"' -f4)
+			return 0
+		fi
 		sleep 0.2
 	done
 	fail "the GUI didn't start: $(cat "$BATS_TEST_TMPDIR/gui.err")"
+}
+
+# `gui_api <path> [<json body>]`: a call to the GUI's API, as its page makes it (with the token).
+gui_api() {
+	if [ $# -eq 1 ]; then
+		curl -s -H "x-aa-token: $GUI_TOKEN" "$GUI_URL$1"
+	else
+		curl -s -X POST -H "x-aa-token: $GUI_TOKEN" -H 'content-type: application/json' --data-binary "$2" "$GUI_URL$1"
+	fi
 }
 
 # `gui_run <args>...`: one CLI run through the GUI's API; prints the CLI's JSON answer.
 gui_run() {
 	# Each word a JSON string, then all of them an array (jq --args would take --json as its own).
 	printf '%s\n' "$@" | jq -R . | jq -sc '{ args: . }' |
-		curl -s -X POST -H 'content-type: application/json' --data-binary @- "$GUI_URL/api/run" | jq -c .json
+		curl -s -X POST -H "x-aa-token: $GUI_TOKEN" -H 'content-type: application/json' --data-binary @- "$GUI_URL/api/run" | jq -c .json
 }
 
 # Description: gui serves the page and runs the CLI for it, in the project, until it is stopped.
 # Steps:
 #   1. Run gui --server-only --port 0 in the background; check it says where it serves the GUI.
-#   2. Check the page is served, and /api/project names the project folder and the noos backend.
+#   2. Check the page is served, with a token, and /api/project names the project folder and the
+#      noos backend.
 #   3. Through the API, run init, add eval-testpart and read; check each answers, the add with its
 #      wiring, and read lists the nodes.
 #   4. Stop it with Ctrl-C (SIGINT); check it says it stopped.
@@ -49,7 +63,7 @@ gui_run() {
 	start_gui
 	run curl -s "$GUI_URL/"
 	assert_output --partial "<title>Attach Studio</title>"
-	run curl -s "$GUI_URL/api/project"
+	run gui_api /api/project
 	assert_output "{\"dir\":\"$PROJECT\",\"settings\":true,\"backend\":\"noos\"}"
 	[ "$(gui_run init --json | jq -r .ok)" = true ]
 	[ "$(gui_run add eval-testpart --json | jq -r '.wiring | length')" = 1 ]
@@ -84,10 +98,36 @@ gui_run() {
 	need curl
 	start_gui
 	local fresh="$BATS_TEST_TMPDIR/fresh/project"
-	run curl -s -X POST -H 'content-type: application/json' -d "{\"dir\":\"$fresh\",\"create\":true}" "$GUI_URL/api/project"
+	run gui_api /api/project "{\"dir\":\"$fresh\",\"create\":true}"
 	[ -d "$fresh" ] || fail "no folder made: $output"
 	assert_output "{\"dir\":\"$fresh\",\"settings\":false,\"backend\":null}"
-	run curl -s -X POST -H 'content-type: application/json' -d "{\"dir\":\"$BATS_TEST_TMPDIR/absent\"}" "$GUI_URL/api/project"
+	run gui_api /api/project "{\"dir\":\"$BATS_TEST_TMPDIR/absent\"}"
 	assert_output --partial "Not a folder"
 	[ ! -e "$BATS_TEST_TMPDIR/absent" ]
+}
+
+# Description: the GUI's API answers only the GUI's own page: a call without its token, from
+# another origin, or for another host is refused, and runs nothing.
+# Steps:
+#   1. Start the GUI in the background.
+#   2. POST /api/run setting build-command with no token, as a text/plain body (what another web
+#      page could send); check it is refused (not the GUI's page).
+#   3. Send the same with the token but from another Origin, then for another Host; check each is
+#      refused.
+#   4. Check build-command is still unset, and a file outside the page's folder isn't served.
+# bats test_tags=id:N0286
+@test "the GUI's API answers only its own page" {
+	need curl
+	start_gui
+	local body='{"args":["config","build-command","touch pwned"]}'
+	run curl -s -X POST -H 'content-type: text/plain' --data-binary "$body" "$GUI_URL/api/run"
+	assert_output --partial "not the GUI's page"
+	run curl -s -X POST -H "x-aa-token: $GUI_TOKEN" -H 'Origin: http://evil.example' -H 'content-type: application/json' --data-binary "$body" "$GUI_URL/api/run"
+	assert_output --partial "not the GUI's page"
+	run curl -s -X POST -H "x-aa-token: $GUI_TOKEN" -H "Host: evil.example:${GUI_URL##*:}" -H 'content-type: application/json' --data-binary "$body" "$GUI_URL/api/run"
+	assert_output --partial "not the GUI's page"
+	run_json config build-command
+	assert_json '.configs[0].value' null
+	run curl -s --path-as-is "$GUI_URL/../../../etc/passwd"
+	assert_output --partial "not found"
 }

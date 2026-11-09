@@ -10,6 +10,6 @@ export function start_gui(options: {
     project: string;
     /** 127.0.0.1's port; 0 for any free one. Default DEFAULT_PORT. */
     port?: number;
-    /** The page to serve. Default: index.html next to the server. */
-    html?: string;
-}): Promise<{ server: Server; url: string }>;
+    /** The folder of the page (index.html, core/, ecosystems/). Default: the server's own. */
+    root?: string;
+}): Promise<{ server: Server; url: string; token: string }>;

@@ -1,7 +1,11 @@
 #!/usr/bin/env node
-// The GUI's server: it serves index.html and runs the CLI for the page. Every action in the
-// page is one `analog-attach <args>` run in the project folder. Arguments are passed as an
-// array to spawn (no shell), and the server only listens on 127.0.0.1.
+// The GUI's server: it serves the page (index.html, core/, ecosystems/) and runs the CLI for it.
+// Every action in the page is one `analog-attach <args>` run in the project folder. Arguments
+// are passed as an array to spawn (no shell), and the server only listens on 127.0.0.1.
+//
+// Any page the browser opens can send requests to 127.0.0.1, so the API answers only the GUI's
+// own page: each call carries the token the server wrote into that page (x-aa-token), from the
+// GUI's own origin (Origin, Host). Without them, a call is refused (403).
 //
 // `analog-attach gui` starts it (packages/cli, src/front/gui.ts). On its own, for working on the
 // page:
@@ -11,13 +15,24 @@
 // runs the `analog-attach` on PATH, or the command in $ANALOG_ATTACH (`node path/to/cli.js`).
 
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const DEFAULT_PORT = 5177;
-const INDEX_HTML = path.join(path.dirname(fileURLToPath(import.meta.url)), "index.html");
+const PAGE_ROOT = path.dirname(fileURLToPath(import.meta.url));
+const TYPES = { ".html": "text/html; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png" };
+
+/** A file of the page, by its URL path: under `root` only, and of a type the page uses. */
+function page_file(root, pathname) {
+	const relative = pathname === "/" ? "index.html" : decodeURIComponent(pathname).replace(/^\/+/, "");
+	const file = path.resolve(root, relative);
+	if (file !== root && !file.startsWith(root + path.sep)) return undefined;
+	if (!(path.extname(file) in TYPES) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return undefined;
+	return file;
+}
 
 function read_body(request) {
 	return new Promise((resolve, reject) => {
@@ -48,8 +63,11 @@ function send(response, status, body, type = "application/json") {
  * "/path/to/cli.js"]`); `project` the folder the CLI runs in, which the page can change.
  * Resolves with the server and its URL once it listens.
  */
-export function start_gui({ cli, project, port = DEFAULT_PORT, html = INDEX_HTML }) {
+export function start_gui({ cli, project, port = DEFAULT_PORT, root = PAGE_ROOT }) {
 	let folder = path.resolve(project);
+	const page_root = path.resolve(root);
+	const token = crypto.randomBytes(24).toString("hex");
+	let origins = new Set();
 	const [command, ...prefix] = cli;
 
 	/** Run the CLI to completion: exit code, stdout, stderr, and stdout parsed when it is JSON. */
@@ -84,8 +102,22 @@ export function start_gui({ cli, project, port = DEFAULT_PORT, html = INDEX_HTML
 	const server = http.createServer(async (request, response) => {
 		const url = new URL(request.url ?? "/", "http://localhost");
 		try {
-			if (request.method === "GET" && url.pathname === "/") {
-				send(response, 200, fs.readFileSync(html, "utf8"), "text/html; charset=utf-8");
+			if (!url.pathname.startsWith("/api/")) {
+				const file = request.method === "GET" ? page_file(page_root, url.pathname) : undefined;
+				if (file === undefined) {
+					send(response, 404, { error: "not found" });
+					return;
+				}
+				const text = fs.readFileSync(file, path.extname(file) === ".png" ? undefined : "utf8");
+				// The page gets the token; the other files are code, the same for anyone.
+				send(response, 200, file.endsWith("index.html") ? text.replace("%AA_TOKEN%", token) : text, TYPES[path.extname(file)]);
+				return;
+			}
+
+			// The API: the GUI's own page only (the token it was given, from its own origin).
+			const origin = request.headers.origin;
+			if (request.headers["x-aa-token"] !== token || !origins.has(`http://${request.headers.host ?? ""}`) || (origin !== undefined && !origins.has(origin))) {
+				send(response, 403, { error: "not the GUI's page" });
 				return;
 			}
 
@@ -144,7 +176,9 @@ export function start_gui({ cli, project, port = DEFAULT_PORT, html = INDEX_HTML
 		server.once("error", reject);
 		server.listen(port, "127.0.0.1", () => {
 			const address = server.address();
-			resolve({ server, url: `http://127.0.0.1:${String(typeof address === "object" && address ? address.port : port)}` });
+			const listening = String(typeof address === "object" && address ? address.port : port);
+			origins = new Set([`http://127.0.0.1:${listening}`, `http://localhost:${listening}`]);
+			resolve({ server, url: `http://127.0.0.1:${listening}`, token });
 		});
 	});
 }
