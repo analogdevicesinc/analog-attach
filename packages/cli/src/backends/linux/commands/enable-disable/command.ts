@@ -65,7 +65,8 @@ export function set_node_status(
 
     const resolved = resolve_path(identifier, overlay, base);
     const path = resolved.in_overlay?.node_path ?? resolved.in_base?.path;
-    const node = path === undefined ? undefined : overlay.ensure_node(path);
+    // The fragment whose status applies (a later one's wins, as in dtc), else the first, or a new one
+    const node = path === undefined ? undefined : overlay.property_node(path, "status") ?? overlay.ensure_node(path);
     if (node === undefined) { return "not-found"; }
 
     const index = node.properties.findIndex(p => p.name === "status");
@@ -199,6 +200,22 @@ if (import.meta.vitest) {
         const output = overlay.print();
 
         expect(output).toContain('status = "okay"');
+    });
+
+    test("set_node_status - writes into the fragment whose status applies", () => {
+        const base = DeviceTree.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n};\n\n&spi0 {\n    status = "disabled";\n};\n`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        expect(set_node_status(base, overlay, "spi0", "okay")).toBe("done");
+
+        const [first, second] = overlay.overlay_nodes_at("/soc/spi@7e204000");
+        expect(first?.properties.map(p => p.name)).toEqual([]);
+        expect(second?.properties.map(p => p.name)).toEqual(["status"]);
+        expect(overlay.overlay_properties("/soc/spi@7e204000").find(p => p.name === "status")?.value)
+            .toEqual(PropertyBuilder.build_string().with_value("okay").with_name("status").build().value);
     });
 
     test("status_response - the JSON for done and not-found", () => {

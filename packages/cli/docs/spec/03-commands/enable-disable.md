@@ -41,12 +41,13 @@ the CLI shall refuse with `Couldn't find node <path> in <base file> or
 fragment whose `target` is an unresolved label, and the nodes in it, aren't
 found (`delete.md` D-6).
 
-**ENABLE-011** The CLI shall set `status = "<status>"` on the first overlay
-node at the node's path, in file order, replacing a `status` that node already
-has. When the overlay has no node there (a base node it doesn't target), the
-CLI shall add a fragment for it first: targeting the node's first label, or
-its path (`target-path`) when it has none, in the configured overlay syntax
-(02-common §8.3). (Open issue E-1.)
+**ENABLE-011** The CLI shall set `status = "<status>"` on the overlay node
+whose `status` applies (of the overlay nodes at the node's path that set one,
+the last in file order, as a later fragment's value wins in dtc), replacing
+it, else on the first overlay node at the node's path. When the overlay has
+no node there (a base node it doesn't target), the CLI shall add a fragment
+for it first: targeting the node's first label, or its path (`target-path`)
+when it has none, in the configured overlay syntax (02-common §8.3).
 
 **ENABLE-012** The CLI shall write the status whatever the node's current
 status, in the base or the overlay: `enable` on a node that is already
@@ -63,14 +64,6 @@ enabled still writes `status = "okay"`.
 command-specific field.
 
 ## 6. Open issues
-
-**E-1. In an overlay with several fragments for a node, `enable` can have no
-effect.** The status goes into the first fragment for the node, but a later
-fragment's `status` wins, as in dtc. With `fragment@0` and `fragment@1` both
-for `&spi0`, the second setting `status = "disabled"`, `enable spi0` writes
-`"okay"` into `fragment@0`, reports `Enabled spi0`, and `read spi0 status`
-still shows `"disabled"`. `update` writes to the fragment whose value
-applies (`update.md`). `enable` and `disable` should do the same.
 
 **E-2. The not-found message differs between modes, and from `read`'s.** In
 human mode it is `Couldn't find node <path> in <base file> or <overlay file>`,
