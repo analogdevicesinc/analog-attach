@@ -42,13 +42,18 @@ export function bindings_directory(paths: SchemaPaths): string {
     return path.join(expand_home(paths.linux), "Documentation/devicetree/bindings");
 }
 
+/**
+ * The base of the schemas' `$id`s. ref-parser resolves a `$ref` against the `$id` of the schema it is in, so
+ * `/schemas/types.yaml` in a binding whose `$id` is `http://devicetree.org/schemas/...` is asked for under this
+ * URL; dt-schema reads it from the checkouts as well, never from the network.
+ */
+const SCHEMAS_URL = "http://devicetree.org/schemas";
+
 export function create_context(paths: SchemaPaths): SchemaContext {
+    const directories = [bindings_directory(paths), path.join(expand_home(paths.dt_schema), "dtschema/schemas")];
     return {
         parser: new $RefParser(),
-        search_paths: [
-            { prefix: "/schemas", dir: bindings_directory(paths) },
-            { prefix: "/schemas", dir: path.join(expand_home(paths.dt_schema), "dtschema/schemas") },
-        ],
+        search_paths: [SCHEMAS_URL, "/schemas"].flatMap(prefix => directories.map(directory => ({ prefix, dir: directory }))),
         property_types: property_types(paths),
     };
 }

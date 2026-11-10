@@ -51,7 +51,7 @@ export async function dereference(ctx: SchemaContext, source: string | JSONSchem
     if (typeof source !== "string") { stash_references(source); }
 
     const dereferenced = await run(() => ctx.parser.dereference(source, {
-        resolve: { my: schema_resolver(ctx.search_paths) },
+        resolve: { my: schema_resolver(ctx.search_paths), http: false },
         parse: { yaml: schema_parser },
         dereference: {
             circular: false,
@@ -66,7 +66,7 @@ export async function dereference(ctx: SchemaContext, source: string | JSONSchem
 /** Like `dereference`, but circular references stay as `$ref`s. */
 export async function bundle(ctx: SchemaContext, source: string | JSONSchema): Promise<Result<JSONSchema, string>> {
     const bundled = await run(() => ctx.parser.bundle(source, {
-        resolve: { my: schema_resolver(ctx.search_paths) },
+        resolve: { my: schema_resolver(ctx.search_paths), http: false },
         parse: { yaml: schema_parser },
     }));
 
@@ -117,6 +117,8 @@ function is_readable(file: string): boolean {
 }
 
 // https://apidevtools.com/json-schema-ref-parser/docs/plugins/resolvers.html
+// The only resolver for references under the search paths; ref-parser's HTTP one is off, so a schema that is
+// not in the checkouts fails to resolve rather than being downloaded.
 function schema_resolver(search_paths: SearchPath[]) {
     return {
         order: 1,

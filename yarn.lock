@@ -64,14 +64,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@apidevtools/json-schema-ref-parser@npm:^15.3.1":
-  version: 15.3.1
-  resolution: "@apidevtools/json-schema-ref-parser@npm:15.3.1"
+"@apidevtools/json-schema-ref-parser@npm:^16.0.6":
+  version: 16.0.6
+  resolution: "@apidevtools/json-schema-ref-parser@npm:16.0.6"
   dependencies:
-    js-yaml: "npm:^4.1.1"
+    js-yaml: "npm:^5.4.2"
   peerDependencies:
     "@types/json-schema": ^7.0.15
-  checksum: 10c0/31995e8e199b57605c48089adf9df216823463204104d9013717b810ad25784fc5112631848fe8231c2d7e332c505b9511de781d4ec030d62cde3412ad0f9264
+  checksum: 10c0/da5b0021b120834a3c5a5036f54502242525bc847950a28fc2524bc725c65aebd53a0697a23a05d7ec97152d4e2e435dff631fd9520f79fffb1ddd687073f060
   languageName: node
   linkType: hard
 
@@ -2441,6 +2441,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"argparse@npm:^3.0.3":
+  version: 3.0.4
+  resolution: "argparse@npm:3.0.4"
+  checksum: 10c0/845346e39e677b46f8558cece7c8dad1f7045f8b86af33356d8565b26a16940bf770a14a51d6da40ce76554a141e0e95b514d055d1da17a2f1b42df7d523fa0f
+  languageName: node
+  linkType: hard
+
 "argparse@npm:~1.0.9":
   version: 1.0.10
   resolution: "argparse@npm:1.0.10"
@@ -2472,7 +2479,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "attach-lib@workspace:packages/attach-lib"
   dependencies:
-    "@apidevtools/json-schema-ref-parser": "npm:^15.3.1"
+    "@apidevtools/json-schema-ref-parser": "npm:^16.0.6"
     "@microsoft/api-extractor": "npm:^7.60.1"
     "@types/json-schema": "npm:^7.0.15"
     "@types/node": "npm:22.x"
@@ -4107,7 +4114,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"js-yaml@npm:^4.1.0, js-yaml@npm:^4.1.1":
+"js-yaml@npm:^4.1.0":
   version: 4.3.2
   resolution: "js-yaml@npm:4.3.2"
   dependencies:
@@ -4115,6 +4122,17 @@ __metadata:
   bin:
     js-yaml: bin/js-yaml.js
   checksum: 10c0/dedd34c2e8fef1d504687f1bc94ed0ee1311a1f78770fa2800352c6d59c635ccf555009d74e9afe529ae62199da2b1ccef30e53dc84dcd8d2d8187c22574bc97
+  languageName: node
+  linkType: hard
+
+"js-yaml@npm:^5.4.2":
+  version: 5.5.0
+  resolution: "js-yaml@npm:5.5.0"
+  dependencies:
+    argparse: "npm:^3.0.3"
+  bin:
+    js-yaml: bin/js-yaml.mjs
+  checksum: 10c0/311619f44dd788657e9b81d4b5c60ff367441f364045e3796bc604a41f25819852748fb173ae82f2553d53cb609d7fdb79e0a74148892cb2c085eebe91839b53
   languageName: node
   linkType: hard
 
