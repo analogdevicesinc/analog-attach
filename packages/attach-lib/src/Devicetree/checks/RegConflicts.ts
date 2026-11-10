@@ -1,6 +1,6 @@
 import { DeviceTree } from "../DeviceTree.js";
 import { DeviceTreeOverlay } from "../DeviceTreeOverlay.js";
-import { number_property } from "../nodes/Access.js";
+import { cell_number, number_property } from "../nodes/Access.js";
 import { type CellArrayElement, type DTNode, type DTProperty, is_dt_flag } from "../syntax/AST.js";
 import { PropertyBuilder } from "../build/PropertyBuilder.js";
 import { address_cells_of } from "../AddressCells.js";
@@ -47,8 +47,9 @@ const join_cells = (cells: bigint[]): bigint => cells.reduce((result, cell) => (
 
 /**
  * The (address, size) entries of a `reg`, read with the parent's cell counts.
- * Undefined when it doesn't decode: a flag, a phandle or expression cell, a
- * cell count that doesn't divide, or a parent without addresses.
+ * Undefined when it doesn't decode: a flag, a phandle or an expression that
+ * doesn't evaluate, a cell count that doesn't divide, or a parent without
+ * addresses.
  */
 export function reg_entries(reg: DTProperty, address_cells: number, size_cells: number): RegEntry[] | undefined {
     if (is_dt_flag(reg.value) || address_cells === 0) { return undefined; }
@@ -56,8 +57,9 @@ export function reg_entries(reg: DTProperty, address_cells: number, size_cells: 
     for (const value of reg.value) {
         if (value.kind !== "array") { return undefined; }
         for (const element of value.elements) {
-            if (element.kind !== "number") { return undefined; }
-            values.push(element.value & 0xFF_FF_FF_FFn);
+            const number = cell_number(element);
+            if (number === undefined) { return undefined; }
+            values.push(number & 0xFF_FF_FF_FFn);
         }
     }
     const width = address_cells + size_cells;
@@ -307,6 +309,11 @@ if (import.meta.vitest) {
 
     test("reg_conflicts — the unit address doesn't matter, reg does", () => {
         const overlay = setup(spi("\t\t\tspidev@0 { reg = <0>; };"), "&spi0 {\n\tadc@1 { reg = <0>; };\n\tadc@2 { reg = <2>; };\n};");
+        expect(reg_conflicts(overlay).map(c => c.nodes)).toEqual([["spidev@0", "adc@1"]]);
+    });
+
+    test("reg_conflicts — a reg written as an expression clashes with a number of its value", () => {
+        const overlay = setup(spi("\t\t\tspidev@0 { reg = <0>; };"), "&spi0 {\n\tadc@1 { reg = <(1 - 1)>; };\n\tadc@2 { reg = <(MY_ADDR)>; };\n};");
         expect(reg_conflicts(overlay).map(c => c.nodes)).toEqual([["spidev@0", "adc@1"]]);
     });
 

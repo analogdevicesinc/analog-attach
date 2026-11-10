@@ -1,4 +1,5 @@
-import { type DTLabel, type DTNode, type DTPath, type DTProperty, is_dt_flag, get_full_node_name } from "../syntax/AST.js";
+import { type CellArrayElement, type DTLabel, type DTNode, type DTPath, type DTProperty, is_dt_flag, get_full_node_name } from "../syntax/AST.js";
+import { evaluate_expression } from "../syntax/Expression.js";
 
 export type LocatedNode = { node: DTNode; path: string };
 
@@ -39,14 +40,18 @@ function find_cell_array(node: DTNode, name: string) {
     return first;
 }
 
+/** The number a cell holds: a number's value, an expression's as dtc computes it (`(4<<8|0x03)`). Undefined for a reference or an expression that doesn't evaluate. */
+export function cell_number(element: CellArrayElement): bigint | undefined {
+    if (element.kind === "number") { return element.value; }
+    if (element.kind === "expression") { return evaluate_expression(element.value); }
+    return undefined;
+}
+
 export function number_property(node: DTNode, name: string): bigint | undefined {
     const cell_array = find_cell_array(node, name);
     if (cell_array === undefined || cell_array.elements.length !== 1) { return; }
     const element = cell_array.elements[0];
-    if (element === undefined) { return; }
-    if (element.kind === "number") { return element.value; }
-    if (element.kind === "expression" && typeof element.value === "bigint") { return element.value; }
-    return;
+    return element === undefined ? undefined : cell_number(element);
 }
 
 export function reference_property(node: DTNode, name: string): string | undefined {
@@ -62,10 +67,7 @@ export function extract_first_number(node: DTNode, name: string): bigint | undef
     const cell_array = find_cell_array(node, name);
     if (cell_array === undefined) { return; }
     const element = cell_array.elements[0];
-    if (element === undefined) { return; }
-    if (element.kind === "number") { return element.value; }
-    if (element.kind === "expression" && typeof element.value === "bigint") { return element.value; }
-    return;
+    return element === undefined ? undefined : cell_number(element);
 }
 
 export function extract_first_reference(node: DTNode, name: string): string | undefined {
@@ -152,6 +154,21 @@ if (import.meta.vitest) {
         expect(number_property(node, "#interrupt-cells")).toBe(3n);
         expect(number_property(node, "reg")).toBeUndefined();
         expect(number_property(node, "missing")).toBeUndefined();
+    });
+
+    test("number_property and extract_first_number read an expression as its value", async () => {
+        const dt = await dts(`/dts-v1/;
+/ {
+    node {
+        #address-cells = <(1 + 1)>;
+        reg = <(4 << 8 | 0x03) 0x400>;
+        name = <(FOO)>;
+    };
+};`);
+        const node = dt.as_stream().toArray().find(({ node }) => node.name === "node")!.node;
+        expect(number_property(node, "#address-cells")).toBe(2n);
+        expect(extract_first_number(node, "reg")).toBe(0x04_03n);
+        expect(number_property(node, "name")).toBeUndefined();
     });
 
     test("extract_first_number reads first cell from any array", async () => {

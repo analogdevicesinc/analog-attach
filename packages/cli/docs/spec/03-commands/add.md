@@ -190,9 +190,14 @@ is other than 0; an unset `#size-cells` is 0, as ADD-048 reads it.
 and the parent isn't memory-mapped, the CLI shall give the node the lowest
 address from 0 that no enabled child of the parent occupies. A child occupies
 the address its `reg` gives, or when it has no `reg`, its hexadecimal unit
-address. A child whose `reg` the CLI can't read (its first `<…>` doesn't
-start with `#address-cells` numbers) occupies nothing, even when its unit
-address is hexadecimal (open issue A-6). When the address is not 0, the CLI
+address. A cell of `reg` written as an expression (`<(4 << 8 | 0x03)>`, what
+cpp makes of a macro such as qcom's `PMR735A_ADC7_DIE_TEMP`) counts as the
+number dtc computes for it: its operators, precedence and unsigned 64-bit
+arithmetic. A child whose `reg` the CLI can't read (its first `<…>` doesn't
+start with `#address-cells` numbers or expressions that compute, such as
+`<(MY_ADDR)>`, a macro the workfile doesn't expand) occupies nothing, even
+when its unit address is hexadecimal, as dtc refuses such a `reg`. When the
+address is not 0, the CLI
 shall give the note (two lines):
 
 ```
@@ -799,13 +804,6 @@ label of that overlay and means nothing in the workspace: `add adi,adxl345
 named adxl345@53` (`i2cbus` is a label of `i2c-buses.dtsi`; the node is under
 `/soc/i2c@7e804000`). A fix would be to name the parent by its label in the
 merged tree, or its path, in every case.
-
-**A-6. A child with an unreadable `reg` frees its address.** (From the
-source, not reproduced.) ADD-047 falls back to the unit address only when a
-child has no `reg`. A child whose `reg` can't be read (its first `<…>`
-doesn't start with `#address-cells` numbers) occupies nothing, so `add` may
-pick the address its unit address names. A fix would be to fall back to the
-unit address whenever the `reg` can't be read.
 
 **A-7. The human report and the interview cover the whole workfile, the
 JSON list only what `add` made.** The bootstrap report (ADD-525) and the

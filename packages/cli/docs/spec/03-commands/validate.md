@@ -239,7 +239,8 @@ this section. The other chapters cite it.
 
 **VALIDATE-100** Two children of one node *clash* when both are enabled (no
 `status`, or `status` of `okay` or `ok`), both have a `reg` that decodes with
-the parent's `#address-cells` and `#size-cells` (from the first overlay node
+the parent's `#address-cells` and `#size-cells` (a cell written as an
+expression counting as its value, as in ADD-047; from the first overlay node
 for the parent, else the base's, else 1 and 0, as in ADD-048; open issue
 V-11), and:
 - the parent's `#size-cells` is 0, and an address of one equals an address of

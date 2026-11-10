@@ -1,6 +1,6 @@
 import { type DTNode, type DTProperty, is_dt_flag } from "../syntax/AST.js";
 import { PropertyBuilder } from "../build/PropertyBuilder.js";
-import { is_enabled } from "./Access.js";
+import { cell_number, is_enabled } from "./Access.js";
 
 /**
  * Unit addresses are hex by convention (and dtc requires it on SPI, I2C and
@@ -73,8 +73,9 @@ export function decode_reg_address(reg: DTProperty, address_cells: number): bigi
     let result = 0n;
     for (let index = 0; index < address_cells; index++) {
         const element = first.elements[index];
-        if (element === undefined || element.kind !== "number") { return undefined; }
-        result = (result << 32n) | (element.value & 0xFF_FF_FF_FFn);
+        const value = element === undefined ? undefined : cell_number(element);
+        if (value === undefined) { return undefined; }
+        result = (result << 32n) | (value & 0xFF_FF_FF_FFn);
     }
     return result;
 }
@@ -82,8 +83,9 @@ export function decode_reg_address(reg: DTProperty, address_cells: number): bigi
 /**
  * The address a child occupies on its parent's bus: the first address of its
  * `reg`, read with the parent's `#address-cells`, or with no `reg`, its
- * hexadecimal unit address. Undefined when its `reg` doesn't decode (it then
- * occupies nothing, whatever its unit address) or it has neither.
+ * hexadecimal unit address. A cell written as an expression counts once it
+ * evaluates (`(4<<8|0x03)`, a macro after cpp). Undefined when its `reg` doesn't
+ * decode (it then occupies nothing, whatever its unit address) or it has neither.
  */
 export function occupied_address(child: DTNode, address_cells: number): bigint | undefined {
     const reg = child.properties.find(p => p.name === "reg");
@@ -200,6 +202,33 @@ if (import.meta.vitest) {
     test("decode_reg_address — two address cells", () => {
         const reg = encode_reg_address(0x1_00_00_00_00n, 2, 1);
         expect(decode_reg_address(reg, 2)).toBe(0x1_00_00_00_00n);
+    });
+
+    /** The one child of the root in `source`. */
+    const parsed_node = async (source: string): Promise<DTNode> => {
+        const { DeviceTree } = await import("../DeviceTree.js");
+        const tree = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n${source}\n};`);
+        if (typeof tree === "string") { throw new TypeError(tree); }
+        const child = tree.node_at("/")?.children[0];
+        if (child === undefined) { throw new TypeError("no child"); }
+        return child;
+    };
+
+    test("occupied_address — a reg written as an expression is its value", async () => {
+        // sc7280-idp's `reg = <PMR735A_ADC7_DIE_TEMP>` after cpp
+        expect(occupied_address(await parsed_node("channel@403 { reg = <(4 << 8 | 0x03)>; };"), 1)).toBe(0x04_03n);
+        // the value is the reg's, not the unit address's
+        expect(occupied_address(await parsed_node("channel@0 { reg = <(4 << 8 | 0x03)>; };"), 1)).toBe(0x04_03n);
+        // a macro the workfile doesn't expand occupies nothing
+        expect(occupied_address(await parsed_node("channel@5 { reg = <(MY_ADDR)>; };"), 1)).toBeUndefined();
+    });
+
+    test("next_free_unit_address — a reg written as an expression occupies its address", async () => {
+        const children = new Map<string, DTNode>([
+            ["channel@0", await parsed_node("channel@0 { reg = <(0 << 8 | 0x00)>; };")],
+            ["channel@1", await parsed_node("channel@1 { reg = <1>; };")],
+        ]);
+        expect(next_free_unit_address(children, 1).address).toBe(2n);
     });
 
     test("next_free_unit_address — base spidev@0/1 → 2", () => {
