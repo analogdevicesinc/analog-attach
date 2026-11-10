@@ -21,12 +21,12 @@
     "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.72.1",
     "@vscode/test-cli": "^0.0.15",
-    "@vscode/test-electron": "^2.5.2",
+    "@vscode/test-electron": "^3.1.0",
     "eslint": "^10.14.0",
     "eslint-plugin-unicorn": "^79.0.0",
     "ts-loader": "^9.5.1",
     "typescript": "^5.7.2",
     "webpack": "^5.112.2",
-    "webpack-cli": "^5.1.4"
+    "webpack-cli": "^7.3.1"
   }
 }
