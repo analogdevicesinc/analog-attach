@@ -1,9 +1,9 @@
-name: Build VSIX
+# Obsolete: the VS Code extension is no longer built (packages/extension/README.md).
+# Left runnable by hand only, until the extension is removed.
+name: Build VSIX (obsolete)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 permissions:
   contents: read

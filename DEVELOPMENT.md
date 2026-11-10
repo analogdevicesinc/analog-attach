@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-- `packages/extension`: VS Code extension core
+- `packages/extension`: VS Code extension core — **obsolete**, not built or tested, to be removed (see its README)
 - `packages/attach-lib`: Device tree parsing and binding processing library
 - `packages/extension-protocol`: Shared types and message protocols
 - `packages/hds-components`: HDS Components (Lit-based)
@@ -14,7 +14,7 @@
 ## Requirements
 
 - `yarn v4.5.3`
-- `node >= v20`
+- `node >= v22` (CI also runs the unit tests on Node 26)
 
 ## Getting Started
 
@@ -64,7 +64,6 @@ yarn build:all
 ### Build Individual Packages
 
 ```bash
-yarn build:extension          # VS Code extension
 yarn build:attach-lib         # Device tree library
 yarn build:pnp-webview        # Plug and Play webview
 yarn build:tree-editor-webview # Advanced editor webview
@@ -86,7 +85,9 @@ yarn clean      # Remove built artifacts
 yarn clean:all  # Remove artifacts and node_modules
 ```
 
-## Running the Extension
+## Running the Extension (obsolete)
+
+The VS Code extension is obsolete and no longer builds; the sections below are kept until it is removed.
 
 ### Debug Mode
 
@@ -101,7 +102,7 @@ yarn test           # Run all tests
 yarn test-clean     # Clean build then run tests
 ```
 
-## Packaging the Extension
+## Packaging the Extension (obsolete)
 
 To create a `.vsix` package for installation or distribution:
 
