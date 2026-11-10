@@ -140,7 +140,6 @@ export async function merge_redefinitions(
 ): Promise<DtBindingSchema> {
     const merged = merge_node(binding as Schema) as DtBindingSchema;
 
-    // TODO: special case needs to be handled (a pattern that is a boolean)
     const parents = new Map<string, Schema>();
     for (const [entry, path] of entries_of(merged)) {
         if (!is_inherited_pattern(entry, path) || parents.has(entry.$id)) { continue; }
