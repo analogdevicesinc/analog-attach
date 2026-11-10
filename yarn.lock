@@ -25,7 +25,7 @@ __metadata:
     bats-support: "npm:0.3.0"
     eslint: "npm:^10.14.0"
     eslint-plugin-unicorn: "npm:^79.0.0"
-    eta: "npm:^3.5.0"
+    eta: "npm:^4.6.0"
     tsup: "npm:^9.0.0"
     typescript: "npm:~6.0.3"
     vite: "npm:^8.3.7"
@@ -2499,7 +2499,7 @@ __metadata:
     "@vitest/coverage-v8": "npm:^5.1.0"
     eslint: "npm:^10.14.0"
     eslint-plugin-unicorn: "npm:^79.0.0"
-    eta: "npm:^3.5.0"
+    eta: "npm:^4.6.0"
     typescript: "npm:~6.0.3"
     typescript-eslint: "npm:^8.72.1"
     vite: "npm:^8.3.7"
@@ -3409,10 +3409,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eta@npm:^3.5.0":
-  version: 3.5.0
-  resolution: "eta@npm:3.5.0"
-  checksum: 10c0/28ffc23658e3d77c1ab2660d0158b979688457659fc190d0edca26c186ab34039bec9d6745d975e5f0543981e285cd757bff85b47ea2374ab11444e2b7271dd0
+"eta@npm:^4.6.0":
+  version: 4.6.0
+  resolution: "eta@npm:4.6.0"
+  checksum: 10c0/98c8081f756884bbc22f2bf4a6a38c2322ee97575fb6f0c02dcb1c3040353971c91a96bfba2d6f7cba39bb0ebece5708803a765447d9a81ca1172ccd5e31becf
   languageName: node
   linkType: hard
 
