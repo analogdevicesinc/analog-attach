@@ -424,6 +424,74 @@ properties:
     });
 });
 
+describe('patterns of an allOf entry', () => {
+    const regulator = (name: string, patterns = '') => parsed(name, `
+allOf:
+  - $ref: /schemas/regulator/regulator.yaml#
+properties:
+  compatible:
+    const: x,y
+${patterns}`);
+
+    test('the patterns of a schema the binding references are the binding\'s: its property and child-node patterns', async () => {
+        const { parsed_binding } = await regulator('allof-patterns');
+
+        expect(parsed_binding.property_patterns?.find(rule => rule.pattern === '.*-supply$')?.value).toMatchObject({
+            _t: 'matrix',
+            rows: [{ _t: 'list', item: { _t: 'any' }, minItems: 1, maxItems: 1 }],
+        });
+        expect(keys_of(parsed_binding.pattern_properties ?? [])).toContain('^regulator-state-(standby|mem|disk)$');
+    });
+
+    test('a pattern the binding defines again is merged with the entry\'s: the binding\'s count, the entry\'s phandle', async () => {
+        const { parsed_binding } = await regulator('allof-patterns-redefined', `
+patternProperties:
+  ".*-supply$":
+    maxItems: 1
+`);
+
+        const supply = parsed_binding.property_patterns?.filter(rule => rule.pattern === '.*-supply$') ?? [];
+        expect(supply).toHaveLength(1);
+        expect(supply[0].value).toMatchObject({ _t: 'matrix', maxItems: 1, rows: [{ _t: 'list', minItems: 1, maxItems: 1 }] });
+        expect(supply[0].description).toBe('Input supply phandle(s) for this node');
+    });
+
+    // dt-schema fixes each schema up on its own: the binding's `reg: {maximum: 3}` is one row of one cell before
+    // spi-controller.yaml's rows of up to 256 apply too
+    test('a child-node pattern both define holds the child to each, after each is fixed up', async () => {
+        const { parsed_binding } = await parsed('allof-patterns-fixed-up', `
+allOf:
+  - $ref: /schemas/spi/spi-controller.yaml#
+properties:
+  compatible:
+    const: x,y
+patternProperties:
+  "^.*@[0-9a-f]+$":
+    type: object
+    properties:
+      reg:
+        minimum: 0
+        maximum: 3
+`);
+
+        const child = parsed_binding.pattern_properties?.find(rule => rule.pattern === '^.*@[0-9a-f]+$')?.properties ?? [];
+        expect(child.find(p => p.key === 'reg')?.value).toMatchObject({
+            _t: 'matrix',
+            minItems: 1,
+            maxItems: 1,
+            rows: [{ _t: 'list', item: { _t: 'number', minimum: 0n, maximum: 3n }, minItems: 1, maxItems: 1 }],
+        });
+        expect(child.map(p => p.key)).toContain('spi-max-frequency');
+    });
+
+    test('a child-node pattern of an allOf entry is narrowed like the binding\'s own', async () => {
+        const attach = await regulator('allof-patterns-narrowed');
+
+        const state = attach.narrow_pattern_binding('^regulator-state-(standby|mem|disk)$', JSON.stringify({ 'regulator-on-in-suspend': true }));
+        expect(state?.properties.map(p => p.key)).toContain('regulator-suspend-min-microvolt');
+    });
+});
+
 describe('selected schemas', () => {
     test('a property the binding names gets the counts the select: true schema that defines it gives, the binding\'s keywords winning', async () => {
         const { parsed_binding } = await parsed('selected', `

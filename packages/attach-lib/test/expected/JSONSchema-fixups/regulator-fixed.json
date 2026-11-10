@@ -7,191 +7,7 @@
             "examples": [
                 "xyzreg: regulator {\n  regulator-min-microvolt = <1000000>;\n  regulator-max-microvolt = <2500000>;\n  regulator-always-on;\n  vin-supply = <&vin>;\n\n  regulator-state-mem {\n    regulator-on-in-suspend;\n  };\n};\n"
             ],
-            "patternProperties": {
-                ".*-supply$": {
-                    "description": "Input supply phandle(s) for this node",
-                    "dtType": "phandle",
-                    "items": {
-                        "additionalItems": {
-                            "dtType": "uint32",
-                            "maximum": 4294967295,
-                            "minimum": 0,
-                            "type": "integer",
-                            "typeSize": 32
-                        },
-                        "items": [
-                            {
-                                "oneOf": [
-                                    {
-                                        "maximum": 4294967295,
-                                        "minimum": 1,
-                                        "type": "integer"
-                                    },
-                                    {
-                                        "const": 0,
-                                        "type": "integer"
-                                    }
-                                ]
-                            }
-                        ],
-                        "maxItems": 1,
-                        "minItems": 1,
-                        "type": "array"
-                    },
-                    "maxItems": 1,
-                    "minItems": 1,
-                    "type": "array"
-                },
-                "^regulator-state-(standby|mem|disk)$": {
-                    "additionalProperties": false,
-                    "description": "sub-nodes for regulator state in Standby, Suspend-to-RAM, and Suspend-to-DISK modes. Equivalent with standby, mem, and disk Linux sleep states.",
-                    "patternProperties": {
-                        "^pinctrl-[0-9]+$": {
-                            "dtType": "phandle-array",
-                            "items": {
-                                "additionalItems": {
-                                    "dtType": "uint32",
-                                    "maximum": 4294967295,
-                                    "minimum": 0,
-                                    "type": "integer",
-                                    "typeSize": 32
-                                },
-                                "items": [
-                                    {
-                                        "oneOf": [
-                                            {
-                                                "maximum": 4294967295,
-                                                "minimum": 1,
-                                                "type": "integer"
-                                            },
-                                            {
-                                                "const": 0,
-                                                "type": "integer"
-                                            }
-                                        ]
-                                    }
-                                ],
-                                "maxItems": 1024,
-                                "minItems": 1,
-                                "type": "array"
-                            },
-                            "minItems": 1,
-                            "type": "array"
-                        }
-                    },
-                    "properties": {
-                        "pinctrl-names": {
-                            "dtType": "string-array",
-                            "items": {
-                                "type": "string"
-                            },
-                            "minItems": 1,
-                            "type": "array",
-                            "uniqueItems": true
-                        },
-                        "regulator-changeable-in-suspend": {
-                            "description": "whether the default voltage and the regulator on/off in suspend can be changed in runtime.",
-                            "dtType": "flag",
-                            "type": "boolean"
-                        },
-                        "regulator-mode": {
-                            "description": "operating mode in the given suspend state. The set of possible operating modes depends on the capabilities of every hardware so the valid modes are documented on each regulator device tree binding document.",
-                            "dtType": "uint32",
-                            "maximum": 4294967295,
-                            "minimum": 0,
-                            "type": "integer",
-                            "typeSize": 32
-                        },
-                        "regulator-off-in-suspend": {
-                            "description": "regulator should be off in suspend state.",
-                            "dtType": "flag",
-                            "type": "boolean"
-                        },
-                        "regulator-on-in-suspend": {
-                            "description": "regulator should be on in suspend state.",
-                            "dtType": "flag",
-                            "type": "boolean"
-                        },
-                        "regulator-suspend-max-microvolt": {
-                            "description": "maximum voltage may be set in suspend state.",
-                            "dtType": "int32-matrix",
-                            "items": {
-                                "items": {
-                                    "maximum": 2147483647,
-                                    "minimum": -2147483648
-                                },
-                                "type": "array"
-                            },
-                            "type": "array"
-                        },
-                        "regulator-suspend-microvolt": {
-                            "description": "the default voltage which regulator would be set in suspend. This property is now deprecated, instead setting voltage for suspend mode via the API which regulator driver provides is recommended.",
-                            "dtType": "int32-matrix",
-                            "items": {
-                                "items": {
-                                    "maximum": 2147483647,
-                                    "minimum": -2147483648
-                                },
-                                "type": "array"
-                            },
-                            "type": "array"
-                        },
-                        "regulator-suspend-min-microvolt": {
-                            "description": "minimum voltage may be set in suspend state.",
-                            "dtType": "int32-matrix",
-                            "items": {
-                                "items": {
-                                    "maximum": 2147483647,
-                                    "minimum": -2147483648
-                                },
-                                "type": "array"
-                            },
-                            "type": "array"
-                        },
-                        "status": {
-                            "allOf": [
-                                {
-                                    "allOf": [
-                                        {
-                                            "dtType": "non-unique-string-array",
-                                            "items": {
-                                                "type": "string"
-                                            },
-                                            "minItems": 1,
-                                            "type": "array"
-                                        },
-                                        {
-                                            "uniqueItems": true
-                                        }
-                                    ],
-                                    "dtType": "string-array"
-                                },
-                                {
-                                    "maxItems": 1,
-                                    "minItems": 1,
-                                    "type": "array"
-                                }
-                            ],
-                            "dtType": "string",
-                            "items": [
-                                {
-                                    "enum": [
-                                        "okay",
-                                        "disabled",
-                                        "reserved",
-                                        "fail",
-                                        "fail-needs-probe"
-                                    ]
-                                }
-                            ],
-                            "maxItems": 1,
-                            "minItems": 1,
-                            "type": "array"
-                        }
-                    },
-                    "type": "object"
-                }
-            },
+            "patternProperties": {},
             "properties": {
                 "regulator-active-discharge": {
                     "description": "tristate, enable/disable active discharge of regulators. The values are:\n0: Disable active discharge.\n1: Enable active discharge.\nAbsence of this property will leave configuration to default.\n",
@@ -643,6 +459,40 @@
         "reg_1v8: regulator-1v8 {\n  compatible = \"regulator-fixed\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  gpio = <&gpio1 16 0>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  gpio-open-drain;\n  vin-supply = <&parent_reg>;\n};\nreg_1v8_clk: regulator-1v8-clk {\n  compatible = \"regulator-fixed-clock\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  clocks = <&clock1>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  vin-supply = <&parent_reg>;\n};\nreg_1v8_domain: regulator-1v8-domain {\n  compatible = \"regulator-fixed-domain\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  power-domains = <&domain1>;\n  required-opps = <&domain1_state1>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  vin-supply = <&parent_reg>;\n};\n"
     ],
     "patternProperties": {
+        ".*-supply$": {
+            "description": "Input supply phandle(s) for this node",
+            "dtType": "phandle",
+            "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
         "^pinctrl-[0-9]+$": {
             "dtType": "phandle-array",
             "items": {
@@ -674,6 +524,155 @@
             },
             "minItems": 1,
             "type": "array"
+        },
+        "^regulator-state-(standby|mem|disk)$": {
+            "additionalProperties": false,
+            "description": "sub-nodes for regulator state in Standby, Suspend-to-RAM, and Suspend-to-DISK modes. Equivalent with standby, mem, and disk Linux sleep states.",
+            "patternProperties": {
+                "^pinctrl-[0-9]+$": {
+                    "dtType": "phandle-array",
+                    "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
+                        "maxItems": 1024,
+                        "minItems": 1,
+                        "type": "array"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                }
+            },
+            "properties": {
+                "pinctrl-names": {
+                    "dtType": "string-array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                },
+                "regulator-changeable-in-suspend": {
+                    "description": "whether the default voltage and the regulator on/off in suspend can be changed in runtime.",
+                    "dtType": "flag",
+                    "type": "boolean"
+                },
+                "regulator-mode": {
+                    "description": "operating mode in the given suspend state. The set of possible operating modes depends on the capabilities of every hardware so the valid modes are documented on each regulator device tree binding document.",
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "regulator-off-in-suspend": {
+                    "description": "regulator should be off in suspend state.",
+                    "dtType": "flag",
+                    "type": "boolean"
+                },
+                "regulator-on-in-suspend": {
+                    "description": "regulator should be on in suspend state.",
+                    "dtType": "flag",
+                    "type": "boolean"
+                },
+                "regulator-suspend-max-microvolt": {
+                    "description": "maximum voltage may be set in suspend state.",
+                    "dtType": "int32-matrix",
+                    "items": {
+                        "items": {
+                            "maximum": 2147483647,
+                            "minimum": -2147483648
+                        },
+                        "type": "array"
+                    },
+                    "type": "array"
+                },
+                "regulator-suspend-microvolt": {
+                    "description": "the default voltage which regulator would be set in suspend. This property is now deprecated, instead setting voltage for suspend mode via the API which regulator driver provides is recommended.",
+                    "dtType": "int32-matrix",
+                    "items": {
+                        "items": {
+                            "maximum": 2147483647,
+                            "minimum": -2147483648
+                        },
+                        "type": "array"
+                    },
+                    "type": "array"
+                },
+                "regulator-suspend-min-microvolt": {
+                    "description": "minimum voltage may be set in suspend state.",
+                    "dtType": "int32-matrix",
+                    "items": {
+                        "items": {
+                            "maximum": 2147483647,
+                            "minimum": -2147483648
+                        },
+                        "type": "array"
+                    },
+                    "type": "array"
+                },
+                "status": {
+                    "allOf": [
+                        {
+                            "allOf": [
+                                {
+                                    "dtType": "non-unique-string-array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "minItems": 1,
+                                    "type": "array"
+                                },
+                                {
+                                    "uniqueItems": true
+                                }
+                            ],
+                            "dtType": "string-array"
+                        },
+                        {
+                            "maxItems": 1,
+                            "minItems": 1,
+                            "type": "array"
+                        }
+                    ],
+                    "dtType": "string",
+                    "items": [
+                        {
+                            "enum": [
+                                "okay",
+                                "disabled",
+                                "reserved",
+                                "fail",
+                                "fail-needs-probe"
+                            ]
+                        }
+                    ],
+                    "maxItems": 1,
+                    "minItems": 1,
+                    "type": "array"
+                }
+            },
+            "type": "object"
         }
     },
     "properties": {

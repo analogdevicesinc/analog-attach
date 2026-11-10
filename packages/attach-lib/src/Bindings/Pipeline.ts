@@ -4,6 +4,7 @@ import { apply_JSONSchema_fixups, StepInfo } from "./fixups/Fixups.js";
 import type { ParsedBinding } from "./model/ParsedBinding.js";
 import { DtBindingSchema } from "./schema/Schema.js";
 import { insert_canaries } from "./stages/Canaries.js";
+import { merge_patterns } from "./stages/Patterns.js";
 import { resolve_properties } from "./stages/Properties.js";
 import { merge_redefinitions } from "./stages/Redefinitions.js";
 import { resolve_references } from "./stages/References.js";
@@ -33,6 +34,10 @@ export const PIPELINE_STAGES = [
     {
         id: "fixups", counterpart: "fixups.py",
         summary: "Patches the schema the way dt-schema's fixups do, and guesses the types dt-schema reads from the `$ref`s (`fixup_passes`).",
+    },
+    {
+        id: "patterns", counterpart: "fixups.py:fixup_schema",
+        summary: "Moves the patterns of each node's `allOf` entries into its own `patternProperties` (regulator.yaml's `.*-supply$` under a regulator), merging those of one key with the tighter bounds. After the fixups: dt-schema fixes each schema up on its own and holds a node to all of them.",
     },
     {
         id: "selected", counterpart: "validator.py:DTValidator",
@@ -109,7 +114,7 @@ export async function parse_binding(
 /**
  * Runs a binding through every schema stage, up to the schema that gets
  * narrowed and translated: references → properties → redefinitions →
- * canaries → fixups → selected. `trace` gets the schema after each (`TraceEvent`).
+ * canaries → fixups → patterns → selected. `trace` gets the schema after each (`TraceEvent`).
  */
 export async function process_schema(
     binding_path: string,
@@ -148,7 +153,11 @@ export async function process_schema(
 
     trace?.({ kind: "stage", stage: "fixups", schema: structuredClone(fixuped) });
 
-    const selected = merge_selected(fixuped, await selected_definitions(ctx));
+    const patterns_merged = merge_patterns(fixuped);
+
+    trace?.({ kind: "stage", stage: "patterns", schema: structuredClone(patterns_merged) });
+
+    const selected = merge_selected(patterns_merged, await selected_definitions(ctx));
 
     trace?.({ kind: "stage", stage: "selected", schema: structuredClone(selected) });
 

@@ -3,6 +3,130 @@
     "examples": [
         "reg_1v8: regulator-1v8 {\n  compatible = \"regulator-fixed\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  gpio = <&gpio1 16 0>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  gpio-open-drain;\n  vin-supply = <&parent_reg>;\n};\nreg_1v8_clk: regulator-1v8-clk {\n  compatible = \"regulator-fixed-clock\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  clocks = <&clock1>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  vin-supply = <&parent_reg>;\n};\nreg_1v8_domain: regulator-1v8-domain {\n  compatible = \"regulator-fixed-domain\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  power-domains = <&domain1>;\n  required-opps = <&domain1_state1>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  vin-supply = <&parent_reg>;\n};\n"
     ],
+    "pattern_properties": [
+        {
+            "description": "sub-nodes for regulator state in Standby, Suspend-to-RAM, and Suspend-to-DISK modes. Equivalent with standby, mem, and disk Linux sleep states.",
+            "pattern": "^regulator-state-(standby|mem|disk)$",
+            "properties": [
+                {
+                    "key": "regulator-on-in-suspend",
+                    "value": {
+                        "_t": "flag",
+                        "description": "regulator should be on in suspend state."
+                    }
+                },
+                {
+                    "key": "regulator-off-in-suspend",
+                    "value": {
+                        "_t": "flag",
+                        "description": "regulator should be off in suspend state."
+                    }
+                },
+                {
+                    "key": "regulator-suspend-min-microvolt",
+                    "value": {
+                        "_t": "matrix",
+                        "description": "minimum voltage may be set in suspend state.",
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "number",
+                                    "maximum": "2147483647n",
+                                    "minimum": "-2147483648n"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "key": "regulator-suspend-max-microvolt",
+                    "value": {
+                        "_t": "matrix",
+                        "description": "maximum voltage may be set in suspend state.",
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "number",
+                                    "maximum": "2147483647n",
+                                    "minimum": "-2147483648n"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "key": "regulator-suspend-microvolt",
+                    "value": {
+                        "_t": "matrix",
+                        "description": "the default voltage which regulator would be set in suspend. This property is now deprecated, instead setting voltage for suspend mode via the API which regulator driver provides is recommended.",
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "number",
+                                    "maximum": "2147483647n",
+                                    "minimum": "-2147483648n"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "key": "regulator-changeable-in-suspend",
+                    "value": {
+                        "_t": "flag",
+                        "description": "whether the default voltage and the regulator on/off in suspend can be changed in runtime."
+                    }
+                },
+                {
+                    "key": "regulator-mode",
+                    "value": {
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "description": "operating mode in the given suspend state. The set of possible operating modes depends on the capabilities of every hardware so the valid modes are documented on each regulator device tree binding document.",
+                        "typeSize": 32
+                    }
+                },
+                {
+                    "key": "status",
+                    "value": {
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "enum": [
+                                "okay",
+                                "disabled",
+                                "reserved",
+                                "fail",
+                                "fail-needs-probe"
+                            ],
+                            "enum_type": "string"
+                        },
+                        "maxItems": 1,
+                        "minItems": 1
+                    }
+                },
+                {
+                    "key": "pinctrl-names",
+                    "value": {
+                        "_t": "list",
+                        "item": {
+                            "_t": "string"
+                        },
+                        "minItems": 1,
+                        "unique": true
+                    }
+                }
+            ],
+            "required": []
+        }
+    ],
     "properties": [
         {
             "key": "compatible",
@@ -797,6 +921,26 @@
                             "_t": "any"
                         },
                         "maxItems": 1024,
+                        "minItems": 1
+                    }
+                ]
+            }
+        },
+        {
+            "description": "Input supply phandle(s) for this node",
+            "pattern": ".*-supply$",
+            "value": {
+                "_t": "matrix",
+                "description": "Input supply phandle(s) for this node",
+                "maxItems": 1,
+                "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "maxItems": 1,
                         "minItems": 1
                     }
                 ]

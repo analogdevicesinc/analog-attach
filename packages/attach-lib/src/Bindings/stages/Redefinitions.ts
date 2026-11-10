@@ -13,29 +13,37 @@ const TIGHTER: Record<string, (...bounds: number[]) => number> = {
     maximum: Math.min,
 };
 
+/** The two tables of a node schema whose entries an `allOf` entry can define again. */
+export type Table = "properties" | "patternProperties";
+
 /**
- * The definitions of each property of `node`, nearest first: its own `properties`, then those of its `allOf` entries,
- * then those of an entry nested in one; entries as deep as each other in their order. Not the properties of an
- * `if` / `then` branch, which only add to a property, nor those of a child node.
+ * The definitions of each entry of `node`'s `table`, nearest first: its own, then those of its `allOf` entries, then
+ * those of an entry nested in one; entries as deep as each other in their order. Not those of an `if` / `then`
+ * branch, which only add to a property, nor those of a child node.
  */
-export function definitions_by_name(node: Schema): Map<string, unknown[]> {
-    const tables: { depth: number, properties: Schema }[] = [];
+function definitions_by_key(node: Schema, table: Table): Map<string, unknown[]> {
+    const tables: { depth: number, entries: Schema }[] = [];
 
     const collect = (schema: Schema, depth: number): void => {
-        if (is_schema(schema["properties"])) { tables.push({ depth, properties: schema["properties"] }); }
+        if (is_schema(schema[table])) { tables.push({ depth, entries: schema[table] }); }
         for (const entry of Array.isArray(schema["allOf"]) ? schema["allOf"] : []) {
             if (is_schema(entry)) { collect(entry, depth + 1); }
         }
     };
     collect(node, 0);
 
-    const by_name = new Map<string, unknown[]>();
-    for (const { properties } of tables.sort((a, b) => a.depth - b.depth)) {
-        for (const [name, definition] of Object.entries(properties)) {
-            by_name.set(name, [...(by_name.get(name) ?? []), definition]);
+    const by_key = new Map<string, unknown[]>();
+    for (const { entries } of tables.sort((a, b) => a.depth - b.depth)) {
+        for (const [key, definition] of Object.entries(entries)) {
+            by_key.set(key, [...(by_key.get(key) ?? []), definition]);
         }
     }
-    return by_name;
+    return by_key;
+}
+
+/** The definitions of each property of `node`, nearest first (`definitions_by_key`). */
+export function definitions_by_name(node: Schema): Map<string, unknown[]> {
+    return definitions_by_key(node, "properties");
 }
 
 /**
@@ -60,31 +68,62 @@ export function merge_definitions(definitions: unknown[]): unknown {
     return merged;
 }
 
-/** `schema` and its `allOf` entries, at any depth, without the properties named in `names`. */
-function without(schema: Schema, names: Set<string>): Schema {
+/** `schema` and its `allOf` entries, at any depth, without the entries of its `table` named in `keys`. */
+function without(schema: Schema, table: Table, keys: Set<string>): Schema {
     const result: Schema = { ...schema };
 
-    if (is_schema(schema["properties"])) {
-        result["properties"] = Object.fromEntries(Object.entries(schema["properties"]).filter(([name]) => !names.has(name)));
+    const entries = schema[table];
+    if (is_schema(entries)) {
+        result[table] = Object.fromEntries(Object.entries(entries).filter(([key]) => !keys.has(key)));
     }
     if (Array.isArray(schema["allOf"])) {
-        result["allOf"] = schema["allOf"].map(entry => is_schema(entry) ? without(entry, names) : entry);
+        result["allOf"] = schema["allOf"].map(entry => is_schema(entry) ? without(entry, table, keys) : entry);
     }
     return result;
 }
 
-/** `schema` with each of its child nodes merged (`merge_node`), and those its `allOf` entries describe. */
-function merge_children(schema: Schema): Schema {
+/** Which entries of a `table` `merge_table` moves into a node's own, and how it merges their definitions. */
+export type TableMerge = {
+    table: Table;
+    /** Whether the entry `key`, which `own` (the node's own table) has or not, moves. */
+    moves: (key: string, definitions: unknown[], own: Schema) => boolean;
+    merge: (definitions: unknown[]) => unknown;
+};
+
+/**
+ * `node` with each entry of its `table` that `rule` moves merged (`rule.merge`) into the node's own table, and taken
+ * out of its `allOf` entries. Then the same for its child nodes, and those its `allOf` entries describe.
+ */
+export function merge_table(node: Schema, rule: TableMerge): Schema {
+    const by_key = definitions_by_key(node, rule.table);
+    const table = node[rule.table];
+    const own = is_schema(table) ? table : {};
+    const moved = new Set([...by_key].filter(([key, definitions]) => rule.moves(key, definitions, own)).map(([key]) => key));
+
+    let result = node;
+    if (moved.size > 0) {
+        result = without(node, rule.table, moved);
+        const merged: Schema = { ...own };
+        for (const key of moved) {
+            merged[key] = rule.merge(by_key.get(key) ?? []);
+        }
+        result[rule.table] = merged;
+    }
+    return merge_children(result, rule);
+}
+
+/** `schema` with each of its child nodes merged (`merge_table`), and those its `allOf` entries describe. */
+function merge_children(schema: Schema, rule: TableMerge): Schema {
     const result: Schema = { ...schema };
 
     for (const key of ["properties", "patternProperties"]) {
-        const table = schema[key];
-        if (is_schema(table)) {
-            result[key] = Object.fromEntries(Object.entries(table).map(([name, child]) => [name, is_schema(child) ? merge_node(child) : child]));
+        const entries = schema[key];
+        if (is_schema(entries)) {
+            result[key] = Object.fromEntries(Object.entries(entries).map(([name, child]) => [name, is_schema(child) ? merge_table(child, rule) : child]));
         }
     }
     if (Array.isArray(schema["allOf"])) {
-        result["allOf"] = schema["allOf"].map(entry => is_schema(entry) ? merge_children(entry) : entry);
+        result["allOf"] = schema["allOf"].map(entry => is_schema(entry) ? merge_children(entry, rule) : entry);
     }
     return result;
 }
@@ -94,23 +133,11 @@ function merge_children(schema: Schema): Schema {
  * once (the binding, a schema it references and one that references, all of them `backlight`) is merged into one
  * (`merge_definitions`) in the node's own `properties`, and taken out of the entries. Then the same for its child nodes.
  */
-function merge_node(node: Schema): Schema {
-    const by_name = definitions_by_name(node);
-    const redefined = new Set([...by_name].filter(([, definitions]) => definitions.length > 1).map(([name]) => name));
-
-    if (redefined.size === 0) {
-        return merge_children(node);
-    }
-
-    const result = without(node, redefined);
-    const own: Schema = { ...(is_schema(node["properties"]) ? node["properties"] : {}) };
-    for (const name of redefined) {
-        own[name] = merge_definitions(by_name.get(name) ?? []);
-    }
-    result["properties"] = own;
-
-    return merge_children(result);
-}
+const REDEFINED_PROPERTIES: TableMerge = {
+    table: "properties",
+    moves: (_key, definitions) => definitions.length > 1,
+    merge: merge_definitions,
+};
 
 /** Whether the entry at `path` is a child-node pattern that is a whole schema of another file, by its `$id`. */
 function is_inherited_pattern(entry: unknown, path: string[]): entry is Schema & { $id: string } {
@@ -138,7 +165,7 @@ export async function merge_redefinitions(
     references: DtBindingSchema[],
     ctx: SchemaContext,
 ): Promise<DtBindingSchema> {
-    const merged = merge_node(binding as Schema) as DtBindingSchema;
+    const merged = merge_table(binding as Schema, REDEFINED_PROPERTIES) as DtBindingSchema;
 
     const parents = new Map<string, Schema>();
     for (const [entry, path] of entries_of(merged)) {
