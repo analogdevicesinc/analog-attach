@@ -10,7 +10,7 @@ function watchWorkspaceDeps(): Plugin {
   return {
     name: 'watch-workspace-deps',
     configureServer(server) {
-      const hdsReactDistributionPath = path.resolve(__dirname, '../hds-react/dist');
+      const hdsReactDistributionPath = path.resolve(import.meta.dirname, '../hds-react/dist');
 
       // Watch the hds-react dist folder
       server.watcher.add(hdsReactDistributionPath + '/**/*');
@@ -33,7 +33,7 @@ function serveCodeicons(): Plugin {
   return {
     name: 'serve-codicons',
     configureServer(server) {
-      const codiconsPath = path.resolve(__dirname, '../../node_modules/@vscode/codicons/dist');
+      const codiconsPath = path.resolve(import.meta.dirname, '../../node_modules/@vscode/codicons/dist');
       
       server.middlewares.use((request, response, next) => {
         if (request.url?.startsWith('/codicons/')) {
@@ -75,8 +75,8 @@ function copyCodeicons(): Plugin {
   return {
     name: 'copy-codicons',
     closeBundle() {
-      const codiconsSource = path.resolve(__dirname, '../../node_modules/@vscode/codicons/dist');
-      const distributionPath = path.resolve(__dirname, 'dist/codicons');
+      const codiconsSource = path.resolve(import.meta.dirname, '../../node_modules/@vscode/codicons/dist');
+      const distributionPath = path.resolve(import.meta.dirname, 'dist/codicons');
       
       // Create codicons directory in dist
       if (!fs.existsSync(distributionPath)) {
@@ -102,7 +102,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         entryFileNames: 'webview.js',
         assetFileNames: (assetInfo) => {
@@ -117,11 +117,11 @@ export default defineConfig({
   publicDir: 'public',
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
       // Alias for codicons in dev mode
-      '/codicons': path.resolve(__dirname, '../../node_modules/@vscode/codicons/dist'),
+      '/codicons': path.resolve(import.meta.dirname, '../../node_modules/@vscode/codicons/dist'),
       // Alias for webview-playground from workspace root
-      '/node_modules/@vscode-elements/webview-playground': path.resolve(__dirname, '../../node_modules/@vscode-elements/webview-playground'),
+      '/node_modules/@vscode-elements/webview-playground': path.resolve(import.meta.dirname, '../../node_modules/@vscode-elements/webview-playground'),
     },
   },
   optimizeDeps: {

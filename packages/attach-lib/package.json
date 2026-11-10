@@ -45,6 +45,7 @@
     "yaml": "^2.8.3"
   },
   "devDependencies": {
+    "@microsoft/api-extractor": "^7.60.1",
     "@types/node": "22.x",
     "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.72.1",
@@ -52,8 +53,8 @@
     "eslint": "^10.14.0",
     "eslint-plugin-unicorn": "^79.0.0",
     "typescript": "~6.0.3",
-    "vite": "^7.3.8",
-    "vite-plugin-dts": "^4.5.4",
+    "vite": "^8.3.7",
+    "vite-plugin-dts": "^5.1.2",
     "vitest": "^5.1.0"
   }
 }

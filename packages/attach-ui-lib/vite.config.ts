@@ -10,7 +10,7 @@ export default defineConfig({
       insertTypesEntry: true,
       include: ['src/**/*.ts', 'src/**/*.tsx'],
       exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
-      rollupTypes: true,
+      bundleTypes: true,
     }),
   ],
   css: {
@@ -21,12 +21,12 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      entry: resolve(import.meta.dirname, 'src/index.ts'),
       name: 'AttachUILib',
       formats: ['es'],
       fileName: 'index',
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: ['react', 'react-dom', 'hds-react', 'classnames', 'extension-protocol'],
       output: {
         globals: {

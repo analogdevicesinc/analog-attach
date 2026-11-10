@@ -29,12 +29,12 @@
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@vitejs/plugin-react": "^6.3.0",
     "hds-components": "workspace:*",
     "sass": "^1.108.1",
     "typescript": "^5.7.2",
-    "vite": "^6.4.6",
-    "vite-plugin-dts": "^4.3.0"
+    "vite": "^8.3.7",
+    "vite-plugin-dts": "^5.1.2"
   },
   "peerDependencies": {
     "react": "^19.0.0"
