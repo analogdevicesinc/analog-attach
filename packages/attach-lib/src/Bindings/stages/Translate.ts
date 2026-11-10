@@ -570,7 +570,6 @@ function is_single_integer(object: Schema): boolean {
         && typeof dt_type === "string" && /^u?int(8|16|32|64)$/.test(dt_type);
 }
 
-// TODO: handle objects
 /** `name`: the property's, when the schema is one's (a `compatible` reads its `oneOf` of lists apart). */
 function narrow_object(object: unknown, name?: string): AttachType {
     // `true`, a list or a value: nothing to read
