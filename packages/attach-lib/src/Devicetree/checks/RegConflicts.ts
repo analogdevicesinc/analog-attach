@@ -226,14 +226,15 @@ function gpio_specifier_count(property: DTProperty, gpio_cells: (provider: strin
 }
 
 /**
- * Whether the overlay adds the node or sets its reg or status, the only ways
- * it can make the node clash. A base node the overlay only adds children to
- * (pin groups under gpio) keeps the clashes it has in the base.
+ * Whether the overlay adds the node or sets its reg or status, in any of its
+ * fragments for the node, the only ways it can make the node clash. A base
+ * node the overlay only adds children to (pin groups under gpio) keeps the
+ * clashes it has in the base.
  */
 function changes_claim(overlay: DeviceTreeOverlay, path: string): boolean {
-    const found = overlay.find_node(path);
-    if (found === undefined) { return false; }
-    return !found.is_in_base || found.node.properties.some(p => p.name === "reg" || p.name === "status");
+    if (overlay.overlay_nodes_at(path).length === 0) { return false; }
+    if (overlay.get_base_dts()?.node_at(path) === undefined) { return true; }
+    return overlay.overlay_properties(path).some(p => p.name === "reg" || p.name === "status");
 }
 
 /** The first address two regs both claim. A size of 0 still claims its address. */
@@ -350,6 +351,19 @@ if (import.meta.vitest) {
             "&gpio {\n\tpins { brcm,pins = <19>; };\n};",
         );
         expect(reg_conflicts(overlay).map(c => c.in_overlay)).toEqual([[false, false]]);
+    });
+
+    test("reg_conflicts — a base node a later fragment enables is on the overlay side", () => {
+        const base = "\tsoc {\n\t\t#address-cells = <1>;\n\t\t#size-cells = <1>;\n\t\tgpiomem@7e200000 { reg = <0x7e200000 0x1000>; };\n\t\tgpio: gpio@7e200000 { reg = <0x7e200000 0x1000>; status = \"disabled\"; };\n\t};";
+        const in_overlay = (body: string) => reg_conflicts(setup(base, body)).map(c => c.in_overlay);
+        expect(in_overlay("&gpio { status = \"okay\"; };")).toEqual([[false, true]]);
+        expect(in_overlay("&gpio { pins { brcm,pins = <4>; }; };\n&gpio { status = \"okay\"; };")).toEqual([[false, true]]);
+    });
+
+    test("address_cells_of — the cells a later fragment sets", () => {
+        const overlay = setup("\tsoc {\n\t\tbus: bus { };\n\t};", "&bus { };\n&bus { #address-cells = <2>; #size-cells = <1>; };");
+        expect(address_cells_of(overlay, "/soc/bus")).toEqual({ address: 2, size: 1 });
+        expect(address_cells_of(overlay, "bus")).toEqual({ address: 2, size: 1 });
     });
 
     test("reg_conflicts — a base node whose reg the overlay sets is on the overlay side", () => {

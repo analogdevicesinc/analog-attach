@@ -216,7 +216,8 @@ literal. Example:
 **ADD-048** When the node gets an address, the CLI shall write `reg` with
 the parent's `#address-cells` cells of address (most significant first)
 followed by `#size-cells` cells of 0. Each count comes from the overlay's
-node, else the base's, else 1 for the address and 0 for the size. When the
+fragments for the parent (a later one's value winning, as in dtc), else the
+base's, else 1 for the address and 0 for the size. When the
 size is more than 0 cells, the CLI shall give the note `reg size set to 0;
 update reg with the real size`.
 

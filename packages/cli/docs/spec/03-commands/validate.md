@@ -240,9 +240,9 @@ this section. The other chapters cite it.
 **VALIDATE-100** Two children of one node *clash* when both are enabled (no
 `status`, or `status` of `okay` or `ok`), both have a `reg` that decodes with
 the parent's `#address-cells` and `#size-cells` (a cell written as an
-expression counting as its value, as in ADD-047; from the first overlay node
-for the parent, else the base's, else 1 and 0, as in ADD-048; open issue
-V-11), and:
+expression counting as its value, as in ADD-047; from the overlay's
+fragments for the parent, a later one's value winning as in dtc, else the
+base's, else 1 and 0, as in ADD-048), and:
 - the parent's `#size-cells` is 0, and an address of one equals an address of
   the other; or
 - the parent's `#size-cells` is more than 0, and a range of one overlaps a
@@ -297,10 +297,10 @@ selects (`list.md` LIST-081).
 ### 7.3 The overlay's nodes
 
 **VALIDATE-110** A node is *the overlay's* when the overlay adds it, or when
-the first overlay node for its path (in file order) sets its `reg` or
-`status`. A base node the overlay only adds children to (pin groups under
-`gpio`) isn't, and neither is one whose `reg` or `status` only a later
-fragment for it sets. (Open issue V-11.)
+any of the overlay's fragments for its path sets its `reg` or `status`: with
+`&gpio { pins { brcm,pins = <4>; }; };` followed by `&gpio { reg =
+<0x7e200000 0xb4>; };`, `gpio` is the overlay's. A base node the overlay only
+adds children to (pin groups under `gpio`) isn't.
 
 ### 7.4 When they are reported
 
@@ -408,16 +408,6 @@ gpio-controller; #gpio-cells = <2>; }; };` and `&spi0 { cs-gpios = <&exp 1
 0>; a@3 { reg = <3>; }; };`, `validate` gives no warning, while `<&gpio 1 0>`
 gives `chip select 3 has no cs-gpios entry: spi@7e204000 has chip select 0`.
 A fix would be to look the provider up in the merged tree.
-
-**V-11. Only the first fragment for a node counts.** VALIDATE-110 reads
-`reg` and `status` from the first overlay node for the path, and
-VALIDATE-100 takes the parent's `#address-cells` and `#size-cells` from it
-too. With `&gpio { pins { brcm,pins = <4>; }; };` followed by `&gpio { reg =
-<0x7e200000 0xb4>; };`, `validate` gives no warning. With only the second
-fragment it gives `reg overlaps gpiomem at 0x7e200000; If gpio@7e200000
-replaces it: disable /soc/gpiomem`. Imported overlays often have several
-fragments for one node. A fix would be to read the node as all its overlay
-fragments together (`effective_node`), as `read` and `update` do.
 
 **V-12. The node count includes the external nodes.** `<n> nodes checked`
 (VALIDATE-502) counts every node the workfile has, external ones too, which

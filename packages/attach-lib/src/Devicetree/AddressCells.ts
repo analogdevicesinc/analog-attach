@@ -1,24 +1,34 @@
 import { PropertyBuilder } from "./build/PropertyBuilder.js";
 import { has_property, number_property } from "./nodes/Access.js";
 import type { DeviceTreeOverlay } from "./DeviceTreeOverlay.js";
+import type { DTNode } from "./syntax/AST.js";
 
 export interface AddressCells {
     address: number;
     size: number;
 }
 
+/**
+ * The `#address-cells` / `#size-cells` of the node at `parent_path` (a path, or a label): the overlay's, over all its
+ * fragments for the node (a later one's wins, as in dtc), else the base's, else 1 and 0.
+ */
 export function address_cells_of(overlay: DeviceTreeOverlay, parent_path: string): AddressCells {
-    const node = overlay.find_node(parent_path)?.node;
-    const base_node = overlay.get_base_dts()?.node_at(parent_path);
-
-    const overlay_addr = node === undefined ? undefined : number_property(node, "#address-cells");
-    const overlay_size = node === undefined ? undefined : number_property(node, "#size-cells");
-    const base_addr = base_node === undefined ? undefined : number_property(base_node, "#address-cells");
-    const base_size = base_node === undefined ? undefined : number_property(base_node, "#size-cells");
+    const base = overlay.get_base_dts();
+    const path = parent_path.startsWith("/")
+        ? parent_path
+        : overlay.find_node(parent_path)?.node_path ?? base?.locate(parent_path)?.path ?? parent_path;
+    // The overlay's properties before the base's: `number_property` reads the first of a name
+    const node: DTNode = {
+        name: "",
+        unit_addr: undefined,
+        labels: [],
+        properties: [...overlay.overlay_properties(path), ...(base?.node_at(path)?.properties ?? [])],
+        children: [],
+    };
 
     return {
-        address: Number(overlay_addr ?? base_addr ?? 1n),
-        size: Number(overlay_size ?? base_size ?? 0n),
+        address: Number(number_property(node, "#address-cells") ?? 1n),
+        size: Number(number_property(node, "#size-cells") ?? 0n),
     };
 }
 
