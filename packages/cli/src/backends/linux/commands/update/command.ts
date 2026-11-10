@@ -418,6 +418,18 @@ export function implicit_interrupt_parent(
     if (inherited === undefined) {
         return { warning: `No interrupt-parent inherited for ${node_path}; set one: update ${node_path} interrupt-parent <controller>` };
     }
+
+    let warning: string | undefined;
+    if (inherited.interrupt_cells !== undefined) {
+        const row_count = count_interrupt_cells(built);
+        if (row_count !== undefined && row_count !== inherited.interrupt_cells) {
+            warning = `${inherited.label ?? inherited.path} has #interrupt-cells = <${inherited.interrupt_cells}> but interrupts has ${row_count} cells; set interrupt-parent explicitly`;
+        }
+    }
+
+    // The node's own base interrupt-parent is written already: nothing inherited to show.
+    if (inherited.from === node_path) { return { warning }; }
+
     if (inherited.label === undefined) {
         return { warning: `Inherited interrupt-parent at ${inherited.from} has no label; cannot write &{/path} in a plugin` };
     }
@@ -428,14 +440,6 @@ export function implicit_interrupt_parent(
         .build();
 
     place_property(overlay, target_reference, found, is_base_target, ip_built, "interrupt-parent");
-
-    let warning: string | undefined;
-    if (inherited.interrupt_cells !== undefined) {
-        const row_count = count_interrupt_cells(built);
-        if (row_count !== undefined && row_count !== inherited.interrupt_cells) {
-            warning = `${inherited.label} has #interrupt-cells = <${inherited.interrupt_cells}> but interrupts has ${row_count} cells; set interrupt-parent explicitly`;
-        }
-    }
 
     return {
         message: `Set interrupt-parent = <&${inherited.label}> on ${node_path} (inherited from ${inherited.from})`,
@@ -528,6 +532,42 @@ if (import.meta.vitest) {
         if (base.node_exists(name)) { return true; }
         return overlay.find_node(name) !== undefined;
     };
+
+    test("implicit_interrupt_parent — an inherited parent is written, the node's own base one isn't", () => {
+        const base = DeviceTree.new_from_string(`/dts-v1/;
+/ {
+    interrupt-parent = <&gic>;
+    gic: gic {
+        interrupt-controller;
+        #interrupt-cells = <3>;
+    };
+    aon: aon {
+        interrupt-controller;
+        #interrupt-cells = <1>;
+    };
+    hdmi: hdmi {
+        interrupt-parent = <&aon>;
+    };
+    dsi: dsi {
+    };
+};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const run = (label: string, cells: string) => {
+            const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n&${label} {\n\tinterrupts = <${cells}>;\n};`, base);
+            if (typeof overlay === "string") { throw new TypeError(overlay); }
+            const { target_reference, found, is_base_target } = resolve_write_target(label, overlay, base);
+            const built = found?.node.properties.find(p => p.name === "interrupts");
+            const result = implicit_interrupt_parent(overlay, base, target_reference, found, is_base_target, "interrupts", built);
+            const written = overlay.overlay_properties(`/${label}`).some(p => p.name === "interrupt-parent");
+            return { ...result, written };
+        };
+        expect(run("dsi", "1 2 3")).toEqual({ message: "Set interrupt-parent = <&gic> on /dsi (inherited from /)", warning: undefined, written: true });
+        expect(run("hdmi", "1")).toEqual({ warning: undefined, written: false });
+        // The cells are still checked against it.
+        expect(run("hdmi", "1 2")).toEqual({
+            warning: "aon has #interrupt-cells = <1> but interrupts has 2 cells; set interrupt-parent explicitly", written: false,
+        });
+    });
 
     test("decide_update — known flag, no value → set-flag", () => {
         expect(decide_update("flag", [], false)).toBe("set-flag");

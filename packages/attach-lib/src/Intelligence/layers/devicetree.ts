@@ -56,9 +56,12 @@ function suggest_interrupt_parents(
         const matching = controllers.find(c => c.label === inherited.label);
         if (matching !== undefined) {
             const cells = number_property(matching.node, "#interrupt-cells");
+            const origin = inherited.from === node_path
+                ? "; the node's own"
+                : `${inherited.from === "/" ? "" : ` at ${inherited.from}`}; inherited from ${inherited.from}`;
             suggestions.push({
                 rows: [[{ label: inherited.label }]],
-                display: `${inherited.label} — interrupt controller, #interrupt-cells = <${cells ?? "?"}>${inherited.from === "/" ? "" : ` at ${inherited.from}`}; inherited from ${inherited.from}`,
+                display: `${inherited.label} — interrupt controller, #interrupt-cells = <${cells ?? "?"}>${origin}`,
                 source: "devicetree",
             });
         }
@@ -245,6 +248,10 @@ if (import.meta.vitest) {
         spi0: spi@7e204000 {
             #address-cells = <1>;
             #size-cells = <0>;
+            adc@1 {
+                reg = <1>;
+                interrupt-parent = <&gpio>;
+            };
         };
     };
     no_label_intc {
@@ -271,6 +278,17 @@ if (import.meta.vitest) {
         expect(result[1]!.note).toBeUndefined();
         expect(result.every(s => !s.display.includes("no_label_intc"))).toBe(true);
         expect(result.every(s => !s.display.includes("disabled_intc"))).toBe(true);
+    });
+
+    test("devicetree_layer — interrupt-parent: the node's own first, marked as its own", () => {
+        const result = devicetree_layer.suggest_values!("interrupt-parent", {
+            devicetree: int_dt, data: "{}",
+            placement: { node_path: "/soc/spi@7e204000/adc@1", parent_path: "/soc/spi@7e204000", siblings: [] },
+        }, []);
+        expect(result.map(s => s.display)).toStrictEqual([
+            "gpio — interrupt controller, #interrupt-cells = <2>; the node's own",
+            "gicv2 — interrupt controller, #interrupt-cells = <3>",
+        ]);
     });
 
     test("devicetree_layer — interrupt-parent: no suggestions for other properties", () => {

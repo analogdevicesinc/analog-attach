@@ -262,32 +262,39 @@ controller's (`num-cs`, `cs-gpios`). Their wording is in `validate.md`.
 **UPDATE-080** When `<property>` is `interrupts`, the value was built (§6.2,
 cells or strings), the target node was in the overlay before this command
 (Open issue U-8), and that overlay node has no `interrupt-parent`, the CLI
-shall look up the interrupt parent the node inherits in the base tree.
-Starting at the node's parent and going up, the first node that has
-`#interrupt-cells` is the interrupt parent, and the first that has an
-`interrupt-parent` the base can resolve gives the node it references. That
-node (the controller, or the one with `interrupt-parent`) is `<from>`. The
-overlay's nodes and properties, and the target node's own base
-`interrupt-parent`, aren't looked at (Open issue U-12).
+shall look up the node's interrupt parent in the base tree, as Linux does.
+The target node's own base `interrupt-parent`, when the base can resolve it,
+gives the node it references. Otherwise, starting at the node's parent and
+going up, the first node that has `#interrupt-cells` is the interrupt parent,
+and the first that has an `interrupt-parent` the base can resolve gives the
+node it references. The target node's own `#interrupt-cells` doesn't make it
+its own parent. The node the parent came from (the target node, the
+controller, or the ancestor with `interrupt-parent`) is `<from>`. The
+overlay's nodes and properties aren't looked at (Open issue U-12).
 
-**UPDATE-081** When an interrupt parent is inherited and it has a label, the
-CLI shall write `interrupt-parent = <&<label>>` to the node (§6.4) and add the
-detail `Set interrupt-parent = <&<label>> on <node path> (inherited from
-<from>)`, `<node path>` being the absolute path. The `<&` and `>` around
-`<label>` are literal.
+**UPDATE-081** When an interrupt parent is inherited (`<from>` isn't the
+target node) and it has a label, the CLI shall write `interrupt-parent =
+<&<label>>` to the node (§6.4) and add the detail `Set interrupt-parent =
+<&<label>> on <node path> (inherited from <from>)`, `<node path>` being the
+absolute path. The `<&` and `>` around `<label>` are literal. When `<from>`
+is the target node, its own base `interrupt-parent` already says which
+parent applies, so the CLI shall write none and add no detail.
 
-**UPDATE-082** When UPDATE-081 applies and the interrupt parent's
-`#interrupt-cells` differs from the number of cells in the first row of
-`interrupts`, the CLI shall give the warning `<label> has #interrupt-cells =
-<<n>> but interrupts has <m> cells; set interrupt-parent explicitly`. The
-outer `<` and `>` around `<n>` are literal. A value written as strings has no
-cell row and gets no warning.
+**UPDATE-082** When UPDATE-080 finds an interrupt parent that is inherited
+and has a label (UPDATE-081), or is the target node's own, and that
+parent's `#interrupt-cells` differs from the number of cells in the first
+row of `interrupts`, the CLI shall give the warning `<label> has
+#interrupt-cells = <<n>> but interrupts has <m> cells; set interrupt-parent
+explicitly`, `<label>` being the parent's path when it has no label. The
+outer `<` and `>` around `<n>` are literal. A value written as strings has
+no cell row and gets no warning.
 
 **UPDATE-083** If no interrupt parent is inherited, then the CLI shall give the
 warning `No interrupt-parent inherited for <node path>; set one: update <node
 path> interrupt-parent <controller>`, where `<controller>` is literal. If the
 inherited one has no label, then the CLI shall give the warning `Inherited
-interrupt-parent at <from> has no label; cannot write &{/path} in a plugin`.
+interrupt-parent at <from> has no label; cannot write &{/path} in a plugin`;
+the target node's own parent gets no such warning (UPDATE-081).
 In both cases `interrupts` is still written.
 
 ### 6.8 Output of a set
@@ -529,19 +536,15 @@ writes the refused value when the user skips (`-`) the refused property.
 compares `#interrupt-cells` with the first row's cell count, so `interrupts
 = <1 2>, <3>` passes against two cells.
 
-**U-12. The inherited interrupt-parent ignores the overlay and the node's own
-base value.** UPDATE-080 walks the base tree from the node's parent up, and
-resolves an ancestor's `interrupt-parent` in the base only. After `update
-spi0 interrupt-parent gpio`, `update dac interrupts 5 2` still writes
-`interrupt-parent = <&gicv2>` (inherited from `/`), which overrides what the
-overlay set on `spi0`. `hdmi0` has `interrupt-parent = <&aon_intr>` in the
-base; after `update hdmi0 status okay`, `update hdmi0 interrupts 1` writes
-`interrupt-parent = <&gicv2>` into the fragment, replacing the node's own
-parent. The lookup also runs for a value that isn't cells: `update spidev1
-interrupts hello` (spidev1 already in the overlay) writes `interrupts =
-"hello"` and an `interrupt-parent`. A fix would be to start at the node
-itself and walk the merged tree (the lib's `overlay_lookup`, which nothing
-uses yet), and to skip the lookup when `interrupts` isn't cells.
+**U-12. The inherited interrupt-parent ignores the overlay.** UPDATE-080
+walks the base tree and resolves an `interrupt-parent` in the base only.
+After `update spi0 interrupt-parent gpio`, `update dac interrupts 5 2` still
+writes `interrupt-parent = <&gicv2>` (inherited from `/`), which overrides
+what the overlay set on `spi0`. The lookup also runs for a value that isn't
+cells: `update spidev1 interrupts hello` (spidev1 already in the overlay)
+writes `interrupts = "hello"` and an `interrupt-parent`. A fix would be to
+walk the merged tree (`base_lookup(overlay.merged_tree())`), and to skip the
+lookup when `interrupts` isn't cells.
 
 **U-13. An empty value is written as `<>`.** Only the `strings` shape hint
 refuses an empty value (UPDATE-031). With the `cells` hint or none,

@@ -319,8 +319,8 @@ stack under its own name.
 **LIST-072** When the property is `clocks` or ends in `-supply`, the CLI shall
 put the values that name a node the overlay adds (its label is the overlay's
 and not the base's) before the others, keeping the order within each group.
-For other properties the stack's order stays (the inherited interrupt parent
-first).
+For other properties the stack's order stays (the node's interrupt parent
+first, its own base `interrupt-parent` or the one it inherits).
 
 **LIST-073** When the node's binding resolves, the CLI shall check each value
 against the binding's definition of the property, narrowed with the value

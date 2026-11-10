@@ -55,7 +55,6 @@ export { placement_from_overlay } from "./layers/placement.js";
 export {
     effective_interrupt_parent,
     base_lookup,
-    overlay_lookup,
     type InterruptParentInfo,
     type NodeLookup,
 } from "./interrupt_parent.js";
