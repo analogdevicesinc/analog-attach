@@ -1,15 +1,15 @@
 import { Result } from "../result.js";
 import { bindings_directory, create_context, SchemaContext, SchemaPaths } from "./Context.js";
 import { apply_JSONSchema_fixups, StepInfo } from "./fixups/Fixups.js";
-import type { ParsedBinding } from "./model/ParsedBinding.js";
+import type { ParsedBinding, PropertyPatternRule } from "./model/ParsedBinding.js";
 import { DtBindingSchema } from "./schema/Schema.js";
 import { insert_canaries } from "./stages/Canaries.js";
 import { merge_patterns } from "./stages/Patterns.js";
 import { resolve_properties } from "./stages/Properties.js";
-import { merge_redefinitions } from "./stages/Redefinitions.js";
+import { merge_definitions, merge_redefinitions } from "./stages/Redefinitions.js";
 import { resolve_references } from "./stages/References.js";
-import { merge_selected, selected_definitions } from "./stages/Selected.js";
-import { translate_JSONSchema } from "./stages/Translate.js";
+import { merge_selected, selected_definitions, type SelectedDefinitions } from "./stages/Selected.js";
+import { property_pattern_rule, translate_JSONSchema } from "./stages/Translate.js";
 import { filter_peripheral_properties, load_spi_peripherals, type ControllerContext } from "./stages/VendorFilter.js";
 import type { PipelineTracer } from "./Trace.js";
 
@@ -93,7 +93,8 @@ export async function parse_binding(
 ): Promise<Result<ProcessedBinding, PipelineError>> {
 
     const trace = options?.trace;
-    const processed = await process_schema(binding_path, create_context(paths), trace);
+    const ctx = create_context(paths);
+    const processed = await process_schema(binding_path, ctx, trace);
 
     if (Result.is_err(processed)) {
         return processed;
@@ -108,7 +109,32 @@ export async function parse_binding(
     const binding = filter(translated);
     trace?.({ kind: "translated", step: "vendor-filter", binding: structuredClone(binding) });
 
-    return Result.Ok({ schema: processed.value, binding, to_binding: schema => filter(translate_JSONSchema(schema)) });
+    // After the trace: the same for every binding, and nothing a step did to this one
+    const selected_patterns = selected_pattern_rules(await selected_definitions(ctx));
+    return Result.Ok({
+        schema: processed.value,
+        binding: { ...binding, selected_patterns },
+        to_binding: schema => ({ ...filter(translate_JSONSchema(schema)), selected_patterns }),
+    });
+}
+
+const translated_selected = new WeakMap<SelectedDefinitions, readonly PropertyPatternRule[]>();
+
+/**
+ * The property patterns of the `select: true` schemas that type a name, each key's definitions merged
+ * (`merge_definitions`) and translated, in file order (`ParsedBinding.selected_patterns`): not the ~860 of
+ * vendor-prefixes.yaml (`^adi,.*`), nor dt-core.yaml's catch-all, which allow names but say nothing of their values.
+ * Translated once per `selected_definitions`.
+ */
+function selected_pattern_rules(selected: SelectedDefinitions): readonly PropertyPatternRule[] {
+    const cached = translated_selected.get(selected);
+    if (cached !== undefined) { return cached; }
+
+    const rules = [...selected.patterns]
+        .map(([pattern, definitions]) => property_pattern_rule(pattern, merge_definitions(definitions)))
+        .filter(rule => rule.value._t !== "unknown");
+    translated_selected.set(selected, rules);
+    return rules;
 }
 
 /**

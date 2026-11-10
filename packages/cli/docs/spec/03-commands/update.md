@@ -34,7 +34,7 @@ GRM-072).
 | Target node | The node `<path>` resolves to (GRM-025 to GRM-027), in the overlay or the base. |
 | Base target | A target node that the base has, whether or not the overlay already changes it. |
 | Overlay node | A target node that only the overlay has (the overlay adds it). |
-| Definition | What the target node's binding says about `<property>`: by name, else by a property pattern of the binding. |
+| Definition | What the target node's binding says about `<property>`: by name, else by the first property pattern of the binding that matches it, typed by a selected pattern when it says nothing of the value (LIST-055: `in1-supply` under `"^in[13]-supply$": true` is a phandle, so its shape hint is `cells`). |
 | Shape hint | What the definition gives the value: `flag`, `strings` (a string or list of strings, string enums included), `cells` (numbers, references, matrices), or none (no binding, no definition, or an untyped one). The hint shapes the value and never refuses it, except for `flag` (UPDATE-030): what the definition doesn't allow is written with a warning (UPDATE-015, UPDATE-040, UPDATE-041). |
 | Merged node | The target node as the base and the overlay together have it. |
 

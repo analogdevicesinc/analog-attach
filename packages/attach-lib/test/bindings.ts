@@ -45,6 +45,12 @@ function stable(value: unknown): unknown {
 
 /**
  * The JSON a snapshot holds: keys sorted, so a change of their order isn't a change, and bigints as `"<n>n"`, so a
- * bigint that becomes a number is one. `vitest -u` rewrites the snapshots.
+ * bigint that becomes a number is one. Not a binding's `selected_patterns`, the same for every binding (the tests of
+ * `property_definition` check them). `vitest -u` rewrites the snapshots.
  */
-export const snapshot = (value: unknown): string => `${JSON.stringify(stable(value), undefined, 4)}\n`;
+export const snapshot = (value: unknown): string => {
+    const shown = typeof value === 'object' && value !== null && 'selected_patterns' in value
+        ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'selected_patterns'))
+        : value;
+    return `${JSON.stringify(stable(shown), undefined, 4)}\n`;
+};

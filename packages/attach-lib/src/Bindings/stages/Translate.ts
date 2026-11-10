@@ -18,17 +18,13 @@ export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
             continue;
         }
 
-        const node_schema = typeof schema === 'object' ? schema as DtBindingSchema : undefined;
-        const description = node_schema?.description ?? "";
-
         if (!is_node_pattern(pattern, schema)) {
-            property_patterns.push({
-                pattern: pattern,
-                description: description,
-                value: narrow_object(schema)
-            });
+            property_patterns.push(property_pattern_rule(pattern, schema));
             continue;
         }
+
+        const node_schema = typeof schema === 'object' ? schema as DtBindingSchema : undefined;
+        const description = node_schema?.description ?? "";
 
         pattern_properties.push({
             pattern: pattern,
@@ -47,6 +43,12 @@ export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
         property_patterns: property_patterns.length === 0 ? undefined : property_patterns,
         examples: fixuped.examples ?? []
     };
+}
+
+/** A pattern of properties (not of child nodes) and its schema, translated. */
+export function property_pattern_rule(pattern: string, schema: unknown): PropertyPatternRule {
+    const description = is_schema(schema) && typeof schema["description"] === "string" ? schema["description"] : "";
+    return { pattern, description, value: narrow_object(schema) };
 }
 
 /**

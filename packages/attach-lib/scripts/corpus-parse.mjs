@@ -60,7 +60,8 @@ async function summarize(file) {
     const message = parsed.error.message.replaceAll(linux, "<linux>").replaceAll(dt_schema, "<dt-schema>").replaceAll("\n", " ");
     return { entry: `!${parsed.error.stage}: ${message.slice(0, 300)}` };
   }
-  const binding = parsed.value.parsed_binding;
+  // Not its selected_patterns: the same for every binding, and the rule tests check them
+  const { selected_patterns: _selected, ...binding } = parsed.value.parsed_binding;
   return {
     entry: createHash("sha1").update(JSON.stringify(binding, replacer)).digest("hex").slice(0, 12),
     dump: JSON.stringify(binding, replacer, 2) + "\n",

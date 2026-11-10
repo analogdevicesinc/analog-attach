@@ -8,6 +8,7 @@ import {
     populate_properties,
     unit_radix,
     node_data_json,
+    property_definition,
 } from "attach-lib";
 import type {
     DTNode,
@@ -20,6 +21,7 @@ import type {
     PopulateOptions,
     ControllerContext,
     ParseOptions,
+    PropertyDefinition,
 } from "attach-lib";
 
 import path from "node:path";
@@ -34,6 +36,8 @@ export type NodeBinding = {
     child_nodes: PatternPropertyRule[];
     /** Properties named by a pattern (e.g. `^adi,bypass-attenuator-in[0-4]$`). */
     property_patterns: PropertyPatternRule[];
+    /** The patterns of the `select: true` schemas that type a name (`.*-supply$`), for a pattern that doesn't (`ParsedBinding.selected_patterns`). */
+    selected_patterns?: readonly PropertyPatternRule[];
     /** The YAML file the properties come from (the parent's, for a pattern match). */
     binding_path: string;
     origin:
@@ -53,21 +57,16 @@ export function narrowed_binding(binding: NodeBinding, node: DTNode): NodeBindin
     return narrowed === undefined ? binding : { ...binding, properties: narrowed.properties, required_properties: narrowed.required_properties };
 }
 
-/** A binding's definition of a property, and the pattern it came from when it isn't named. */
-export type PropertyDefinition = ResolvedProperty & { pattern?: string };
-
-/** The definition of `name`: the property of that name, else the first property pattern that matches it. */
+/**
+ * The definition of `name`: the property of that name, else the first property pattern that matches it, typed by a
+ * selected pattern when it says nothing of the value (`property_definition`: `"^in[13]-supply$": true` is a phandle).
+ */
 export function find_property_definition(
-    binding: Pick<NodeBinding, "property_patterns">,
+    binding: Pick<NodeBinding, "property_patterns" | "selected_patterns">,
     properties: ResolvedProperty[],
     name: string,
 ): PropertyDefinition | undefined {
-    const named = properties.find(p => p.key === name);
-    if (named !== undefined) { return named; }
-    const rule = binding.property_patterns.find(r => new RegExp(r.pattern).test(name));
-    if (rule === undefined) { return undefined; }
-    const value = rule.value.description === undefined && rule.description !== "" ? { ...rule.value, description: rule.description } : rule.value;
-    return { key: name, value, pattern: rule.pattern };
+    return property_definition(binding, properties, name);
 }
 
 export function match_pattern_rule(
@@ -159,6 +158,7 @@ export async function resolve_node_binding(
             required_properties: initial.required_properties,
             child_nodes: initial.pattern_properties ?? [],
             property_patterns: initial.property_patterns ?? [],
+            ...(initial.selected_patterns === undefined ? {} : { selected_patterns: initial.selected_patterns }),
             binding_path,
             origin: { kind: "compatible", compatible: compatible_value },
             narrow_and_populate(node: DTNode) {
@@ -287,6 +287,16 @@ if (import.meta.vitest) {
     test("find_property_definition — the pattern's description when the type has none", () => {
         const binding = { property_patterns: [{ pattern: "-supply$", description: "Input supply", value: { _t: "unknown" } as const }] };
         expect(find_property_definition(binding, [], "vdd-supply")?.value.description).toBe("Input supply");
+    });
+
+    test("find_property_definition — a pattern that doesn't type the name takes a selected pattern's type, with its own description", () => {
+        const phandle: AttachType = { _t: "matrix", rows: [{ _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 }], minItems: 1, maxItems: 1 };
+        const binding = {
+            property_patterns: [{ pattern: "^in[13]-supply$", description: "Input supply", value: { _t: "unknown" } as const }],
+            selected_patterns: [{ pattern: ".*-supply$", description: "", value: phandle }],
+        };
+        expect(find_property_definition(binding, [], "in3-supply")).toEqual({ key: "in3-supply", value: { ...phandle, description: "Input supply" }, pattern: "^in[13]-supply$" });
+        expect(find_property_definition(binding, [], "vdd-supply")).toBeUndefined();
     });
 
     test("narrowed_binding — the properties and required list the node's data selects; the binding itself when narrowing fails", () => {

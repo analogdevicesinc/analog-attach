@@ -109,7 +109,10 @@ The lib (`Bindings/schema/PatternKind.ts`) splits a binding's patternProperties 
   with the same fixups and types as named properties.
 
 `find_property_definition` (`binding-resolution.ts`) looks a property up by name, then by property
-pattern. These all go through it: `update`'s shape hint, the suggestion check, `list value` and
+pattern (the lib's `property_definition`): a pattern that says nothing of the value
+(`"^in[13]-supply$": true`) takes the type of the first of `NodeBinding.selected_patterns` (the
+`select: true` schemas' patterns: dt-core's `.*-supply$`, the unit suffixes) that matches the name, with
+the binding's description (spec LIST-055). These all go through it: `update`'s shape hint, the suggestion check, `list value` and
 `property_info` (`read`, `list property <path> <prop>`).
 
 `list property <path>` shows the names a pattern matches (the lib's `expand_pattern`: `channel@0 …

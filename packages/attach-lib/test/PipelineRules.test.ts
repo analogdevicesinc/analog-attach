@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
 
-import { Attach, Result, type ParsedBinding, type ResolvedProperty, type SchemaPaths } from 'attach-lib';
+import { Attach, Result, property_definition, type ParsedBinding, type ResolvedProperty, type SchemaPaths } from 'attach-lib';
 
 import { afterAll, describe, test, expect } from 'vitest';
 
@@ -40,6 +40,9 @@ const property = (binding: ParsedBinding, key: string): ResolvedProperty['value'
 /** A list's or a matrix's `[minItems, maxItems]`. */
 const counts = (type: ResolvedProperty['value'] | undefined) =>
     type?._t === 'list' || type?._t === 'matrix' ? [type.minItems, type.maxItems] : undefined;
+
+/** A phandle that is one row of one cell: a `-supply`. */
+const phandle_row = { _t: 'matrix', minItems: 1, maxItems: 1, rows: [{ _t: 'list', item: { _t: 'any' }, minItems: 1, maxItems: 1 }] };
 
 const spi_max_frequency = {
     _t: 'scalar',
@@ -904,5 +907,62 @@ properties:
       pattern: '^[0-9]$'
 `, schema_paths);
         expect(property(parsed_binding, 'data-lanes')).toMatchObject({ _t: 'list', item: { _t: 'number' }, typeSize: 32 });
+    });
+});
+
+describe('the type of a pattern\'s name', () => {
+    // dt-schema types a name by every pattern it knows: `in1-supply` is a phandle by dt-core's `.*-supply$`, whatever
+    // pattern of the binding allows it
+    const with_patterns = (name: string, patterns: string) => parsed(name, `
+properties:
+  compatible:
+    const: x,y
+  adi,ch0-microvolt:
+    description: named
+patternProperties:
+${patterns}`);
+
+    test('a name an untyped pattern of the binding allows gets the type of a selected pattern it matches', async () => {
+        const { parsed_binding } = await with_patterns('named-supply', `
+  "^in[13]-supply$":
+    description: Optional voltage supply
+  "^[a-z]+-supply$": true
+`);
+        expect(property_definition(parsed_binding, parsed_binding.properties, 'in1-supply')).toStrictEqual({
+            key: 'in1-supply',
+            pattern: '^in[13]-supply$',
+            value: { ...phandle_row, description: 'Optional voltage supply' },
+        });
+        expect(property_definition(parsed_binding, parsed_binding.properties, 'foo-supply')?.value).toMatchObject(phandle_row);
+    });
+
+    test('a unit suffix gives the type of property-units.yaml', async () => {
+        const { parsed_binding } = await with_patterns('named-unit', `
+  "^adi,ch[0-3]-microvolt$": true
+`);
+        // an int32-matrix; `^adi,.*` of vendor-prefixes.yaml matches the name first, but types nothing
+        expect(property_definition(parsed_binding, parsed_binding.properties, 'adi,ch1-microvolt')?.value).toMatchObject({
+            _t: 'matrix', rows: [{ _t: 'list', item: { _t: 'number', minimum: -2_147_483_648n, maximum: 2_147_483_647n } }],
+        });
+    });
+
+    test('a typed pattern keeps its type, a named property is itself, and a name nothing allows has no definition', async () => {
+        const { parsed_binding } = await with_patterns('named-typed', `
+  "^adi,ch[0-3]-microvolt$":
+    $ref: /schemas/types.yaml#/definitions/string
+`);
+        expect(property_definition(parsed_binding, parsed_binding.properties, 'adi,ch1-microvolt')?.value).toMatchObject({ _t: 'list', item: { _t: 'string' } });
+        expect(property_definition(parsed_binding, parsed_binding.properties, 'adi,ch0-microvolt')).toStrictEqual(
+            parsed_binding.properties.find(p => p.key === 'adi,ch0-microvolt'));
+        expect(property_definition(parsed_binding, parsed_binding.properties, 'vdd-supply')).toBeUndefined();
+    });
+
+    test('a narrowed binding still types a pattern\'s name', async () => {
+        const attach = await with_patterns('named-narrowed', `
+  "^in[13]-supply$": true
+`);
+        const narrowed = attach.narrow_binding(JSON.stringify({ compatible: ['x,y'] }));
+        if (narrowed === undefined) { expect.fail('no narrowed binding'); }
+        expect(property_definition(narrowed, narrowed.properties, 'in3-supply')?.value).toMatchObject(phandle_row);
     });
 });

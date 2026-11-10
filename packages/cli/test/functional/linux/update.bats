@@ -101,6 +101,32 @@ with_channel() {
 	assert_unchanged
 }
 
+# Description: a property named by a binding pattern that doesn't type it takes the type of the
+# selected pattern its name falls under (spec LIST-055): the AD4695's "^in(?:[13579]|1[135])-supply$"
+# says nothing of the value, dt-core's .*-supply$ makes in1-supply a phandle, so its cells must resolve
+# (spec UPDATE-032) rather than be written as a string.
+# Steps:
+#   1. Make the overlay with an AD4695 on spi0, and snapshot it.
+#   2. Run update on its in1-supply with foo, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message saying 'foo' is not a number, macro or label.
+#   4. Check the workfile is unchanged.
+#   5. Run update on its in1-supply with the label sd_vcc_reg, and check the overlay has
+#      in1-supply = <&sd_vcc_reg>.
+# bats test_tags=req:UPDATE-02, id:L0365
+@test "update types a supply that the binding's pattern leaves untyped as a phandle" {
+	with_overlay
+	aa add adi,ad4695 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad4695 failed"
+	snapshot
+	run_json update ad4695 in1-supply foo
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' "'foo' is not a number, a known macro, or a label in the base tree/overlay"
+	assert_unchanged
+	aa update ad4695 in1-supply sd_vcc_reg >/dev/null 2>&1
+	run cat "$WORKFILE"
+	assert_output --partial 'in1-supply = <&sd_vcc_reg>;'
+}
+
 # Description: giving a value to a property that is a flag in the binding is refused.
 # Steps:
 #   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.

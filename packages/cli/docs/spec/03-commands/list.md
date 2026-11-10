@@ -223,6 +223,8 @@ matches: the names joined by `, ` when there are at most three, `<first> …
 <last>` when there are more, or `<stem>…` when the pattern fixes only a start.
 A pattern that isn't anchored with `^`, or fixes nothing, shows the regex
 itself and only `(pattern)` / `(pattern; set: …)`.
+The entry has no type: the type a selected pattern gives (LIST-055) needs a
+name, so `list property <path> <property>` gives it.
 
 **LIST-035** A child-node pattern's entry shall be `<names> (child node
 <regex>; present: <children>)`, `<children>` being the node's children the
@@ -268,6 +270,17 @@ properties, then by the binding's property patterns. If neither has it, then
 the CLI shall refuse with `Property <property> not found in <origin>`, where
 `<origin>` is `<compatible> binding`, or `pattern "<regex>" of <parent
 compatible>`.
+
+**LIST-055** Where the first property pattern that matches the property says
+nothing of its value (`"^in[13]-supply$": true`), the CLI shall give the
+property the type of the first pattern of the schemas dt-validate checks every
+node against (`select: true`: dt-core.yaml's `.*-supply$`, `.*-names$` and
+`^#.*-cells$`, pinctrl-consumer.yaml's `^pinctrl-[0-9]+$`, the unit suffixes
+of property-units.yaml) that matches the name, with the binding's description:
+`in1-supply` is a phandle, `adi,ch0-microvolt` an `int32` matrix. A property
+no pattern of the binding matches stays not found (LIST-051), and a pattern
+that types its names keeps its own type. `update` (its Definition) and `list
+value` (LIST-073) look the property up the same way.
 
 **LIST-052** In human mode the CLI shall write:
 
@@ -323,8 +336,8 @@ For other properties the stack's order stays (the node's interrupt parent
 first, its own base `interrupt-parent` or the one it inherits).
 
 **LIST-073** When the node's binding resolves, the CLI shall check each value
-against the binding's definition of the property, narrowed with the value
-in place, and add a note to a value that fails: `not defined by <origin>;
+against the binding's definition of the property (LIST-051, LIST-055),
+narrowed with the value in place, and add a note to a value that fails: `not defined by <origin>;
 validate may reject it` when the binding doesn't define the property (origin
 per LIST-051), or the value check's message otherwise. Notes join with `; `.
 

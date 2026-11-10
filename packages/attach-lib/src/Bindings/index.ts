@@ -18,7 +18,8 @@ export { fixup_passes, type StepInfo, type FixupPass } from "./fixups/Fixups.js"
 export type { ControllerContext } from "./stages/VendorFilter.js";
 
 // What it produces
-export type { ResolvedProperty, PatternPropertyRule, PropertyPatternRule, ParsedBinding } from "./model/ParsedBinding.js";
+export type { ResolvedProperty, PatternPropertyRule, PropertyPatternRule, ParsedBinding, PropertyDefinition } from "./model/ParsedBinding.js";
+export { property_definition } from "./model/ParsedBinding.js";
 export {
     AttachEnumType,
     is_list,
