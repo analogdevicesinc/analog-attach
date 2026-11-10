@@ -217,5 +217,9 @@
     "watch:attach-ui-lib": "yarn workspace attach-ui-lib watch",
     "watch:pnp-webview": "yarn workspace pnp-webview watch"
   },
-  "packageManager": "yarn@4.5.3"
+  "packageManager": "yarn@4.5.3",
+  "resolutions": {
+    "mocha/serialize-javascript": "^7.1.4",
+    "mocha/diff": "^8.0.3"
+  }
 }
