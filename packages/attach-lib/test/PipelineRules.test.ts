@@ -630,6 +630,62 @@ allOf:
         expect(maximum('x,a')).toBe(7n);
         expect(maximum('x,b')).toBe(3n);
     });
+
+    // rpmh names its supplies only in branches: there the branch is the property's definition
+    const branch_only = async (name: string, then: string, paths?: SchemaPaths) => {
+        const attach = await parsed(name, `
+properties:
+  compatible:
+    enum: ["x,a", "x,b"]
+  adi,mode-gpios:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    maximum: 7
+allOf:
+  - if:
+      properties:
+        compatible:
+          const: x,b
+    then:
+${then}`, paths);
+        const narrowed = attach.narrow_binding(JSON.stringify({ compatible: ['x,b'] }));
+        if (narrowed === undefined) { expect.fail('no narrowed binding'); }
+        return narrowed;
+    };
+    const phandle = { _t: 'matrix', rows: [{ _t: 'list', item: { _t: 'any' }, minItems: 1, maxItems: 1 }] };
+
+    test('a property only a then branch names gets the type of its name', async () => {
+        const narrowed = await branch_only('branch-supply', `
+      properties:
+        vdd-x-supply: true
+`);
+        expect(property(narrowed, 'vdd-x-supply')).toMatchObject(phandle);
+    });
+
+    test('a property only a then branch names gets the type the processed schema gives its name', async () => {
+        const narrowed = await branch_only('branch-processed', `
+      properties:
+        backlight: true
+`, schema_paths);
+        expect(property(narrowed, 'backlight')).toMatchObject(phandle);
+    });
+
+    test('a property only a then branch names gets the definition of a select: true schema', async () => {
+        const narrowed = await branch_only('branch-selected', `
+      properties:
+        mount-matrix: true
+`);
+        expect(property(narrowed, 'mount-matrix')).toMatchObject({ _t: 'list', item: { _t: 'string' }, minItems: 9, maxItems: 9 });
+    });
+
+    // -gpios names are phandle-arrays, but the binding has said what this one is
+    test('a property the node defines keeps its type when a then branch refines it', async () => {
+        const narrowed = await branch_only('branch-refined', `
+      properties:
+        adi,mode-gpios:
+          maximum: 3
+`);
+        expect(property(narrowed, 'adi,mode-gpios')).toMatchObject({ _t: 'scalar', cell: { _t: 'number', maximum: 3n }, typeSize: 32 });
+    });
 });
 
 describe('branch narrowing takes what dt-schema takes', () => {

@@ -699,11 +699,18 @@
                     "channel@0": {
                         "properties": {
                             "reg": {
+                                "dtType": "address",
                                 "items": [
                                     {
+                                        "dtType": "uint32-array",
                                         "items": [
                                             {
-                                                "const": 0
+                                                "const": 0,
+                                                "dtType": "uint32",
+                                                "maximum": 4294967295,
+                                                "minimum": 0,
+                                                "type": "integer",
+                                                "typeSize": 32
                                             }
                                         ],
                                         "maxItems": 1,

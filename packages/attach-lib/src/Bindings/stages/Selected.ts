@@ -5,6 +5,7 @@ import { parse } from "yaml";
 import { Result } from "../../result.js";
 import { SchemaContext } from "../Context.js";
 import { apply_JSONSchema_fixups } from "../fixups/Fixups.js";
+import { defined_within, DefinedNames, in_branch, refines } from "../fixups/Walker.js";
 import { is_object_schema } from "../schema/PatternKind.js";
 import { merge_definitions } from "./Redefinitions.js";
 import { dereference, DT_TYPE } from "./References.js";
@@ -157,32 +158,39 @@ function merge_property(definition: unknown, everywhere: unknown[] | undefined):
  * those schemas too, so iio.yaml gives `mount-matrix` its 9 items, and pinctrl-consumer.yaml makes the
  * `^pinctrl-[0-9]+$` of `fixup_node_properties` a phandle-array, but they add no property the node doesn't name, nor
  * another type to one it types (`without_alternatives`), nor anything to a child node of the name. Every node: the
- * binding's, its child nodes' and those of its `allOf` entries, not an `if` / `then`, which only adds to a property.
+ * binding's, its child nodes' and those of its `allOf` entries. In a `then` / `else` only a property the node doesn't
+ * define (`refines`): the branch is its definition there, and only refines one the node has elsewhere.
  */
 export function merge_selected(binding: DtBindingSchema, selected: SelectedDefinitions): DtBindingSchema {
-    const merge_node = (node: Schema): Schema => {
+    const merge_node = (node: Schema, path: string[], outside: DefinedNames): Schema => {
         const result: Schema = { ...node };
 
         if (is_schema(node["properties"])) {
             result["properties"] = Object.fromEntries(Object.entries(node["properties"]).map(([name, definition]) => {
+                if (refines([...path, "properties", name], name, outside)) { return [name, definition]; }
                 const merged = merge_property(definition, selected.properties.get(name));
-                return [name, is_schema(merged) ? merge_node(merged) : merged];
+                return [name, is_schema(merged) ? merge_node(merged, [...path, "properties", name], new Set()) : merged];
             }));
         }
-        if (is_schema(node["patternProperties"])) {
+        if (is_schema(node["patternProperties"]) && !in_branch(path)) {
             // A pattern of the same key: what a binding names `^pinctrl-[0-9]+$` is a pinctrl-N, nothing else is
             result["patternProperties"] = Object.fromEntries(Object.entries(node["patternProperties"]).map(([pattern, child]) => {
                 const merged = merge_property(child, selected.patterns.get(pattern));
-                return [pattern, is_schema(merged) ? merge_node(merged) : merged];
+                return [pattern, is_schema(merged) ? merge_node(merged, [...path, "patternProperties", pattern], new Set()) : merged];
             }));
         }
+        const within = defined_within(node, outside);
         if (Array.isArray(node["allOf"])) {
-            result["allOf"] = node["allOf"].map(entry => is_schema(entry) && !("if" in entry) ? merge_node(entry) : entry);
+            result["allOf"] = node["allOf"].map(entry => is_schema(entry) ? merge_node(entry, [...path, "allOf"], within) : entry);
+        }
+        for (const key of ["then", "else"]) {
+            const branch = node[key];
+            if (is_schema(branch)) { result[key] = merge_node(branch, [...path, key], within); }
         }
         return result;
     };
 
-    return merge_node(binding as unknown as Schema) as unknown as DtBindingSchema;
+    return merge_node(binding as unknown as Schema, [], new Set()) as unknown as DtBindingSchema;
 }
 
 if (import.meta.vitest) {

@@ -1,10 +1,10 @@
 import { DT_TYPE } from "../stages/References.js";
-import { PropertyFixup } from "./Walker.js";
+import { in_branch, PropertyFixup } from "./Walker.js";
 import { property_type, PropertyTypes } from "../schema/PropertyTypes.js";
 import { PropertySchema } from "../schema/Schema.js";
 
-/** Places a schema describes the property's own value in; the rest (conditions, refinements) only say more about it. */
-const NOT_THE_DEFINITION = new Set(["if", "not", "select", "then", "else"]);
+/** Conditions on a node: what a property is there doesn't describe its value. */
+const CONDITIONS = new Set(["if", "not", "select"]);
 
 /** A property that holds child nodes (`cpus`, `port`) isn't the value the name's type is about. */
 function is_node_schema(schema: PropertySchema): boolean {
@@ -16,11 +16,15 @@ function is_node_schema(schema: PropertySchema): boolean {
  * `types.yaml`, so no `dtType`) gets the one dt-schema's own schemas declare for its name. `reg: {maxItems: 1}`
  * is an `address`, `interrupts: {maxItems: 1}` a `uint32-matrix`. A `true` property becomes `{ dtType }`. A name
  * that is a flag or another type gets the other when the schema counts its items: `ranges: {maxItems: 1}` is a
- * `uint32-matrix`, `ranges: true` a `flag`.
+ * `uint32-matrix`, `ranges: true` a `flag`. Where the property is defined: not in a condition, nor in a `then` /
+ * `else` that only refines a definition of the node (`FixupContext.refines`), but in one that names a property the
+ * node doesn't (rpmh's `vdd-l2-l3-supply: true`), as dt-schema types a name wherever it is.
  */
 export function fixup_dt_type(types: PropertyTypes): PropertyFixup {
-    return (schema, { path, name }) => {
-        if (path.at(-1) !== name || path.at(-2) !== "properties" || path.some(key => NOT_THE_DEFINITION.has(key))) {
+    return (schema, { path, name, refines }) => {
+        if (path.at(-1) !== name || path.at(-2) !== "properties" || path.some(key => CONDITIONS.has(key))
+            // Without the walk's `refines`, a `then` / `else` is taken to say more about a definition elsewhere
+            || (refines ?? in_branch(path))) {
             return schema;
         }
 
@@ -45,7 +49,8 @@ if (import.meta.vitest) {
         patterns: [{ pattern: /-gpios?$/, type: "phandle-array" }],
         counted: new Map([["ranges", "uint32-matrix"]]),
     };
-    const tagged = (schema: PropertySchema, name: string, path = ["properties", name]) => fixup_dt_type(types)(schema, { path, name });
+    const tagged = (schema: PropertySchema, name: string, path = ["properties", name], refines?: boolean) =>
+        fixup_dt_type(types)(schema, { path, name, ...(refines === undefined ? {} : { refines }) });
 
     test("a property without a type gets the one of its name", () => {
         expect(tagged({ maxItems: 1 }, "reg")).toStrictEqual({ maxItems: 1, dtType: "address" });
@@ -70,6 +75,11 @@ if (import.meta.vitest) {
         expect(tagged(false, "reg")).toBe(false);
         expect(tagged({ type: "object", properties: {} }, "reg")).toStrictEqual({ type: "object", properties: {} });
         expect(tagged({ maxItems: 1 }, "reg", ["allOf", "then", "properties", "reg"])).toStrictEqual({ maxItems: 1 });
+        expect(tagged({ maxItems: 1 }, "reg", ["allOf", "then", "properties", "reg"], true)).toStrictEqual({ maxItems: 1 });
         expect(tagged({ const: 1 }, "reg", ["if", "properties", "reg"])).toStrictEqual({ const: 1 });
+    });
+
+    test("a then branch that names a property the node doesn't define is its definition", () => {
+        expect(tagged(true, "reset-gpios", ["allOf", "then", "properties", "reset-gpios"], false)).toStrictEqual({ dtType: "phandle-array" });
     });
 }
