@@ -53,7 +53,7 @@ function updateFormElementInArray(
 }
 
 // Debounce timer stored outside the store to avoid serialization issues
-let debounceTimer: NodeJS.Timeout | undefined;
+let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
 // Helper function to handle configuration API errors
 const handleConfigurationError = (error: unknown, operation: string, set: (state: Partial<DeviceConfigurationState>) => void) => {

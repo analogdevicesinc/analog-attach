@@ -1,4 +1,5 @@
-import { UUID } from "node:crypto";
+/** The shape of node:crypto's `UUID`, declared here: the protocol is also compiled for the webviews, which have no Node types. */
+type UUID = `${string}-${string}-${string}-${string}-${string}`;
 
 /**
  * Data structures described in {@link ../../../../src/MessageAPI/MessageAPI.md}.

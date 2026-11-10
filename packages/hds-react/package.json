@@ -32,7 +32,7 @@
     "@vitejs/plugin-react": "^6.3.0",
     "hds-components": "workspace:*",
     "sass": "^1.108.1",
-    "typescript": "^5.7.2",
+    "typescript": "~6.0.3",
     "vite": "^8.3.7",
     "vite-plugin-dts": "^5.1.2"
   },

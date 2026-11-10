@@ -153,7 +153,7 @@ function updateFormElementInArray(
 }
 
 // Debounce timer stored outside the store to avoid serialization issues
-let debounceTimer: NodeJS.Timeout | undefined;
+let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
 // Helper to clear channel-related state flags
 const clearChannelState = () => ({
