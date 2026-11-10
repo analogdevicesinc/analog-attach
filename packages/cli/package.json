@@ -62,7 +62,7 @@
     "@types/node": "22.x",
     "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.72.1",
-    "@vitest/coverage-v8": "^4.1.12",
+    "@vitest/coverage-v8": "^5.1.0",
     "ajv": "^8.17.1",
     "attach-lib": "*",
     "attach-no-os-lib": "workspace:*",
@@ -73,6 +73,7 @@
     "eslint-plugin-unicorn": "^79.0.0",
     "tsup": "^8.5.1",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.12"
+    "vite": "^7.3.8",
+    "vitest": "^5.1.0"
   }
 }

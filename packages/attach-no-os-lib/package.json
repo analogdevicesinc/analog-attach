@@ -26,14 +26,14 @@
   },
   "devDependencies": {
     "@types/node": "22.x",
-    "@vitest/coverage-v8": "^4.1.12",
+    "@vitest/coverage-v8": "^5.1.0",
     "eslint": "^10.14.0",
     "eslint-plugin-unicorn": "^79.0.0",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.72.1",
     "vite": "^7.3.8",
     "vite-plugin-dts": "^4.5.4",
-    "vitest": "^4.1.12"
+    "vitest": "^5.1.0"
   },
   "dependencies": {
     "eta": "^3.5.0"
