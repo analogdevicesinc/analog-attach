@@ -274,18 +274,21 @@ controller's (`num-cs`, `cs-gpios`). Their wording is in `validate.md`.
 
 ### 6.7 interrupts and interrupt-parent
 
-**UPDATE-080** When `<property>` is `interrupts`, the value was built (§6.2,
-cells or strings), the target node was in the overlay before this command
-(Open issue U-8), and that overlay node has no `interrupt-parent`, the CLI
-shall look up the node's interrupt parent in the base tree, as Linux does.
-The target node's own base `interrupt-parent`, when the base can resolve it,
-gives the node it references. Otherwise, starting at the node's parent and
-going up, the first node that has `#interrupt-cells` is the interrupt parent,
-and the first that has an `interrupt-parent` the base can resolve gives the
-node it references. The target node's own `#interrupt-cells` doesn't make it
-its own parent. The node the parent came from (the target node, the
-controller, or the ancestor with `interrupt-parent`) is `<from>`. The
-overlay's nodes and properties aren't looked at (Open issue U-12).
+**UPDATE-080** When `<property>` is `interrupts`, the value was built as
+cells (§6.2), the target node was in the overlay before this command (Open
+issue U-8), and that overlay node has no `interrupt-parent`, the CLI shall
+look up the node's interrupt parent in the merged tree (the base with the
+overlay applied), as Linux does once the overlay is applied. The target
+node's own `interrupt-parent`, when the merged tree can resolve it, gives the
+node it references. Otherwise, starting at the node's parent and going up, the
+first node that has `#interrupt-cells` is the interrupt parent, and the first
+that has an `interrupt-parent` the merged tree can resolve gives the node it
+references: after `update spi0 interrupt-parent gpio`, a device under `spi0`
+inherits `gpio` from it. The target node's own `#interrupt-cells` doesn't
+make it its own parent. The node the parent came from (the target node, the
+controller, or the ancestor with `interrupt-parent`) is `<from>`. A value
+that isn't cells (`interrupts hello`, a string) gets no lookup: no
+`interrupt-parent` is written and nothing is warned about it.
 
 **UPDATE-081** When an interrupt parent is inherited (`<from>` isn't the
 target node) and it has a label, the CLI shall write `interrupt-parent =
@@ -550,16 +553,6 @@ writes the refused value when the user skips (`-`) the refused property.
 **U-11. The interrupt cell check looks at the first row only.** UPDATE-082
 compares `#interrupt-cells` with the first row's cell count, so `interrupts
 = <1 2>, <3>` passes against two cells.
-
-**U-12. The inherited interrupt-parent ignores the overlay.** UPDATE-080
-walks the base tree and resolves an `interrupt-parent` in the base only.
-After `update spi0 interrupt-parent gpio`, `update dac interrupts 5 2` still
-writes `interrupt-parent = <&gicv2>` (inherited from `/`), which overrides
-what the overlay set on `spi0`. The lookup also runs for a value that isn't
-cells: `update spidev1 interrupts hello` (spidev1 already in the overlay)
-writes `interrupts = "hello"` and an `interrupt-parent`. A fix would be to
-walk the merged tree (`base_lookup(overlay.merged_tree())`), and to skip the
-lookup when `interrupts` isn't cells.
 
 **U-13. An empty value is written as `<>`.** Only the `strings` shape hint
 refuses an empty value (UPDATE-031). With the `cells` hint or none,

@@ -407,6 +407,9 @@ export function implicit_interrupt_parent(
 ): { message?: string; warning?: string } {
     if (property_name !== "interrupts") { return {}; }
     if (built === undefined) { return {}; }
+    // A value that isn't cells (`interrupts = "hello"`) has no interrupt parent to inherit.
+    const row_count = count_interrupt_cells(built);
+    if (row_count === undefined) { return {}; }
 
     const node_path = found?.node_path;
     if (node_path === undefined) { return {}; }
@@ -414,18 +417,16 @@ export function implicit_interrupt_parent(
     const has_interrupt_parent = found?.node.properties.some(p => p.name === "interrupt-parent") ?? false;
     if (has_interrupt_parent) { return {}; }
 
-    const inherited = effective_interrupt_parent(base_lookup(base_dt), node_path, base_dt);
+    // The base with the overlay applied, as Linux walks it: an interrupt-parent the overlay sets on an ancestor counts.
+    const tree = overlay.merged_tree() ?? base_dt;
+    const inherited = effective_interrupt_parent(base_lookup(tree), node_path, tree);
     if (inherited === undefined) {
         return { warning: `No interrupt-parent inherited for ${node_path}; set one: update ${node_path} interrupt-parent <controller>` };
     }
 
-    let warning: string | undefined;
-    if (inherited.interrupt_cells !== undefined) {
-        const row_count = count_interrupt_cells(built);
-        if (row_count !== undefined && row_count !== inherited.interrupt_cells) {
-            warning = `${inherited.label ?? inherited.path} has #interrupt-cells = <${inherited.interrupt_cells}> but interrupts has ${row_count} cells; set interrupt-parent explicitly`;
-        }
-    }
+    const warning = inherited.interrupt_cells === undefined || row_count === inherited.interrupt_cells
+        ? undefined
+        : `${inherited.label ?? inherited.path} has #interrupt-cells = <${inherited.interrupt_cells}> but interrupts has ${row_count} cells; set interrupt-parent explicitly`;
 
     // The node's own base interrupt-parent is written already: nothing inherited to show.
     if (inherited.from === node_path) { return { warning }; }
@@ -567,6 +568,40 @@ if (import.meta.vitest) {
         expect(run("hdmi", "1 2")).toEqual({
             warning: "aon has #interrupt-cells = <1> but interrupts has 2 cells; set interrupt-parent explicitly", written: false,
         });
+    });
+
+    test("implicit_interrupt_parent — the parent the overlay sets on an ancestor is inherited; a value that isn't cells gets none", async () => {
+        const { print_property } = await import("attach-lib");
+        const base = DeviceTree.new_from_string(`/dts-v1/;
+/ {
+    interrupt-parent = <&gic>;
+    gic: gic {
+        interrupt-controller;
+        #interrupt-cells = <3>;
+    };
+    gpio: gpio {
+        interrupt-controller;
+        #interrupt-cells = <2>;
+    };
+    bus: bus {
+        dev: dev {
+        };
+    };
+};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const run = (fragments: string) => {
+            const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n${fragments}`, base);
+            if (typeof overlay === "string") { throw new TypeError(overlay); }
+            const { target_reference, found, is_base_target } = resolve_write_target("dev", overlay, base);
+            const built = found?.node.properties.find(p => p.name === "interrupts");
+            const result = implicit_interrupt_parent(overlay, base, target_reference, found, is_base_target, "interrupts", built);
+            const written = overlay.overlay_properties("/bus/dev").find(p => p.name === "interrupt-parent");
+            return { ...result, written: written === undefined ? undefined : print_property(written, "", 0).trim() };
+        };
+        expect(run("&bus {\n\tinterrupt-parent = <&gpio>;\n};\n&dev {\n\tinterrupts = <25 2>;\n};")).toEqual({
+            message: "Set interrupt-parent = <&gpio> on /bus/dev (inherited from /bus)", warning: undefined, written: "interrupt-parent = <&gpio>;",
+        });
+        expect(run(`&dev {\n\tinterrupts = "hello";\n};`)).toEqual({ written: undefined });
     });
 
     test("decide_update — known flag, no value → set-flag", () => {

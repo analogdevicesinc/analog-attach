@@ -644,3 +644,44 @@ assert_warned() {
 	run cat "$WORKFILE"
 	assert_output --partial 'interrupt-parent = <&gicv2>;'
 }
+
+# Description: the interrupt-parent inherited on setting interrupts is found in the base with the
+# overlay applied: one the overlay sets on the node's bus is the one written on the node, with no
+# cell-count warning when its cells match.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and set interrupt-parent gpio on spi0.
+#   2. Run update ad7124_8 interrupts 25 2, with --json.
+#   3. Check it succeeds with severity info, the message saying interrupt-parent = <&gpio> was set,
+#      inherited from /soc/spi@7e204000, and no warning on standard error.
+#   4. Check the overlay has interrupt-parent = <&gpio> and no <&gicv2>.
+# bats test_tags=id:L0369
+@test "setting interrupts inherits the interrupt-parent the overlay sets on an ancestor" {
+	with_adc
+	aa update spi0 interrupt-parent gpio >/dev/null 2>&1 || fail "update spi0 interrupt-parent failed"
+	run_json update ad7124_8 interrupts 25 2
+	assert_success
+	assert_json '.severity' info
+	assert_json '.message' 'Set interrupts on ad7124_8; Set interrupt-parent = <&gpio> on /soc/spi@7e204000/adi,ad7124-8@2 (inherited from /soc/spi@7e204000)'
+	[[ "$stderr" != *"interrupt-cells"* ]] || fail "cell-count warning: $stderr"
+	run grep -c 'interrupt-parent = <&gpio>;' "$WORKFILE"
+	assert_output 2
+	run grep -q 'gicv2' "$WORKFILE"
+	assert_failure
+}
+
+# Description: setting interrupts to a value that isn't cells writes no interrupt-parent.
+# Steps:
+#   1. Make the overlay and put spidev1 (no binding types its interrupts) in it, with status okay.
+#   2. Run update spidev1 interrupts hello, with --json.
+#   3. Check it succeeds, the overlay has interrupts = "hello", and it has no interrupt-parent.
+# bats test_tags=id:L0370
+@test "setting interrupts to a value that isn't cells writes no interrupt-parent" {
+	with_overlay
+	aa update spidev1 status okay >/dev/null 2>&1 || fail "update spidev1 status failed"
+	run_json update spidev1 interrupts hello
+	assert_success
+	assert_json '.message | test("interrupt-parent")' false
+	grep -q 'interrupts = "hello";' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	run grep -q 'interrupt-parent' "$WORKFILE"
+	assert_failure
+}
