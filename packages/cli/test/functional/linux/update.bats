@@ -569,6 +569,77 @@ assert_warned() {
 	assert_unchanged
 }
 
+# `with_adp5055`: the workfile with an ADP5055 on i2c1 (label adp5055), whose bucks are child
+# nodes of a pattern without @ (^buck[0-2]$).
+with_adp5055() {
+	with_overlay
+	aa add adi,adp5055 --parent i2c1 >/dev/null 2>&1 || fail "add adi,adp5055 failed"
+}
+
+# Description: naming a child that the binding's child-node pattern allows creates it, though the
+# pattern has no @ (adi,adp5055's ^buck[0-2]$), and naming it again shows it.
+# Steps:
+#   1. Make the overlay with an ADP5055 on i2c1.
+#   2. Run update adp5055 buck0.
+#   3. Check it succeeds, says buck0 was added to adp5055 and that regulator-name is missing.
+#   4. Check the overlay has an empty buck0 node, with no reg, and no buck0 property.
+#   5. Run update adp5055 buck0 again; check it succeeds and shows the buck0 node.
+# bats test_tags=req:UPDATE-08, id:L0371
+@test "naming a child of a pattern without @ creates the child node" {
+	with_adp5055
+	run aa update adp5055 buck0
+	assert_success
+	assert_output --partial 'Added buck0 to adp5055'
+	assert_output --partial 'Missing required: regulator-name'
+	grep -Pzq 'buck0 \{\n\t*\};' "$WORKFILE" || fail "no empty buck0 node: $(cat "$WORKFILE")"
+	run grep -q 'buck0;' "$WORKFILE"
+	assert_failure
+	run aa update adp5055 buck0
+	assert_success
+	assert_line --index 0 'buck0 {'
+}
+
+# Description: a value given for a child that a pattern without @ allows is refused, and nothing
+# is written.
+# Steps:
+#   1. Make the overlay with an ADP5055 on i2c1, and snapshot it.
+#   2. Run update adp5055 buck1 3, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message saying buck1 is a child node and giving
+#      the update adp5055/buck1 command.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-08, id:L0372
+@test "a value given for a child of a pattern without @ is refused" {
+	with_adp5055
+	snapshot
+	run_json update adp5055 buck1 3
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' 'buck1 is a child node; set its properties with `update adp5055/buck1 <prop> <value>`'
+	assert_unchanged
+}
+
+# Description: a name the binding defines as a property, or doesn't define, is a property, with
+# or without @.
+# Steps:
+#   1. Make the overlay with an ADP5055 on i2c1.
+#   2. Run update adp5055 adi,ocp-blanking (a flag of the binding); check it sets the flag.
+#   3. Run update adp5055 foo@1 (no property or pattern of the binding); check it sets a flag.
+#   4. Check the overlay has adi,ocp-blanking; and foo@1; and no foo@1 node.
+# bats test_tags=req:UPDATE-08, id:L0373
+@test "a name the binding doesn't define as a node is a property, with or without @" {
+	with_adp5055
+	run aa update adp5055 adi,ocp-blanking
+	assert_success
+	assert_output --partial 'Set flag adi,ocp-blanking on adp5055'
+	run aa update adp5055 foo@1
+	assert_success
+	assert_output --partial 'Set flag foo@1 on adp5055'
+	grep -q 'adi,ocp-blanking;' "$WORKFILE" || fail "no flag: $(cat "$WORKFILE")"
+	grep -q 'foo@1;' "$WORKFILE" || fail "no flag: $(cat "$WORKFILE")"
+	run grep -q 'foo@1 {' "$WORKFILE"
+	assert_failure
+}
+
 # Description: changing a node's reg renames the node, its unit address the new reg in
 # hexadecimal.
 # Steps:

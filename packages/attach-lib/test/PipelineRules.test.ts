@@ -966,3 +966,64 @@ ${patterns}`);
         expect(property_definition(narrowed, narrowed.properties, 'in3-supply')?.value).toMatchObject(phandle_row);
     });
 });
+
+// A pattern names child nodes when its schema is a node's (`type: object`, `properties`, `patternProperties` or
+// `required`, inline or in a branch), whatever the pattern: an `@` in it decides nothing
+describe('a pattern of child nodes or of properties', () => {
+    const patterns = (narrowed: ParsedBinding) => ({
+        nodes: keys_of(narrowed.pattern_properties ?? []),
+        properties: keys_of(narrowed.property_patterns ?? []),
+    });
+
+    test('a pattern with @ whose schema is a value\'s names properties', async () => {
+        const { parsed_binding } = await parsed('pattern-at-value', `
+properties:
+  compatible:
+    const: x,y
+patternProperties:
+  "^x,gain@[0-9]$":
+    $ref: /schemas/types.yaml#/definitions/uint32
+`);
+        expect(patterns(parsed_binding)).toEqual({ nodes: [], properties: ['^x,gain@[0-9]$'] });
+    });
+
+    test('a branch that only requires properties of child nodes names child nodes, without @, in a oneOf too', async () => {
+        const attach = await parsed('pattern-required', `
+properties:
+  compatible:
+    enum: ["x,a", "x,b"]
+patternProperties:
+  "^buck[0-2]$":
+    type: object
+    properties:
+      regulator-name: true
+      x,mode:
+        type: boolean
+allOf:
+  - if:
+      properties:
+        compatible:
+          const: x,b
+    then:
+      patternProperties:
+        "^buck[01]$":
+          required: [regulator-name]
+    else:
+      patternProperties:
+        "^buck[12]$":
+          oneOf:
+            - required: [regulator-name]
+            - required: [x,mode]
+`);
+        expect(patterns(attach.parsed_binding)).toEqual({ nodes: ['^buck[0-2]$'], properties: [] });
+        const narrowed = (compatible: string) => {
+            const binding = attach.narrow_binding(JSON.stringify({ compatible: [compatible] }));
+            if (binding === undefined) { expect.fail('no narrowed binding'); }
+            return binding;
+        };
+        const then = narrowed('x,b');
+        expect(patterns(then)).toEqual({ nodes: ['^buck[0-2]$', '^buck[01]$'], properties: [] });
+        expect(then.pattern_properties?.find(rule => rule.pattern === '^buck[01]$')?.required).toEqual(['regulator-name']);
+        expect(patterns(narrowed('x,a'))).toEqual({ nodes: ['^buck[0-2]$', '^buck[12]$'], properties: [] });
+    });
+});

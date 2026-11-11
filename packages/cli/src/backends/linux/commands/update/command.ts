@@ -27,7 +27,7 @@ import { answer, command, input_error, PromptCancelled, refuse, warned, type Fla
 import type { ErrorType } from "../../../../interface/error-types";
 import { load_workspace, type Bindings, type Workfile } from "../../config/workspace";
 import { resolve_write_target, parse_node_path, not_found_message } from "../../utilities";
-import { child_unit_radix, find_property_definition, resolve_node_binding } from "../../binding-resolution";
+import { child_unit_radix, find_property_definition, narrowed_binding, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
 import { suggest_values } from "../list/value";
 import { read_target } from "../read/command";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
@@ -160,57 +160,60 @@ Special cases:
 
         const property_name = property_argument;
 
-        // R12: child nodes via update. A name with @ is a child node when the node has it or its binding's patterns allow it.
-        if (property_name.includes("@")) {
-            const node_path = found?.node_path ?? base_dt.locate(target_reference)?.path ?? node_identifier;
-            if (overlay.effective_children(node_path).has(property_name)) {
-                if (values.length > 0) { return refuse(child_node_message(node_identifier, property_name), { type: "invalid-value" }); }
-                const child_identifier = node_identifier === "/" ? `/${property_name}` : `${node_identifier}/${property_name}`;
-                return read_target(session, overlay, { ok: true, value: bindings }, child_identifier, undefined, { quiet });
-            }
-
-            let child_patterns: string[] = [];
-            if (binding_node !== undefined) {
-                const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, bindings);
-                if (!("error" in binding)) { child_patterns = binding.child_nodes.map(c => c.pattern); }
-            }
-            if (child_patterns.some(pattern => new RegExp(pattern).test(property_name))) {
-                if (values.length > 0) { return refuse(child_node_message(node_identifier, property_name), { type: "invalid-value" }); }
-
-                const child_path = create_child_node(overlay, node_path, property_name, child_patterns);
-                workspace.overlay.save();
-                const message = `Added ${property_name} to ${node_identifier}`;
-                const child: NewNode = {
-                    workfile: workspace.overlay,
-                    base: base_dt,
-                    bindings,
-                    identifier: `${node_identifier}/${property_name}`,
-                    path: child_path,
-                };
-                const missing = await missing_required_of(child);
-                const response = async (): Promise<UpdateChildResponse> => ({
-                    ok: true,
-                    message,
-                    severity: "info",
-                    path: child_path.split("/").filter(Boolean),
-                    missing_required: await describe_missing(child, missing),
-                });
-                // Asked only on a terminal, without --quiet, with the interview setting on.
-                if (quiet || session.prompter === undefined || !workspace.settings.interview) {
-                    return answer<UpdateResponse>(response, () => [message, ...missing_lines(child.identifier, missing)].join("\n"));
-                }
-                // On a terminal: fill the pinned values, then ask for the rest (no example values for a child).
-                session.say(message);
-                try {
-                    await ask_for_missing(child, missing, session as InteractiveSession);
-                } catch (error) {
-                    if (!(error instanceof PromptCancelled)) { throw error; }
-                    for (const line of missing_lines(child.identifier, await missing_required_of(child))) { session.say(line); }
-                }
-                return answer<UpdateResponse>(response, "");
-            }
-            // Fall through to property handling (creates a flag for unknown names)
+        // R12: child nodes via update. A name is a child node when the node has a child of that name, else when its binding
+        // defines it as a node (`defines_child_node`); `@` in it decides nothing.
+        const node_path = found?.node_path ?? base_dt.locate(target_reference)?.path ?? node_identifier;
+        if (overlay.effective_children(node_path).has(property_name)) {
+            if (values.length > 0) { return refuse(child_node_message(node_identifier, property_name), { type: "invalid-value" }); }
+            const child_identifier = node_identifier === "/" ? `/${property_name}` : `${node_identifier}/${property_name}`;
+            return read_target(session, overlay, { ok: true, value: bindings }, child_identifier, undefined, { quiet });
         }
+
+        let child_patterns: string[] = [];
+        let defines_child = false;
+        if (binding_node !== undefined) {
+            const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, bindings);
+            if (!("error" in binding)) {
+                child_patterns = binding.child_nodes.map(c => c.pattern);
+                defines_child = defines_child_node(binding, narrowed_binding(binding, binding_node).properties, property_name);
+            }
+        }
+        if (defines_child) {
+            if (values.length > 0) { return refuse(child_node_message(node_identifier, property_name), { type: "invalid-value" }); }
+
+            const child_path = create_child_node(overlay, node_path, property_name, child_patterns);
+            workspace.overlay.save();
+            const message = `Added ${property_name} to ${node_identifier}`;
+            const child: NewNode = {
+                workfile: workspace.overlay,
+                base: base_dt,
+                bindings,
+                identifier: `${node_identifier}/${property_name}`,
+                path: child_path,
+            };
+            const missing = await missing_required_of(child);
+            const response = async (): Promise<UpdateChildResponse> => ({
+                ok: true,
+                message,
+                severity: "info",
+                path: child_path.split("/").filter(Boolean),
+                missing_required: await describe_missing(child, missing),
+            });
+            // Asked only on a terminal, without --quiet, with the interview setting on.
+            if (quiet || session.prompter === undefined || !workspace.settings.interview) {
+                return answer<UpdateResponse>(response, () => [message, ...missing_lines(child.identifier, missing)].join("\n"));
+            }
+            // On a terminal: fill the pinned values, then ask for the rest (no example values for a child).
+            session.say(message);
+            try {
+                await ask_for_missing(child, missing, session as InteractiveSession);
+            } catch (error) {
+                if (!(error instanceof PromptCancelled)) { throw error; }
+                for (const line of missing_lines(child.identifier, await missing_required_of(child))) { session.say(line); }
+            }
+            return answer<UpdateResponse>(response, "");
+        }
+        // Fall through to property handling (creates a flag for unknown names)
 
         const outcome = await apply_update(workspace.overlay, base_dt, bindings, node_identifier, property_name, values, message => { session.warn(message); });
         switch (outcome.kind) {
@@ -229,14 +232,28 @@ Special cases:
     },
 });
 
-/** Add the child `name` (`channel@0`) under `node_path`, with a reg in the radix the parent's patterns name it in; its path. */
+/**
+ * Whether the binding defines `name` as a child node: the property of that name (`properties`, narrowed) by its type,
+ * a `node`; else a child-node pattern that matches it (`^buck[0-2]$`, `^channel@([0-9]|1[0-5])$`). A name it defines
+ * otherwise, or not at all, is a property.
+ */
+export function defines_child_node(binding: Pick<NodeBinding, "child_nodes">, properties: ResolvedProperty[], name: string): boolean {
+    const named = properties.find(property => property.key === name);
+    if (named !== undefined) { return named.value._t === "node"; }
+    return binding.child_nodes.some(rule => new RegExp(rule.pattern).test(name));
+}
+
+/**
+ * Add the child `name` (`channel@0`, `buck0`) under `node_path`, with a reg in the radix the parent's patterns name it
+ * in when it has a unit address; its path.
+ */
 export function create_child_node(overlay: DeviceTreeOverlay, node_path: string, name: string, child_patterns: string[]): string {
     const at = name.indexOf("@");
-    const child_name = name.slice(0, at);
-    const child_unit = name.slice(at + 1);
+    const child_name = at === -1 ? name : name.slice(0, at);
+    const child_unit = at === -1 ? undefined : name.slice(at + 1);
     const child_properties: DTProperty[] = [];
 
-    const parsed_addr = parse_unit_address(child_unit, unit_radix(child_patterns, child_name) ?? 16);
+    const parsed_addr = child_unit === undefined ? undefined : parse_unit_address(child_unit, unit_radix(child_patterns, child_name) ?? 16);
     if (parsed_addr !== undefined) {
         const cells = address_cells_of(overlay, node_path);
         child_properties.push(encode_reg_address(parsed_addr, cells.address, cells.size));
@@ -641,6 +658,33 @@ if (import.meta.vitest) {
         expect(printed).toContain("#address-cells = <1>;");
         expect(create_child_node(overlay, path, "port@a", ["^port@[0-9a-f]+$"])).toBe(`${path}/port@a`);
         expect(overlay.print()).toMatch(/port@a \{\s*reg = <10>;/);
+    });
+
+    test("create_child_node - a name without @ is the child's whole name, with no reg", () => {
+        const { overlay } = parse(overlay_with_imu);
+        const path = "/soc/spi@7e204000/adi,ad7124-8@0";
+        expect(create_child_node(overlay, path, "buck0", ["^buck[0-2]$"])).toBe(`${path}/buck0`);
+        expect(overlay.effective_children(path).has("buck0")).toBe(true);
+        expect(overlay.print()).toMatch(/buck0 \{\s*\};/);
+    });
+
+    test("defines_child_node - a named property by its type, else a child-node pattern; @ decides nothing", () => {
+        const binding = {
+            child_nodes: [{ pattern: "^buck[0-2]$", description: "", properties: [], required: [] }],
+            property_patterns: [{ pattern: "^x,gain@[0-9]$", description: "", value: { _t: "flag" } as const }],
+        };
+        const properties: ResolvedProperty[] = [
+            { key: "regulators", value: { _t: "node", properties: [] } },
+            { key: "adi,ocp-blanking", value: { _t: "flag" } },
+            { key: "buck2", value: { _t: "flag" } },
+        ];
+        expect(defines_child_node(binding, properties, "buck0")).toBe(true);
+        expect(defines_child_node(binding, properties, "regulators")).toBe(true);
+        expect(defines_child_node(binding, properties, "adi,ocp-blanking")).toBe(false);
+        // The named property comes first, as property_definition takes it.
+        expect(defines_child_node(binding, properties, "buck2")).toBe(false);
+        expect(defines_child_node(binding, properties, "x,gain@1")).toBe(false);
+        expect(defines_child_node(binding, properties, "channel@0")).toBe(false);
     });
 
     test("place_property - writes a true multi-row matrix as separate <...> groups", () => {

@@ -60,8 +60,8 @@ then the CLI shall refuse with the message of `read.md` READ-021.
 
 ## 5. What `update` does
 
-**UPDATE-010** When `<property>` contains `@`, the CLI shall first apply §8.
-It shall apply UPDATE-011 to UPDATE-014 only when §8 doesn't handle it.
+**UPDATE-010** The CLI shall first apply §8. It shall apply UPDATE-011 to
+UPDATE-014 only when §8 doesn't handle it.
 
 **UPDATE-011** When no value is given and the shape hint is `flag`, the CLI
 shall set the flag (UPDATE-020).
@@ -360,7 +360,15 @@ give no diagnostics of UPDATE-015.
 
 ## 8. Child nodes
 
-Applies when `<property>` contains `@`.
+Applies to every `<property>`. A name is a child node when the merged node
+has a child of that name (UPDATE-120, UPDATE-121), whatever the binding says.
+Otherwise it is one when the target node's binding defines it as a node: the
+binding's property of that name when it has one, a node (an object schema:
+`type: object`, `properties`, `patternProperties` or `required`, inline or in
+a branch); else a child-node pattern of the binding that matches it, a
+pattern whose schema is a node's. An `@` in the name or in the pattern decides
+nothing: adi,adp5055's `^buck[0-2]$` names the child nodes `buck0` to `buck2`,
+and a pattern with `@` whose schema is a value's names properties.
 
 **UPDATE-120** When the merged node has a child named `<property>`, whether
 the overlay adds it, changes it, or only the base has it, and no value is
@@ -371,25 +379,27 @@ read's node (`04-protocol/read.schema.json#/$defs/read-node-answer`).
 **UPDATE-121** When the merged node has a child named `<property>` and values
 are given, the CLI shall refuse with UPDATE-122's message and write nothing.
 
-**UPDATE-122** When the target node has no such child and `<property>`
-matches a child-node pattern of the target node's binding:
+**UPDATE-122** When the target node has no such child and its binding
+defines `<property>` as a node (the §8 intro):
 
 - If values are given, then the CLI shall refuse with ``<property> is a child
   node; set its properties with `update <path>/<property> <prop> <value>` ``.
   `<prop>` and `<value>` are literal.
 - Otherwise the CLI shall create the child (UPDATE-123).
 
-**UPDATE-123** When creating a child `<name>@<unit>`, the CLI shall add an
-empty node `<name>@<unit>` without a label under the target node (into the
-overlay per UPDATE-050 or UPDATE-051). When `<unit>` is a number in the radix
-of UPDATE-070, the CLI shall also write `reg` for it (as ADD-048 encodes it)
+**UPDATE-123** When creating a child `<name>@<unit>`, or `<name>` without a
+unit address (`buck0`), the CLI shall add an empty node of that name without a
+label under the target node (into the overlay per UPDATE-050 or UPDATE-051).
+When `<unit>` is a number in the radix of UPDATE-070, the CLI shall also
+write `reg` for it (as ADD-048 encodes it)
 and add to an overlay-only parent whichever of `#address-cells = <1>` and
 `#size-cells = <0>` it lacks (ADD-049). The CLI shall then write the overlay
 and report `Added <property> to <path>`.
 
-**UPDATE-124** When `<property>` contains `@` and neither UPDATE-120 to
-UPDATE-122 applies (no binding, or no pattern matches), the CLI shall handle
-it as a property name by §5. With no value that sets a flag named
+**UPDATE-124** When neither UPDATE-120 to UPDATE-122 applies (no binding,
+a binding that defines `<property>` as a property, or one that doesn't define
+it), the CLI shall handle it as a property name by §5, with or without `@` in
+it. With no value that sets a flag named
 `<property>` (Open issue U-4).
 
 ### 8.1 The child's missing required properties

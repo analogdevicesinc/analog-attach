@@ -4354,7 +4354,7 @@
     "usb/vialab,vl817.yaml": "39e88de4c20c",
     "usb/willsemi,wusb3801.yaml": "1caaf2c59686",
     "usb/xlnx,usb2.yaml": "7a685df39e4b",
-    "vendor-prefixes.yaml": "6700b0b0dd4d",
+    "vendor-prefixes.yaml": "b438a15112fc",
     "virtio/mmio.yaml": "93ceb76c9759",
     "virtio/pci-iommu.yaml": "c1012797941b",
     "virtio/virtio-device.yaml": "4e765f352e73",
