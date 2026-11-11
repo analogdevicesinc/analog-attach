@@ -212,6 +212,62 @@ assert_warned() {
 	grep -q 'diff-channels = <1 2 3>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
 }
 
+# Description: a value the binding offers as one whole list (adi,ad5758's adi,range-microamp, one
+# <min max> pair of six) is checked as that list: an option is written with no warning, and a
+# pair that is no option is written with the one warning naming the options.
+# Steps:
+#   1. Make the overlay, add an adi,ad5758 on spi0 and set adi,dc-dc-mode 1 (the branch that
+#      allows adi,range-microamp).
+#   2. Run update ad5758 adi,range-microamp 0 20000, with --json.
+#   3. Check it succeeds with severity info, no warning on standard error, and the overlay has
+#      adi,range-microamp = <0 20000>.
+#   4. Run update ad5758 adi,range-microamp 1 2, with --json.
+#   5. Check it succeeds with severity warn, standard error is the one warning that 1 2 is not
+#      one of the options, and the overlay has adi,range-microamp = <1 2>.
+# bats test_tags=req:UPDATE-02, id:L0366
+@test "update checks a whole-list option as one value" {
+	with_overlay
+	aa add adi,ad5758 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad5758 failed"
+	aa update ad5758 adi,dc-dc-mode 1 >/dev/null 2>&1 || fail "update adi,dc-dc-mode failed"
+	run_json update ad5758 adi,range-microamp 0 20000
+	assert_success
+	assert_json '.severity' info
+	[[ "$stderr" != *"warning:"* ]] || fail "warned: $stderr"
+	grep -q 'adi,range-microamp = <0 20000>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	run_json update ad5758 adi,range-microamp 1 2
+	assert_warned adi,range-microamp
+	[[ "$stderr" == "warning: adi,range-microamp takes one of 0 20000 | 0 24000 | 4 24000 | -20000 20000 | -24000 24000 | -1000 22000, got 1 2" ]] \
+		|| fail "expected the one value warning: $stderr"
+	grep -q 'adi,range-microamp = <1 2>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+}
+
+# Description: a negative number, which update writes as an expression ((-20000)), is checked by
+# the number it gives: an option with a negative is written with no warning, and a pair with a
+# negative that is no option gets the warning.
+# Steps:
+#   1. Make the overlay, add an adi,ad5758 on spi0 and set adi,dc-dc-mode 1.
+#   2. Run update ad5758 adi,range-microamp -20000 20000, with --json.
+#   3. Check it succeeds with severity info, no warning on standard error, and the overlay has
+#      adi,range-microamp = <(-20000) 20000>.
+#   4. Run update ad5758 adi,range-microamp -1 2, with --json.
+#   5. Check it succeeds with severity warn and standard error is the one warning that -1 2 is not
+#      one of the options.
+# bats test_tags=req:UPDATE-02, id:L0368
+@test "update checks a negative number by its value" {
+	with_overlay
+	aa add adi,ad5758 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad5758 failed"
+	aa update ad5758 adi,dc-dc-mode 1 >/dev/null 2>&1 || fail "update adi,dc-dc-mode failed"
+	run_json update ad5758 adi,range-microamp -20000 20000
+	assert_success
+	assert_json '.severity' info
+	[[ "$stderr" != *"warning:"* ]] || fail "warned: $stderr"
+	grep -q 'adi,range-microamp = <(-20000) 20000>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	run_json update ad5758 adi,range-microamp -1 2
+	assert_warned adi,range-microamp
+	[[ "$stderr" == "warning: adi,range-microamp takes one of 0 20000 | 0 24000 | 4 24000 | -20000 20000 | -24000 24000 | -1000 22000, got -1 2" ]] \
+		|| fail "expected the one value warning: $stderr"
+}
+
 # Description: update with a property and no value shows the property exactly as read does, in
 # text and in JSON.
 # Steps:

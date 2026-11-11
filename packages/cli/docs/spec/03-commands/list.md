@@ -382,10 +382,10 @@ devicetree writes it>}`, its numbers as numbers in `list`
 (`{"value": "0 20000", "list": [0, 20000], "display_string": "<0 20000>"}`):
 `value` is a string because the option is a list, not because the property is
 a string; an option that is one value has no `list`. The check of LIST-073
-then fails each of them and adds the note `Values for property <property> are
+holds such a value to the options as a whole (UPDATE-041), so an option gets
+no note; a value that is none of them gets `Values for property <property> are
 <options>`, `<options>` being every option as JSON
-(`[["raspberrypi,400","brcm,bcm2711"],…]`, `[[0,20000],[0,24000],…]`). (Open
-issue L-10.)
+(`[["raspberrypi,400","brcm,bcm2711"],…]`, `[[0,20000],[0,24000],…]`).
 
 **LIST-080** When the property names a provider the user can add instead
 (`fixed-clock` for `clocks`, `regulator-fixed` for a `*-supply`, as `read`
@@ -646,21 +646,6 @@ adi,adt7475` says `6 properties, 1 child node patterns`, and its JSON
 `^adi,pin(5|10)-function$` or `^adi,pin(9|14)-function$`, which `list
 property` of such a node lists (LIST-034). A fix would be a `patterns` list
 in `device`, described like `properties`, and a count in the human line.
-
-**L-10. Whole-list options fail the binding's check.** `list value /
-compatible` (an RPi 4 base) offers each fallback list as its strings joined by
-a space (`raspberrypi,4-model-b brcm,bcm2711`, displayed
-`"raspberrypi,4-model-b", "brcm,bcm2711"`), each with the note `Values for
-property compatible are [[…]]` (LIST-079). Passed to `update / compatible`, it
-writes the two strings the binding asks for, but warns `compatible takes 1
-value, got 2` and `compatible takes one of raspberrypi,400,brcm,bcm2711, …,
-got raspberrypi,4-model-b`: the value check reads each option as one string.
-Lists of numbers do the same: `update ad5758 adi,range-microamp 0 20000`
-writes `<0 20000>` and warns `adi,range-microamp takes 1 value, got 2` and
-`adi,range-microamp takes one of 0,20000, 0,24000, …, got 0`, and `update ad5758
-adi,range-microamp 1 2`, which no option is, gets the same two warnings and
-no other (`data-lanes`, ti,ads1119's `diff-channels` alike). A fix would be to
-check a whole-list option as one list of values, for the count and the value.
 
 **L-11. The `list property` input error names no node.** `list property
 testpart x` says `'analog-attach read <node> x' describes one property`,

@@ -6,7 +6,8 @@ import { AttachEnumType, is_dt_flag, list_cell, type AttachType, type Cell, type
 // bound is in cells only once every entry has a known width: interrupts
 // under a known interrupt-parent. Lists whose entries name a phandle
 // (clocks, dmas, *-gpios) have as many cells as the provider takes, so they
-// have no bounds here.
+// have no bounds here. A value of a whole-list option (a `compatible` with
+// its fallbacks, adi,range-microamp's `<0 20000>`) is one item, of any length.
 
 export interface ItemBounds {
     min: number;
@@ -40,6 +41,16 @@ export function item_bounds(type: AttachType): ItemBounds | undefined {
     }
 }
 
+/**
+ * The item of a list that is an enum with an option that is a whole list, written all at once; undefined for any
+ * other type.
+ */
+export function whole_list_enum(type: AttachType): Extract<Cell, { _t: "enum" }> | undefined {
+    if (type._t !== "list") { return undefined; }
+    const cell = list_cell(type);
+    return cell?._t === "enum" && cell.enum.some(option => Array.isArray(option)) ? cell : undefined;
+}
+
 /** The values a built property holds: its cells and its strings. */
 export function value_count(property: DTProperty): number {
     if (is_dt_flag(property.value)) { return 0; }
@@ -47,10 +58,12 @@ export function value_count(property: DTProperty): number {
 }
 
 /** The warning for a value count the binding doesn't allow; undefined when it fits or the binding sets no bounds. */
-export function count_warning(property: string, type: AttachType, count: number): string | undefined {
+export function count_warning(property: string, type: AttachType, values: number): string | undefined {
     const bounds = item_bounds(type);
     if (bounds === undefined) { return undefined; }
     const { min, max } = bounds;
+    // A value of several whole-list options would need the cells split by option; no binding has one yet.
+    const count = whole_list_enum(type) === undefined ? values : Math.min(values, 1);
     if (count >= min && (max === undefined || count <= max)) { return undefined; }
     const takes = max === undefined
         ? `at least ${min} values`
@@ -117,5 +130,20 @@ if (import.meta.vitest) {
         expect(count_warning("lanes", numbers(1), 9)).toBeUndefined();
         expect(count_warning("interrupts", { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 }, 2)).toBeUndefined();
         expect(count_warning("interrupts", specifiers([{ _t: "number" }, flags], 1, 1), 3)).toBe("warning: interrupts takes 2 values, got 3");
+    });
+
+    test("count_warning — a value of a whole-list option counts as one, of any length", () => {
+        const range: AttachType = { _t: "list", item: { _t: "enum", enum: [[0n, 20_000n], [0n, 24_000n]], enum_type: AttachEnumType.NUMBER }, minItems: 1, maxItems: 1 };
+        expect(count_warning("adi,range-microamp", range, 2)).toBeUndefined();
+        expect(count_warning("adi,range-microamp", range, 3)).toBeUndefined();
+        expect(count_warning("adi,range-microamp", range, 0)).toBe("warning: adi,range-microamp takes 1 value, got 0");
+        const compatible: AttachType = {
+            _t: "list",
+            item: { _t: "enum", enum: [["raspberrypi,400", "brcm,bcm2711"], "brcm,bcm2711"], enum_type: AttachEnumType.STRING },
+            minItems: 1,
+            maxItems: 1,
+        };
+        expect(count_warning("compatible", compatible, 2)).toBeUndefined();
+        expect(count_warning("compatible", compatible, 1)).toBeUndefined();
     });
 }

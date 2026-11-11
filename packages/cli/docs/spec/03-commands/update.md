@@ -181,8 +181,11 @@ width, such as `interrupts` under a known interrupt parent), and the written
 value has a count outside them, the CLI shall write the value and give the
 warning `warning: <property> takes <bound>, got <count>`. `<bound>` is
 `<n> value` or `<n> values` for a fixed count, `<min> to <max> values`, or
-`at least <min> values`. `<count>` counts every cell and every string. Lists
-whose entries name a phandle (`clocks`, `dmas`, `*-gpios`) have no bounds.
+`at least <min> values`. `<count>` counts every cell and every string, except
+that a value of a whole-list option (LIST-079: a `compatible` with its
+fallbacks, `adi,range-microamp`'s `<0 20000>`) counts as one, whatever its
+length. Lists whose entries name a phandle (`clocks`, `dmas`, `*-gpios`) have
+no bounds.
 
 **UPDATE-041** When the definition bounds a written value, and the value is
 outside it, the CLI shall write the value and give the warning `warning:
@@ -193,8 +196,20 @@ or a string by the options of its enum (`one of <option>, <option>…`, for
 example `warning: status takes one of okay, disabled, reserved, fail,
 fail-needs-probe, got bogus`). Each value is held to the cell of its position:
 a scalar's, a list's (one for every value, or one per position), the single
-row of a matrix. Labels, paths, expressions, macro enums and lists whose
-entries name a phandle aren't checked. Every node a binding closes (with
+row of a matrix. When an option of the enum is a whole list (LIST-079), the
+written values are one value, held to the options as a whole: entry by entry
+and of the same length, an option of one value being a list of one. Such an
+option is written as `update` takes it, its entries joined by a space (`0
+20000`, `raspberrypi,400 brcm,bcm2711`), the options separated by ` | `, and
+so is the value (`warning: adi,range-microamp takes one of 0 20000 | 0 24000
+| …, got 1 2`). A number is checked as dtc stores it in a cell of its width,
+read signed when the cell allows a negative (its minimum or an option of its
+enum is negative, as for an `int32`) and unsigned otherwise; this holds for an
+expression too, computed as dtc does, and so for a negative number, which the
+CLI writes as one (`-20000` as `(-20000)`, `warning: offset takes -5 to 5, got
+-6`; in an unsigned cell `(-1)` is `4294967295`). Labels, paths, expressions
+with a macro, macro enums and lists whose entries name a phandle aren't
+checked. Every node a binding closes (with
 `additionalProperties` or `unevaluatedProperties`) defines `status`, with
 dt-core's options, and `pinctrl-names` and `pinctrl-<n>`.
 

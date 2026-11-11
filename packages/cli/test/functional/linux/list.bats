@@ -391,6 +391,22 @@ with_adc() {
 	assert_json ".suggestions[0].display_string | test(\"the binding's default\")" true
 }
 
+# Description: list value offers each whole-list option of an enum (the root's compatible with its
+# fallback) as one value, and none of them is noted as failing the binding's check.
+# Steps:
+#   1. Make the overlay.
+#   2. Run list value / compatible, with --json.
+#   3. Check it succeeds and offers raspberrypi,4-model-b brcm,bcm2711, the list of the RPi 4.
+#   4. Check no suggestion has a note.
+# bats test_tags=req:LIST-08, id:L0367
+@test "list value offers a whole-list option as one value that the binding allows" {
+	with_overlay
+	run_json list value / compatible
+	assert_success
+	assert_json '[.suggestions[].value] | index("raspberrypi,4-model-b brcm,bcm2711") != null' true
+	assert_json '[.suggestions[] | select(.note != null)] | length' 0
+}
+
 # Description: list value offers the options of an enum that the processed schema nests in a
 # matrix (a -microvolt property), the binding's default first.
 # Steps:

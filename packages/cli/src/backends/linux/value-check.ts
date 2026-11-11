@@ -1,14 +1,18 @@
 import {
     AttachEnumType,
+    cell_number,
     INTERRUPT_MACROS,
     GPIO_MACROS,
     is_dt_flag,
     type AttachType,
     type Cell,
     type DTProperty,
+    type EnumOption,
     type List,
     type ResolvedProperty,
 } from "attach-lib";
+
+import { whole_list_enum } from "./item-count";
 
 type ParsedInputValue = SingleInput | ArrayInput | MatrixInput;
 type SingleInput = boolean | bigint | string;
@@ -110,6 +114,14 @@ function check_list(values: ArrayInput, list: List, property: string, matrix: bo
         return true;
     }
 
+    // The values of a whole-list option are one value, the list (LIST-079).
+    const whole = whole_list_enum(list);
+    if (whole !== undefined) {
+        return outside_options(values, whole.enum, whole.enum_type) === undefined
+            ? true
+            : `Values for property ${property} are ${describe_options(whole.enum)}`;
+    }
+
     for (const element of values) {
         const checked = check_cell(element, item, { property, matrix });
         if (checked !== true) { return checked; }
@@ -207,18 +219,41 @@ export function check_value(parsed: ParsedInputValue, property: string, definiti
     }
 }
 
-/** A written value the binding can bound: a number cell or a string; a label, a path or an expression is undefined. */
+/** A written value the binding can bound: a number cell or a string; a label, a path or a macro is undefined. */
 type Written = bigint | string | undefined;
 
-function written_values(property: DTProperty): Written[] {
+/**
+ * The written values, by position. A number cell (an expression too, `(-20000)` being how a negative is written) is
+ * what dtc stores in a cell of its width, read signed when the binding's cell at its position, `signed(index)`,
+ * allows a negative (as dt-schema decodes an `int32`), unsigned otherwise.
+ */
+function written_values(property: DTProperty, signed: (index: number) => boolean): Written[] {
     if (is_dt_flag(property.value)) { return []; }
-    return property.value.flatMap((value): Written[] => {
+    const values: Written[] = [];
+    for (const value of property.value) {
         switch (value.kind) {
-            case "string": { return [value.value]; }
-            case "array": { return value.elements.map(element => element.kind === "number" ? element.value : undefined); }
-            default: { return [undefined]; }
+            case "string": { values.push(value.value); break; }
+            case "array": {
+                for (const element of value.elements) {
+                    const number = cell_number(element);
+                    const width = Number(value.bit_width);
+                    values.push(number === undefined
+                        ? undefined
+                        : (signed(values.length) ? BigInt.asIntN(width, number) : BigInt.asUintN(width, number)));
+                }
+                break;
+            }
+            default: { values.push(undefined); }
         }
-    });
+    }
+    return values;
+}
+
+/** Whether a cell allows a negative number: its minimum, or an option of its enum. */
+function allows_negative(cell: Cell | undefined): boolean {
+    if (cell?._t === "number") { return cell.minimum !== undefined && cell.minimum < 0n; }
+    if (cell?._t !== "enum" || cell.enum_type !== AttachEnumType.NUMBER) { return false; }
+    return cell.enum.flat().some(option => typeof option === "bigint" && option < 0n);
 }
 
 function has_phandle(item: Cell | Cell[]): boolean {
@@ -264,11 +299,35 @@ function outside(value: bigint | string, cell: Cell): string | undefined {
 }
 
 /**
+ * What the whole-list `options` take when the written `values`, as one list, are none of them (`one of 0 20000 |
+ * 0 24000`), and how the values read; undefined when they are one, or can't be checked (a label among them, or
+ * values of another kind than the enum's). An option that is one value is a list of one.
+ */
+function outside_options(values: Written[], options: EnumOption[], enum_type: AttachEnumType): { takes: string; got: string } | undefined {
+    const numbers = enum_type === AttachEnumType.NUMBER && values.every(value => typeof value === "bigint");
+    const strings = enum_type === AttachEnumType.STRING && values.every(value => typeof value === "string");
+    if (!numbers && !strings) { return undefined; }
+    const lists = options.map(option => Array.isArray(option) ? option : [option]);
+    const same = (list: (bigint | string)[]): boolean => list.length === values.length
+        && list.every((entry, index) => (numbers ? BigInt(entry) === values[index] : entry === values[index]));
+    if (lists.some(list => same(list))) { return undefined; }
+    // Each list as update takes it, its entries joined by a space; a string can hold commas, so options are set apart by `|`.
+    const show = (list: Written[]): string => list.map(String).join(" ");
+    return { takes: `one of ${lists.map(list => show(list)).join(" | ")}`, got: show(values) };
+}
+
+/**
  * The warning for the first written value outside what the binding allows (a number above its maximum, a value
  * that is no option of its enum), undefined when every value fits or the binding doesn't bound it (UPDATE-041).
+ * The values of a whole-list option are checked together, as one value.
  */
 export function value_warning(property: string, type: AttachType, written: DTProperty): string | undefined {
-    for (const [index, value] of written_values(written).entries()) {
+    const whole = whole_list_enum(type);
+    if (whole !== undefined) {
+        const outcome = outside_options(written_values(written, () => allows_negative(whole)), whole.enum, whole.enum_type);
+        return outcome === undefined ? undefined : `warning: ${property} takes ${outcome.takes}, got ${outcome.got}`;
+    }
+    for (const [index, value] of written_values(written, index => allows_negative(cell_at(type, index))).entries()) {
         if (value === undefined) { continue; }
         const cell = cell_at(type, index);
         const takes = cell === undefined ? undefined : outside(value, cell);
@@ -337,6 +396,25 @@ if (import.meta.vitest) {
         expect(check_value(4n, "adi,fixed", fixed)).toBe("Value for property adi,fixed is: 3");
     });
 
+    test("a whole-list option is checked as the whole list, of numbers or of strings", () => {
+        const range: ResolvedProperty = {
+            key: "adi,range-microamp",
+            value: { _t: "list", item: { _t: "enum", enum: [[0n, 20_000n], [-20_000n, 20_000n]], enum_type: AttachEnumType.NUMBER }, minItems: 1, maxItems: 1 },
+        };
+        expect(check_value([0n, 20_000n], "adi,range-microamp", range)).toBe(true);
+        expect(check_value([-20_000n, 20_000n], "adi,range-microamp", range)).toBe(true);
+        expect(check_value([1n, 2n], "adi,range-microamp", range)).toBe("Values for property adi,range-microamp are [[0,20000],[-20000,20000]]");
+        expect(check_value(0n, "adi,range-microamp", range)).toBe("Values for property adi,range-microamp are [[0,20000],[-20000,20000]]");
+        const compatible: ResolvedProperty = {
+            key: "compatible",
+            value: { _t: "list", item: { _t: "enum", enum: [["raspberrypi,4-model-b", "brcm,bcm2711"], "brcm,bcm2711"], enum_type: AttachEnumType.STRING }, minItems: 1, maxItems: 1 },
+        };
+        expect(check_value(["raspberrypi,4-model-b", "brcm,bcm2711"], "compatible", compatible)).toBe(true);
+        expect(check_value("brcm,bcm2711", "compatible", compatible)).toBe(true);
+        expect(check_value(["brcm,bcm2711", "raspberrypi,4-model-b"], "compatible", compatible))
+            .toBe(`Values for property compatible are [["raspberrypi,4-model-b","brcm,bcm2711"],"brcm,bcm2711"]`);
+    });
+
     const written = async (source: string): Promise<DTProperty> => {
         const { DeviceTree } = await import("attach-lib");
         const tree = DeviceTree.new_from_string(`/dts-v1/;\n/ { ${source} };`);
@@ -368,5 +446,51 @@ if (import.meta.vitest) {
         expect(value_warning("flags", flags, await written("flags = <5>;"))).toBeUndefined();
         const numbers: AttachType = { _t: "list", item: { _t: "number", maximum: 3n } };
         expect(value_warning("n", numbers, await written("n = <&n>;"))).toBeUndefined();
+    });
+
+    test("value_warning — an expression is checked by its value, in its cell's width, signed when the cell allows a negative", async () => {
+        const offset: AttachType = { _t: "scalar", cell: { _t: "number", minimum: -5n, maximum: 5n } };
+        expect(value_warning("offset", offset, await written("offset = <(-5)>;"))).toBeUndefined();
+        expect(value_warning("offset", offset, await written("offset = <(-6)>;"))).toBe("warning: offset takes -5 to 5, got -6");
+        // dtc stores -1 as 0xffffffff, which an unsigned cell reads as such.
+        const channel: AttachType = { _t: "scalar", cell: { _t: "number", minimum: 0n, maximum: 15n } };
+        expect(value_warning("reg", channel, await written("reg = <(-1)>;"))).toBe("warning: reg takes 0 to 15, got 4294967295");
+        expect(value_warning("reg", channel, await written("reg = <(4<<2)>;"))).toBe("warning: reg takes 0 to 15, got 16");
+        expect(value_warning("reg", channel, await written("reg = <(4<<1)>;"))).toBeUndefined();
+        expect(value_warning("reg", channel, await written("reg = <(FOO+1)>;"))).toBeUndefined();
+        const word: AttachType = { _t: "scalar", cell: { _t: "number", minimum: 0n, maximum: 4_294_967_295n } };
+        expect(value_warning("word", word, await written("word = <(-1)>;"))).toBeUndefined();
+        const wide: AttachType = { _t: "scalar", cell: { _t: "number", minimum: -1n, maximum: 1n } };
+        expect(value_warning("wide", wide, await written("wide = /bits/ 64 <(-1)>;"))).toBeUndefined();
+        const range: AttachType = { _t: "list", item: { _t: "enum", enum: [[0n, 20_000n], [-20_000n, 20_000n]], enum_type: AttachEnumType.NUMBER }, minItems: 1, maxItems: 1 };
+        expect(value_warning("adi,range-microamp", range, await written("adi,range-microamp = <(-20000) 20000>;"))).toBeUndefined();
+        expect(value_warning("adi,range-microamp", range, await written("adi,range-microamp = <(-1) 2>;")))
+            .toBe("warning: adi,range-microamp takes one of 0 20000 | -20000 20000, got -1 2");
+        const mode: AttachType = { _t: "scalar", cell: { _t: "enum", enum: [-1n, 1n], enum_type: AttachEnumType.NUMBER } };
+        expect(value_warning("mode", mode, await written("mode = <(-1)>;"))).toBeUndefined();
+        expect(value_warning("mode", mode, await written("mode = <(-2)>;"))).toBe("warning: mode takes one of -1, 1, got -2");
+    });
+
+    test("value_warning — a whole-list option is the whole written list, of numbers or of strings", async () => {
+        const range: AttachType = { _t: "list", item: { _t: "enum", enum: [[0n, 20_000n], [4n, 24_000n]], enum_type: AttachEnumType.NUMBER }, minItems: 1, maxItems: 1 };
+        expect(value_warning("adi,range-microamp", range, await written("adi,range-microamp = <0 20000>;"))).toBeUndefined();
+        expect(value_warning("adi,range-microamp", range, await written("adi,range-microamp = <0x4 24000>;"))).toBeUndefined();
+        expect(value_warning("adi,range-microamp", range, await written("adi,range-microamp = <1 2>;")))
+            .toBe("warning: adi,range-microamp takes one of 0 20000 | 4 24000, got 1 2");
+        expect(value_warning("adi,range-microamp", range, await written("adi,range-microamp = <0>;")))
+            .toBe("warning: adi,range-microamp takes one of 0 20000 | 4 24000, got 0");
+        expect(value_warning("adi,range-microamp", range, await written("adi,range-microamp = <0 20000 3>;")))
+            .toBe("warning: adi,range-microamp takes one of 0 20000 | 4 24000, got 0 20000 3");
+        expect(value_warning("adi,range-microamp", range, await written("adi,range-microamp = <&n 20000>;"))).toBeUndefined();
+        const compatible: AttachType = {
+            _t: "list",
+            item: { _t: "enum", enum: [["raspberrypi,400", "brcm,bcm2711"], ["raspberrypi,4-model-b", "brcm,bcm2711"], "brcm,bcm2711"], enum_type: AttachEnumType.STRING },
+            minItems: 1,
+            maxItems: 1,
+        };
+        expect(value_warning("compatible", compatible, await written(`compatible = "raspberrypi,4-model-b", "brcm,bcm2711";`))).toBeUndefined();
+        expect(value_warning("compatible", compatible, await written(`compatible = "brcm,bcm2711";`))).toBeUndefined();
+        expect(value_warning("compatible", compatible, await written(`compatible = "brcm,bcm2711", "raspberrypi,400";`)))
+            .toBe(`warning: compatible takes one of raspberrypi,400 brcm,bcm2711 | raspberrypi,4-model-b brcm,bcm2711 | brcm,bcm2711, got brcm,bcm2711 raspberrypi,400`);
     });
 }

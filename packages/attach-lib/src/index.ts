@@ -50,7 +50,7 @@ export {
     type DTPath,
     type CellArrayElement,
 } from './Devicetree/syntax/AST.js';
-export { is_enabled, cell_extract_first_value, type LocatedNode, type NodeTarget } from './Devicetree/nodes/Access.js';
+export { is_enabled, cell_extract_first_value, cell_number, type LocatedNode, type NodeTarget } from './Devicetree/nodes/Access.js';
 export { print_property, type OverlaySyntax, type DtoPrintOptions } from './Devicetree/syntax/Printer.js';
 export type { CellInput, CellValue, NumberRepr } from './Devicetree/build/Cells.js';
 export { NodeBuilder } from './Devicetree/build/NodeBuilder.js';
