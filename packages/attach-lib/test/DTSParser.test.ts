@@ -290,6 +290,15 @@ describe("labels before a block, as dtc takes them", () => {
     expect(Result.is_err(parsed) && format_parse_error(parsed.error)).toBe(message);
   });
 
+  test.each<[string, string, string]>([
+    ["a preprocessor directive", "#include <dt-bindings/gpio/gpio.h>\n", "Preprocessor directives aren't supported: '#include' (line 3, column 1)"],
+    ["a directive dtc doesn't have", "&a {\n\t/delete-it/ x;\n};\n", "Unknown directive: '/delete-it/' (line 4, column 2)"],
+    ["a character dtc doesn't have", "&a { x = $1; };\n", "Unknown character: '$' (line 3, column 10)"],
+  ])("lexing, rejected at its place — %s", (_name, source, message) => {
+    const parsed = parse_dto(`/dts-v1/;\n/plugin/;\n${source}`);
+    expect(Result.is_err(parsed) && format_parse_error(parsed.error)).toBe(message);
+  });
+
   test("overlay, accepted — a label on a reference to a node of the overlay", () => {
     const parsed = parse_dto(`${local}e: &a { x = <1>; };`);
     if (Result.is_err(parsed)) { expect.fail(format_parse_error(parsed.error)); }

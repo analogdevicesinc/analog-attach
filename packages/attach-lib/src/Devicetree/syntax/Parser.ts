@@ -36,7 +36,8 @@ type DeletableNode = Deletable<DTNode<DeletableProperty>>;
 
 export type ParseError = {
     message: string;
-    found?: Token;
+    /** The text met and where it starts: a token, or what the lexer stopped at. */
+    found?: Pick<Token, "value" | "row" | "col">;
     expected?: RawToken;
 }
 
@@ -1246,7 +1247,8 @@ export class Parser {
 export function parse_dts(raw: string): Result<DTSParseResult, ParseError> {
     const lexing_result = lex(raw);
     if (Result.is_err(lexing_result)) {
-        return Result.Err({ message: `Lexing failed with: ${lexing_result.error.message}` });
+        const { message, value, row, col } = lexing_result.error;
+        return Result.Err({ message, found: { value, row, col } });
     }
 
     const { tokens, comments } = lexing_result.value;
@@ -1258,7 +1260,8 @@ export function parse_dts(raw: string): Result<DTSParseResult, ParseError> {
 export function parse_dto(raw: string): Result<DTOParseResult, ParseError> {
     const lexing_result = lex(raw);
     if (Result.is_err(lexing_result)) {
-        return Result.Err({ message: `Lexing failed with: ${lexing_result.error.message}` });
+        const { message, value, row, col } = lexing_result.error;
+        return Result.Err({ message, found: { value, row, col } });
     }
 
     const { tokens, comments } = lexing_result.value;

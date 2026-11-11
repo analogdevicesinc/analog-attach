@@ -549,11 +549,18 @@ setting names:
 **COM-100** When a command needs the workfile, the CLI shall load the base
 first, then read the `workfile` file as written (without preprocessing) and
 parse it against the base. An unset field is reported per COM-126 and a
-missing file per COM-127.
+missing file per COM-127. The workfile is the CLI's: `init` makes it and the
+commands write it (COM-103). Unlike the base, it holds no preprocessor
+directives (`#include`, `#define`), no macros (`IRQ_TYPE_EDGE_FALLING`) and no
+comments: a directive or a macro makes it unparseable (COM-101), and a
+comment is dropped on the next write. A hand-edited workfile that doesn't
+parse is the user's to fix.
 
 **COM-101** If the workfile doesn't parse, then loading shall report
-`workfile: <file> does not parse: <error>`. A `#include` or any other
-preprocessor directive in the workfile makes it unparseable (open issue C-5).
+`workfile: <file> does not parse: <error>`, `<error>` naming what it stopped
+at and where, as `'<text>' (line <n>, column <n>)`. Example:
+`workfile: overlay.dtso does not parse: Failed to parse overlay: Preprocessor
+directives aren't supported: '#include' (line 3, column 1)`.
 
 **COM-102** If the base fails to load, then loading shall report the base's
 problems and those of COM-126 and COM-127 for `workfile`, but not try to parse
@@ -561,7 +568,8 @@ the workfile.
 
 **COM-103** When a command writes the workfile, the CLI shall write the whole
 file, printed from the parsed tree: `/dts-v1/;`, `/plugin/;` and the
-fragments, indented with tabs. Comments and the original layout are not kept.
+fragments, indented with tabs. Comments and the original layout are not kept
+(COM-100).
 
 **COM-104** Where `overlay-syntax` is `fragment`, the CLI shall print each
 fragment as `fragment@<n> { target = <&<label>>; __overlay__ { … }; };`
@@ -765,11 +773,6 @@ workspace.
 **C-4. The preprocessor check is `<tool> --version`.** A tool that exists but
 has no `--version`, or exits non-zero for it (`false`, some wrappers), is
 reported as `not found on PATH` (COM-093).
-
-**C-5. The workfile isn't preprocessed, and comments are lost.** The base
-goes through `preprocess-command` but the workfile doesn't (COM-100), so a
-workfile with `#include <dt-bindings/…>` or a macro doesn't load. Every write
-reprints the file from the tree (COM-103), dropping comments a user added.
 
 **C-8. `read` loads the workspace before checking its arguments.** It calls
 the loader first and applies GRM-020 to GRM-023 and GRM-030 after (COM-030).

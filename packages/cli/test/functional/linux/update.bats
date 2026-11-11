@@ -756,3 +756,24 @@ with_adp5055() {
 	run grep -q 'interrupt-parent' "$WORKFILE"
 	assert_failure
 }
+
+# Description: a workfile with a preprocessor directive doesn't parse (it isn't preprocessed): a
+# command that loads it is refused, naming the file, the directive and its line and column, and
+# nothing is written.
+# Steps:
+#   1. Make the overlay with an AD7124-8 on spi0, add `#include <dt-bindings/gpio/gpio.h>` as its
+#      third line and snapshot it.
+#   2. Update ad7124_8 spi-max-frequency 1000000, with --json; check it is refused (exit 0, .ok
+#      false), saying the workfile does not parse at the #include, line 3, column 1.
+#   3. Check the workfile is unchanged.
+# bats test_tags=req:GEN-12, id:L0376
+@test "a workfile with an #include is refused at the directive, and nothing is written" {
+	with_adc
+	sed -i '2a #include <dt-bindings/gpio/gpio.h>' "$WORKFILE"
+	snapshot
+	run_json update ad7124_8 spi-max-frequency 1000000
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' "workfile: $WORKFILE does not parse: Failed to parse overlay: Preprocessor directives aren't supported: '#include' (line 3, column 1)"
+	assert_unchanged
+}

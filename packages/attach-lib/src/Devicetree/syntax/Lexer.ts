@@ -39,12 +39,18 @@ export type LexerResult = {
 export enum LexerErrorCode {
     UnknownChar = "UnknownChar",
     UnknownDirective = "UnknownDirective",
+    PreprocessorDirective = "PreprocessorDirective",
 }
 
+/** Where lexing stopped: the text met (`value`) and where it starts. */
 export type LexerError = WithRowAndCol & {
     code: LexerErrorCode;
     message: string;
+    value: string;
 }
+
+/** A cpp directive (`#include`), which cpp, not dtc, reads: a source that holds one isn't preprocessed. */
+const CPP_DIRECTIVE = /^#(include|define|undef|ifdef|ifndef|if|elif|else|endif|error|warning|pragma|line)$/;
 
 export function lex(content: string): Result<LexerResult, LexerError> {
     const input_stream = new LexerInputStream(content);
@@ -57,9 +63,8 @@ export function lex(content: string): Result<LexerResult, LexerError> {
             break;
         }
 
-        const coordinates = input_stream.current_coordinates;
-        // `coordinates` follows the stream; a token is placed where it starts.
-        const start = { ...coordinates };
+        // The stream's coordinates move on as it is read; a token (or an error) is placed where it starts.
+        const start = { ...input_stream.current_coordinates };
 
         const raw_token: Result<RawToken, LexerError> = (() => {
 
@@ -81,11 +86,7 @@ export function lex(content: string): Result<LexerResult, LexerError> {
                     }
                     case TokenKind.Directive: {
                         if (!is_dt_directive(value)) {
-                            return Result.Err({
-                                code: LexerErrorCode.UnknownDirective,
-                                message: "Unknown directive met while lexing",
-                                ...coordinates
-                            });
+                            return Result.Err({ code: LexerErrorCode.UnknownDirective, message: "Unknown directive", value, ...start });
                         }
                         return Result.Ok({ kind, value });
                     }
@@ -105,15 +106,14 @@ export function lex(content: string): Result<LexerResult, LexerError> {
                         return Result.Ok({ kind, value: value.slice(0, -1) });
                     }
                     case TokenKind.Identifier: {
+                        if (CPP_DIRECTIVE.test(value)) {
+                            return Result.Err({ code: LexerErrorCode.PreprocessorDirective, message: "Preprocessor directives aren't supported", value, ...start });
+                        }
                         return Result.Ok({ kind, value });
                     }
                     case TokenKind.Char: {
                         if (!is_char_token(value)) {
-                            return Result.Err({
-                                code: LexerErrorCode.UnknownChar,
-                                message: `Unknown char '${value}' met while lexing`,
-                                ...coordinates
-                            });
+                            return Result.Err({ code: LexerErrorCode.UnknownChar, message: "Unknown character", value, ...start });
                         }
 
                         return Result.Ok({ kind, value });
@@ -124,11 +124,7 @@ export function lex(content: string): Result<LexerResult, LexerError> {
                 }
             }
 
-            return Result.Err({
-                code: LexerErrorCode.UnknownChar,
-                message: `Unknown Char!`,
-                ...coordinates
-            });
+            return Result.Err({ code: LexerErrorCode.UnknownChar, message: "Unknown character", value: input_stream.current, ...start });
 
         })();
 
