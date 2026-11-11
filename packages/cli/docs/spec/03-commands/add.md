@@ -188,9 +188,10 @@ is other than 0; an unset `#size-cells` is 0, as ADD-048 reads it.
 
 **ADD-047** Where the name has no unit address, the binding defines `reg`
 and the parent isn't memory-mapped, the CLI shall give the node the lowest
-address that no enabled child of the parent occupies: of the addresses the
-binding's `reg` allows when its first cell is an enum (adp5055's `0x70` or
-`0x71`), else from 0. A child occupies
+address that no enabled child of the parent occupies of those the binding's
+`reg` allows, by its first cell: an enum's options (adp5055's `0x70` or
+`0x71`), or a number's bounds, from its `minimum` (0 when it has none) to its
+`maximum` (adm1266's `0x40` to `0x4f`); with neither, from 0. A child occupies
 the address its `reg` gives, or when it has no `reg`, its hexadecimal unit
 address. A cell of `reg` written as an expression (`<(4 << 8 | 0x03)>`, what
 cpp makes of a macro such as qcom's `PMR735A_ADC7_DIE_TEMP`) counts as the
@@ -199,8 +200,8 @@ arithmetic. A child whose `reg` the CLI can't read (its first `<…>` doesn't
 start with `#address-cells` numbers or expressions that compute, such as
 `<(MY_ADDR)>`, a macro the workfile doesn't expand) occupies nothing, even
 when its unit address is hexadecimal, as dtc refuses such a `reg`. When the
-address isn't the lowest one it could have been (0, or the lowest the enum
-allows), the CLI shall give the note (two lines):
+address isn't the lowest one the binding allows (the enum's lowest option,
+the `minimum`, else 0), the CLI shall give the note (two lines):
 
 ```
 Picked <what> <address> (taken: <occupants>).
@@ -215,7 +216,7 @@ at one address joined by ` and `, the entries joined by `, `. `<n>` is
 literal. Example:
 `Picked chip select 2 (taken: 0 by spidev@0 and adc@0, 1 by spidev@1).`
 
-When every address the enum allows is occupied, the CLI shall give the node
+When every address the binding allows is occupied, the CLI shall give the node
 the lowest of them anyway, with the note `Picked <what> <address> although
 every one the binding allows is taken (<occupants>)`, `<occupants>` listing
 the children at the allowed addresses only, as above; the address warning of

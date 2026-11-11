@@ -7,7 +7,10 @@ import { address_cells_of, ensure_address_cells } from "./AddressCells.js";
 import {
     encode_reg_address,
     format_unit_address,
+    is_allowed_address,
+    lowest_allowed_address,
     next_free_unit_address,
+    type AllowedAddresses,
     parse_unit_address,
 } from "./nodes/UnitAddress.js";
 import { DeviceTree } from "./DeviceTree.js";
@@ -28,10 +31,10 @@ export interface AddNodeRequest {
      */
     auto_address: boolean;
     /**
-     * The addresses the binding's `reg` allows (its enum); the picked address is the lowest free one of them, else
-     * the lowest one, taken. Empty or absent: the lowest free address from 0.
+     * The addresses the binding's `reg` allows (its enum, or its number's bounds); the picked address is the lowest
+     * free one of them, else the lowest one, taken. Absent or an empty enum: the lowest free address from 0.
      */
-    addresses?: bigint[];
+    addresses?: AllowedAddresses;
 }
 
 export type AddNodeNote =
@@ -88,13 +91,13 @@ export function add_node(overlay: DeviceTreeOverlay, request: AddNodeRequest): A
         if (request.auto_address && cells.size > 0) {
             notes.push({ kind: "reg-needed" });
         } else if (request.auto_address) {
-            const allowed = [...request.addresses ?? []].sort((a, b) => (a < b ? -1 : 1));
+            const allowed = request.addresses ?? [];
             const free = next_free_unit_address(effective, cells.address, allowed);
             address = free.address;
             unit = format_unit_address(free.address);
             if (free.taken) {
-                notes.push({ kind: "taken-address", unit, occupants: free.occupants.filter(o => allowed.includes(o.address)) });
-            } else if (free.address !== (allowed[0] ?? 0n)) {
+                notes.push({ kind: "taken-address", unit, occupants: free.occupants.filter(o => is_allowed_address(allowed, o.address)) });
+            } else if (free.address !== lowest_allowed_address(allowed)) {
                 notes.push({ kind: "picked-address", unit, occupants: free.occupants });
             }
         }
@@ -219,6 +222,24 @@ if (import.meta.vitest) {
             .toMatchObject({ status: "added", key: "adi,ad7124-8@5", notes: [{ kind: "picked-address", unit: "5" }] });
         expect(add_node(overlay, request({ name: "adc", addresses: [] })))
             .toMatchObject({ status: "added", key: "adc@2", notes: [{ kind: "picked-address", unit: "2" }] });
+    });
+
+    test("add_node — a range of addresses: the lowest free in it, else its minimum with a note", () => {
+        const overlay = setup();
+        add_node(overlay, request({ parent_path: SPI1, name: "other@5", auto_address: false }));
+        const ranged = request({ parent_path: SPI1, name: "adi,adm1266", compatible: "adi,adm1266", addresses: { minimum: 0x40n, maximum: 0x41n } });
+        expect(add_node(overlay, ranged)).toMatchObject({ status: "added", key: "adi,adm1266@40", notes: [] });
+        expect(add_node(overlay, ranged)).toMatchObject({ status: "added", key: "adi,adm1266@41", notes: [{ kind: "picked-address", unit: "41" }] });
+        expect(add_node(overlay, { ...ranged, name: "pmic" })).toMatchObject({
+            status: "added", key: "pmic@40",
+            notes: [{
+                kind: "taken-address", unit: "40",
+                occupants: [{ name: "adi,adm1266@40", address: 0x40n }, { name: "adi,adm1266@41", address: 0x41n }],
+            }],
+        });
+        // with no maximum, the addresses from the minimum on
+        expect(add_node(setup(), request({ addresses: { minimum: 0x40n } })))
+            .toMatchObject({ status: "added", key: "adi,ad7124-8@40", notes: [] });
     });
 
     test("add_node — explicit name@a writes reg <10> without auto-addressing", () => {

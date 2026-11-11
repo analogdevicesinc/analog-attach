@@ -209,6 +209,22 @@ setup() {
 	assert_json '[.errors[] | select(tostring | test("reg"))] | length' 0
 }
 
+# Description: a device whose binding's reg is a range (adm1266: 0x40 to 0x4f) gets the lowest
+# free address in it, which validate accepts.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Add adi,adm1266 --parent i2c1, with --json; check the key is adi,adm1266@40.
+#   3. Run validate, with --json; check no error concerns reg.
+# bats test_tags=req:ADD-03-LNX, id:L0377
+@test "the default address is the lowest free one in the binding's reg range" {
+	with_overlay
+	run_json add adi,adm1266 --parent i2c1
+	assert_success
+	assert_json '.key' 'adi,adm1266@40'
+	run_json validate
+	assert_json '[.errors[] | select(tostring | test("reg"))] | length' 0
+}
+
 # Description: when every address the binding's reg allows is taken, the device gets the lowest
 # one anyway, with a note naming the nodes at them; under the same name it is a taken name.
 # Steps:

@@ -93,14 +93,32 @@ export function occupied_address(child: DTNode, address_cells: number): bigint |
     return child.unit_addr === undefined ? undefined : parse_unit_address(child.unit_addr);
 }
 
+/** The addresses a binding's `reg` allows: its enum's options, or the bounds of its number (no maximum: unbounded). */
+export type AllowedAddresses = bigint[] | { minimum: bigint; maximum?: bigint };
+
+/** Whether `address` is one `allowed` gives; any, for an empty enum. */
+export function is_allowed_address(allowed: AllowedAddresses, address: bigint): boolean {
+    if (Array.isArray(allowed)) { return allowed.length === 0 || allowed.includes(address); }
+    return address >= allowed.minimum && (allowed.maximum === undefined || address <= allowed.maximum);
+}
+
+/** The lowest address `allowed` gives: an enum's lowest option, a range's minimum, 0 for an empty enum. */
+export function lowest_allowed_address(allowed: AllowedAddresses): bigint {
+    if (!Array.isArray(allowed)) { return allowed.minimum; }
+    let lowest = allowed[0] ?? 0n;
+    for (const option of allowed) { if (option < lowest) { lowest = option; } }
+    return lowest;
+}
+
 /**
- * The lowest address no enabled child occupies: of `allowed` when it has any (a binding's `reg` enum), else from 0.
- * When every allowed address is taken, the lowest of them, `taken`. `occupants` are every enabled child's address.
+ * The lowest address no enabled child occupies of those `allowed` gives (a binding's `reg` enum or range; by
+ * default, every one from 0). When every one is taken, the lowest of them, `taken`. `occupants` are every enabled
+ * child's address.
  */
 export function next_free_unit_address(
     effective_children: Map<string, DTNode>,
     address_cells: number,
-    allowed: bigint[] = [],
+    allowed: AllowedAddresses = [],
 ): { address: bigint; occupants: { name: string; address: bigint }[]; taken: boolean } {
     const occupied = new Map<bigint, string>();
     const all_occupants: { name: string; address: bigint }[] = [];
@@ -114,15 +132,19 @@ export function next_free_unit_address(
         }
     }
 
-    if (allowed.length > 0) {
-        const sorted = [...allowed].sort((a, b) => (a < b ? -1 : 1));
-        const free = sorted.find(candidate => !occupied.has(candidate));
-        return { address: free ?? sorted[0], occupants: all_occupants, taken: free === undefined };
+    const lowest = lowest_allowed_address(allowed);
+    const candidates: Iterable<bigint> = Array.isArray(allowed) && allowed.length > 0
+        ? [...allowed].sort((a, b) => (a < b ? -1 : 1))
+        : addresses_from(lowest, Array.isArray(allowed) ? undefined : allowed.maximum);
+    for (const candidate of candidates) {
+        if (!occupied.has(candidate)) { return { address: candidate, occupants: all_occupants, taken: false }; }
     }
-    for (let candidate = 0n; ; candidate++) {
-        if (occupied.has(candidate)) { continue; }
-        return { address: candidate, occupants: all_occupants, taken: false };
-    }
+    return { address: lowest, occupants: all_occupants, taken: true };
+}
+
+/** `from`, `from + 1`, … up to `to` (unbounded without one). */
+function* addresses_from(from: bigint, to: bigint | undefined): Generator<bigint> {
+    for (let address = from; to === undefined || address <= to; address++) { yield address; }
 }
 
 export type SyncResult = "unchanged" | "renamed" | "conflict" | "not-numeric";
