@@ -3,7 +3,7 @@ import path from "node:path";
 import {
     Attach,
     Result,
-    add_node,
+    add_device_node,
     unresolved_references,
     type DeviceTree,
     type DeviceTreeOverlay,
@@ -38,7 +38,6 @@ export interface AddRequest {
     parent?: string;
     name?: string;
     label?: string;
-    auto_address: boolean;
 }
 
 export const add = command<AddArguments, AddResponse, {
@@ -228,12 +227,6 @@ async function parse_binding(binding_path: string, bindings: Bindings): Promise<
     }
 }
 
-/** Whether the binding has a `reg` property, i.e. the device needs a unit address. */
-async function binding_defines_reg(binding_path: string, bindings: Bindings): Promise<boolean> {
-    const binding = await parse_binding(binding_path, bindings);
-    return binding?.properties.some(p => p.key === "reg") ?? false;
-}
-
 interface ParentChoice {
     bindings: Bindings;
     base: DeviceTree;
@@ -283,8 +276,8 @@ type AddOutcome =
     | { status: "parent-not-found" }
     | { status: "failed"; message: string; type: ErrorType };
 
-function add_by_hand(base: DeviceTree, overlay: DeviceTreeOverlay, request: AddRequest): AddOutcome {
-    const result = add_device(base, overlay, request);
+function add_by_hand(base: DeviceTree, overlay: DeviceTreeOverlay, request: AddRequest, binding: ParsedBinding | undefined): AddOutcome {
+    const result = add_device(base, overlay, request, binding);
     if (result.status === "parent-not-found") { return result; }
     if (result.status !== "added") { return { status: "failed", ...failure_message(result, request.parent ?? "/") }; }
     return { ...result, messages: added => result.notes.map(note => note_message(note, added)) };
@@ -300,7 +293,7 @@ interface TemplateInput {
     cwd: string;
     /** Where the preprocessed examples and overlays are written (`session.state_dir`). */
     state_dir: string;
-    request: Omit<AddRequest, "auto_address">;
+    request: AddRequest;
 }
 
 /** Add the device the way the template says: by hand, or copied from an example or an overlay. */
@@ -308,7 +301,7 @@ async function add_with_template(template: Template, input: TemplateInput): Prom
     const { overlay, base, binding_path, bindings, request } = input;
     switch (template.kind) {
         case "required": {
-            return add_by_hand(base, overlay, { ...request, auto_address: await binding_defines_reg(binding_path, bindings) });
+            return add_by_hand(base, overlay, request, await parse_binding(binding_path, bindings));
         }
         case "example": { return add_from_example(input, template.index); }
         case "overlay": { return add_from_overlay(input, template.name); }
@@ -407,18 +400,17 @@ function resolve_parent_path(base: DeviceTree, overlay: DeviceTreeOverlay, paren
     return resolved.in_overlay?.node_path ?? resolved.in_base?.path;
 }
 
-/** Resolve the parent identifier against the overlay and base, then add the node there. */
-export function add_device(base: DeviceTree, overlay: DeviceTreeOverlay, request: AddRequest): AddNodeResult {
+/** Resolve the parent identifier against the overlay and base, then add the node there, addressed as its binding has it. */
+export function add_device(base: DeviceTree, overlay: DeviceTreeOverlay, request: AddRequest, binding?: ParsedBinding): AddNodeResult {
     const parent_path = resolve_parent_path(base, overlay, request.parent);
     if (parent_path === undefined) { return { status: "parent-not-found" }; }
 
-    return add_node(overlay, {
+    return add_device_node(overlay, {
         parent_path,
         name: request.name ?? request.compatible,
         compatible: request.compatible,
         label: request.label,
-        auto_address: request.auto_address,
-    });
+    }, binding);
 }
 
 function failure_message(result: Exclude<AddNodeResult, { status: "added" | "parent-not-found" }>, parent: string): { message: string; type: ErrorType } {
@@ -465,21 +457,31 @@ function note_message(note: AddNodeNote, added: AddedNode): string {
         case "non-hex-unit": { return `Non-hex unit address "${note.unit}"; no reg created`; }
         case "reg-size-zero": { return "reg size set to 0; update reg with the real size"; }
         case "picked-address": {
-            // I2C addresses read as 0x48, chip selects as decimal, other units as in the node name (hex).
-            const show = (value: bigint): string => {
-                if (added.bus === "i2c") { return `0x${value.toString(16)}`; }
-                return added.bus === "spi" ? value.toString() : value.toString(16);
-            };
-            // A clash puts several nodes at one address: name them together, lowest address first.
-            const by_address = new Map<bigint, string[]>();
-            for (const o of note.occupants) { by_address.set(o.address, [...by_address.get(o.address) ?? [], o.name]); }
-            const taken = [...by_address].toSorted(([a], [b]) => (a < b ? -1 : 1))
-                .map(([address, names]) => `${show(address)} by ${names.join(" and ")}`).join(", ");
-            const word = added.bus === undefined ? "unit address" : ADDRESS_WORD[added.bus];
             const name = added.key.includes("@") ? added.key.slice(0, added.key.indexOf("@")) : added.key;
-            return `Picked ${word} ${show(BigInt(`0x${note.unit}`))} (taken: ${taken}).\nTo change it: rename ${added.label} ${name}@<n>`;
+            return `Picked ${address_word(added)} ${show_address(BigInt(`0x${note.unit}`), added)} (taken: ${occupant_list(note.occupants, added)}).\nTo change it: rename ${added.label} ${name}@<n>`;
+        }
+        case "taken-address": {
+            return `Picked ${address_word(added)} ${show_address(BigInt(`0x${note.unit}`), added)} although every one the binding allows is taken (${occupant_list(note.occupants, added)})`;
         }
     }
+}
+
+function address_word(added: AddedNode): string {
+    return added.bus === undefined ? "unit address" : ADDRESS_WORD[added.bus];
+}
+
+/** I2C addresses read as 0x48, chip selects as decimal, other units as in the node name (hex). */
+function show_address(value: bigint, added: AddedNode): string {
+    if (added.bus === "i2c") { return `0x${value.toString(16)}`; }
+    return added.bus === "spi" ? value.toString() : value.toString(16);
+}
+
+/** `<address> by <name>`, lowest address first; a clash puts several nodes at one address, named together. */
+function occupant_list(occupants: { name: string; address: bigint }[], added: AddedNode): string {
+    const by_address = new Map<bigint, string[]>();
+    for (const o of occupants) { by_address.set(o.address, [...by_address.get(o.address) ?? [], o.name]); }
+    return [...by_address].toSorted(([a], [b]) => (a < b ? -1 : 1))
+        .map(([address, names]) => `${show_address(address, added)} by ${names.join(" and ")}`).join(", ");
 }
 
 if (import.meta.vitest) {
@@ -505,27 +507,28 @@ if (import.meta.vitest) {
         return { base, overlay };
     };
 
-    const request: AddRequest = { compatible: "adi,ad7124-8", auto_address: true };
+    const request: AddRequest = { compatible: "adi,ad7124-8" };
+    const with_reg: ParsedBinding = { required_properties: [], properties: [{ key: "reg", value: { _t: "unknown" } }], pattern_properties: [], examples: [] };
 
     test("add_device — parent by label, by absolute path and by hybrid path", () => {
         const { base, overlay } = setup();
-        expect(add_device(base, overlay, { ...request, parent: "spi0" }))
+        expect(add_device(base, overlay, { ...request, parent: "spi0" }, with_reg))
             .toMatchObject({ status: "added", path: "/soc/spi@7e204000/adi,ad7124-8@1" });
-        expect(add_device(base, overlay, { ...request, parent: "/soc/spi@7e204000" }))
+        expect(add_device(base, overlay, { ...request, parent: "/soc/spi@7e204000" }, with_reg))
             .toMatchObject({ status: "added", path: "/soc/spi@7e204000/adi,ad7124-8@2" });
-        expect(add_device(base, overlay, { ...request, parent: "spi0/adc@4", name: "channel@0", auto_address: false }))
+        expect(add_device(base, overlay, { ...request, parent: "spi0/adc@4", name: "channel@0" }))
             .toMatchObject({ status: "added", path: "/soc/spi@7e204000/adc@4/channel@0" });
     });
 
     test("add_device — no parent adds under the root", () => {
         const { base, overlay } = setup();
-        expect(add_device(base, overlay, { compatible: "regulator-fixed", auto_address: false }))
+        expect(add_device(base, overlay, { compatible: "regulator-fixed" }))
             .toMatchObject({ status: "added", path: "/regulator-fixed" });
     });
 
     test("add_device — unknown parent", () => {
         const { base, overlay } = setup();
-        expect(add_device(base, overlay, { ...request, parent: "i2c0" })).toEqual({ status: "parent-not-found" });
+        expect(add_device(base, overlay, { ...request, parent: "i2c0" }, with_reg)).toEqual({ status: "parent-not-found" });
     });
 
     const added = { path: "/soc/spi@7e204000/adi,ad7124-8@2", key: "adi,ad7124-8@2", label: "ad7124_8" };
@@ -547,6 +550,12 @@ if (import.meta.vitest) {
     test("note_message — I2C addresses are hex", () => {
         expect(note_message({ kind: "picked-address", unit: "49", occupants: [{ name: "temp@48", address: 0x48n }] }, { ...added, key: "adi,adt7410@49", label: "adt7410", bus: "i2c" }))
             .toBe("Picked address 0x49 (taken: 0x48 by temp@48).\nTo change it: rename adt7410 adi,adt7410@<n>");
+    });
+
+    test("note_message — every allowed address taken names the nodes at them", () => {
+        const occupants = [{ name: "adi,adp5055@71", address: 0x71n }, { name: "adi,adp5055@70", address: 0x70n }];
+        expect(note_message({ kind: "taken-address", unit: "70", occupants }, { ...added, key: "pmic@70", label: "third", bus: "i2c" }))
+            .toBe("Picked address 0x70 although every one the binding allows is taken (0x70 by adi,adp5055@70, 0x71 by adi,adp5055@71)");
     });
 
     test("note_message — chip selects are decimal", () => {

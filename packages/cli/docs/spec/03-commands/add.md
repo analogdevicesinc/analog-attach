@@ -188,7 +188,9 @@ is other than 0; an unset `#size-cells` is 0, as ADD-048 reads it.
 
 **ADD-047** Where the name has no unit address, the binding defines `reg`
 and the parent isn't memory-mapped, the CLI shall give the node the lowest
-address from 0 that no enabled child of the parent occupies. A child occupies
+address that no enabled child of the parent occupies: of the addresses the
+binding's `reg` allows when its first cell is an enum (adp5055's `0x70` or
+`0x71`), else from 0. A child occupies
 the address its `reg` gives, or when it has no `reg`, its hexadecimal unit
 address. A cell of `reg` written as an expression (`<(4 << 8 | 0x03)>`, what
 cpp makes of a macro such as qcom's `PMR735A_ADC7_DIE_TEMP`) counts as the
@@ -197,8 +199,8 @@ arithmetic. A child whose `reg` the CLI can't read (its first `<…>` doesn't
 start with `#address-cells` numbers or expressions that compute, such as
 `<(MY_ADDR)>`, a macro the workfile doesn't expand) occupies nothing, even
 when its unit address is hexadecimal, as dtc refuses such a `reg`. When the
-address is not 0, the CLI
-shall give the note (two lines):
+address isn't the lowest one it could have been (0, or the lowest the enum
+allows), the CLI shall give the note (two lines):
 
 ```
 Picked <what> <address> (taken: <occupants>).
@@ -212,6 +214,14 @@ in ascending order as `<address> by <name>`, with the names of the children
 at one address joined by ` and `, the entries joined by `, `. `<n>` is
 literal. Example:
 `Picked chip select 2 (taken: 0 by spidev@0 and adc@0, 1 by spidev@1).`
+
+When every address the enum allows is occupied, the CLI shall give the node
+the lowest of them anyway, with the note `Picked <what> <address> although
+every one the binding allows is taken (<occupants>)`, `<occupants>` listing
+the children at the allowed addresses only, as above; the address warning of
+the clash follows (ADD-090, item 3). Under the same name the key is taken, refused
+by ADD-050. Example: `Picked address 0x70 although every one the binding
+allows is taken (0x70 by adi,adp5055@70, 0x71 by adi,adp5055@71)`.
 
 **ADD-048** When the node gets an address, the CLI shall write `reg` with
 the parent's `#address-cells` cells of address (most significant first)
@@ -793,8 +803,10 @@ node <parent> in <base> or <overlay>` (ADD-030).
 never a valid parent (ADD-020 to ADD-022), so a device whose only bus is in
 the overlay goes under `/` with no note. `--parent` accepts it.
 
-**A-4. `adi,ad5593r` gets SPI parents.** It shares the ad5592r binding, which
-allows SPI, so `list parent` and ADD-022 offer SPI buses for an I2C device.
+**A-4. `adi,ad5593r` gets SPI parents only.** It shares the ad5592r binding,
+which defines `spi-max-frequency` and whose one example puts the ad5593r under
+an `spi` node, so `list parent` and ADD-022 offer SPI buses and no I2C bus at
+all for an I2C device. `--parent i2c1` places it.
 
 **A-5. The duplicate refusal names the parent in a form the user didn't
 see.** ADD-050 shows the parent ADD-022 chose by its absolute path, while

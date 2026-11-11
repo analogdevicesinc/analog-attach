@@ -187,6 +187,56 @@ setup() {
 		fail "no note on the picked chip select: $stderr"
 }
 
+# Description: a device whose binding's reg is an enum (adp5055: 0x70 or 0x71) gets the lowest free
+# address the enum allows, which validate accepts.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Add adi,adp5055 --parent i2c1, with --json; check the key is adi,adp5055@70.
+#   3. Add it again in human mode; check it adds adi,adp5055@71 and notes 0x70 was taken.
+#   4. Run validate, with --json; check no error concerns reg.
+# bats test_tags=req:ADD-03-LNX, id:L0374
+@test "the default address is the lowest free one the binding's reg allows" {
+	with_overlay
+	run_json add adi,adp5055 --parent i2c1
+	assert_success
+	assert_json '.key' 'adi,adp5055@70'
+	run --separate-stderr aa add adi,adp5055 --parent i2c1 --label second
+	assert_success
+	assert_output --partial 'Added adi,adp5055@71'
+	[[ "$stderr" == *'Picked address 0x71 (taken: 0x70 by adi,adp5055@70).'* ]] ||
+		fail "no note on the picked address: $stderr"
+	run_json validate
+	assert_json '[.errors[] | select(tostring | test("reg"))] | length' 0
+}
+
+# Description: when every address the binding's reg allows is taken, the device gets the lowest
+# one anyway, with a note naming the nodes at them; under the same name it is a taken name.
+# Steps:
+#   1. Create the overlay with init and add adi,adp5055 --parent i2c1 twice (@70 and @71).
+#   2. Add adi,adp5055 --parent i2c1 --name pmic; check it adds pmic@70, notes that every
+#      allowed address is taken, naming both nodes, and warns that 0x70 is used.
+#   3. Snapshot the workfile; add adi,adp5055 --parent i2c1 again, with --json; check it is refused
+#      (exit 0, .ok false), the name adi,adp5055@70 being taken, and the workfile is unchanged.
+# bats test_tags=req:ADD-03-LNX, id:L0375
+@test "with every allowed address taken, the lowest allowed one is picked, with a note" {
+	with_overlay
+	aa add adi,adp5055 --parent i2c1 >/dev/null 2>&1 || fail "first add failed"
+	aa add adi,adp5055 --parent i2c1 --label second >/dev/null 2>&1 || fail "second add failed"
+	run --separate-stderr aa add adi,adp5055 --parent i2c1 --name pmic --label third
+	assert_success
+	assert_output --partial 'Added pmic@70'
+	[[ "$stderr" == *'Picked address 0x70 although every one the binding allows is taken (0x70 by adi,adp5055@70, 0x71 by adi,adp5055@71)'* ]] ||
+		fail "no note on the taken address: $stderr"
+	[[ "$stderr" == *'address 0x70 is already used by adi,adp5055@70'* ]] ||
+		fail "no warning on the clash: $stderr"
+	snapshot
+	run_json add adi,adp5055 --parent i2c1 --label fourth
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' 'i2c1 already has a child named adi,adp5055@70'
+	assert_unchanged
+}
+
 # Description: --parent places the device under that node.
 # Steps:
 #   1. Create the overlay with init.

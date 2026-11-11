@@ -93,10 +93,15 @@ export function occupied_address(child: DTNode, address_cells: number): bigint |
     return child.unit_addr === undefined ? undefined : parse_unit_address(child.unit_addr);
 }
 
+/**
+ * The lowest address no enabled child occupies: of `allowed` when it has any (a binding's `reg` enum), else from 0.
+ * When every allowed address is taken, the lowest of them, `taken`. `occupants` are every enabled child's address.
+ */
 export function next_free_unit_address(
     effective_children: Map<string, DTNode>,
     address_cells: number,
-): { address: bigint; occupants: { name: string; address: bigint }[] } {
+    allowed: bigint[] = [],
+): { address: bigint; occupants: { name: string; address: bigint }[]; taken: boolean } {
     const occupied = new Map<bigint, string>();
     const all_occupants: { name: string; address: bigint }[] = [];
 
@@ -109,9 +114,14 @@ export function next_free_unit_address(
         }
     }
 
+    if (allowed.length > 0) {
+        const sorted = [...allowed].sort((a, b) => (a < b ? -1 : 1));
+        const free = sorted.find(candidate => !occupied.has(candidate));
+        return { address: free ?? sorted[0], occupants: all_occupants, taken: free === undefined };
+    }
     for (let candidate = 0n; ; candidate++) {
         if (occupied.has(candidate)) { continue; }
-        return { address: candidate, occupants: all_occupants };
+        return { address: candidate, occupants: all_occupants, taken: false };
     }
 }
 

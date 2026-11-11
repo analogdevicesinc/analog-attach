@@ -27,6 +27,11 @@ export interface AddNodeRequest {
      * selects or channels); elsewhere `reg` is a memory-mapped address.
      */
     auto_address: boolean;
+    /**
+     * The addresses the binding's `reg` allows (its enum); the picked address is the lowest free one of them, else
+     * the lowest one, taken. Empty or absent: the lowest free address from 0.
+     */
+    addresses?: bigint[];
 }
 
 export type AddNodeNote =
@@ -36,6 +41,8 @@ export type AddNodeNote =
     | { kind: "reg-size-zero" }
     /** The auto-picked address skipped occupied ones. */
     | { kind: "picked-address"; unit: string; occupants: { name: string; address: bigint }[] }
+    /** Every address the binding allows is occupied (`occupants`, the children at them); the lowest was picked anyway. */
+    | { kind: "taken-address"; unit: string; occupants: { name: string; address: bigint }[] }
     /** Auto-addressing was asked for but the parent is not indexed; `reg` must be set by hand. */
     | { kind: "reg-needed" };
 
@@ -81,10 +88,13 @@ export function add_node(overlay: DeviceTreeOverlay, request: AddNodeRequest): A
         if (request.auto_address && cells.size > 0) {
             notes.push({ kind: "reg-needed" });
         } else if (request.auto_address) {
-            const free = next_free_unit_address(effective, cells.address);
+            const allowed = [...request.addresses ?? []].sort((a, b) => (a < b ? -1 : 1));
+            const free = next_free_unit_address(effective, cells.address, allowed);
             address = free.address;
             unit = format_unit_address(free.address);
-            if (free.address > 0n) {
+            if (free.taken) {
+                notes.push({ kind: "taken-address", unit, occupants: free.occupants.filter(o => allowed.includes(o.address)) });
+            } else if (free.address !== (allowed[0] ?? 0n)) {
                 notes.push({ kind: "picked-address", unit, occupants: free.occupants });
             }
         }
@@ -179,6 +189,36 @@ if (import.meta.vitest) {
         const overlay = setup();
         add_node(overlay, request({}));
         expect(add_node(overlay, request({}))).toMatchObject({ status: "added", key: "adi,ad7124-8@3", label: "ad7124_8_1" });
+    });
+
+    test("add_node — the lowest free of the allowed addresses, else the lowest allowed one with a note", () => {
+        const overlay = setup();
+        const allowed = request({ parent_path: SPI1, name: "adi,adp5055", compatible: "adi,adp5055", addresses: [0x71n, 0x70n] });
+        add_node(overlay, request({ parent_path: SPI1, name: "other@5", auto_address: false }));
+        expect(add_node(overlay, allowed)).toMatchObject({ status: "added", key: "adi,adp5055@70", notes: [] });
+        expect(overlay.print()).toContain("reg = <112>");
+        expect(add_node(overlay, allowed)).toMatchObject({
+            status: "added", key: "adi,adp5055@71",
+            notes: [{ kind: "picked-address", unit: "71", occupants: [{ name: "other@5", address: 5n }, { name: "adi,adp5055@70", address: 0x70n }] }],
+        });
+        // the note names the children at the allowed addresses only
+        expect(add_node(overlay, { ...allowed, name: "pmic" })).toMatchObject({
+            status: "added", key: "pmic@70",
+            notes: [{
+                kind: "taken-address", unit: "70",
+                occupants: [{ name: "adi,adp5055@70", address: 0x70n }, { name: "adi,adp5055@71", address: 0x71n }],
+            }],
+        });
+        // the same name at the lowest allowed address is a duplicate, as any other
+        expect(add_node(overlay, allowed)).toEqual({ status: "duplicate", key: "adi,adp5055@70" });
+    });
+
+    test("add_node — an address the binding doesn't allow is not skipped, and no addresses pick from 0", () => {
+        const overlay = setup();
+        expect(add_node(overlay, request({ addresses: [0x1n, 0x5n] })))
+            .toMatchObject({ status: "added", key: "adi,ad7124-8@5", notes: [{ kind: "picked-address", unit: "5" }] });
+        expect(add_node(overlay, request({ name: "adc", addresses: [] })))
+            .toMatchObject({ status: "added", key: "adc@2", notes: [{ kind: "picked-address", unit: "2" }] });
     });
 
     test("add_node — explicit name@a writes reg <10> without auto-addressing", () => {
