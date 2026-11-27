@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="Add an ADXL345 accelerometer to a Raspberry Pi 4 with the GUI: set up the project, add the part and its interrupt, validate, build and deploy the overlay, and read the acceleration back over the network." name="description" />
+
+    <title>Use case: Configure a device with the GUI &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../../../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../../../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Use case: Configure a device with the CLI only" href="../cli/index.html" />
+    <link rel="prev" title="Use Cases" href="../../index.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../../../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../../../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Use case: Configure a device with the GUI</a><ul>
+<li><a class="reference internal" href="#goal">Goal</a></li>
+<li><a class="reference internal" href="#what-you-need">What you need</a></li>
+<li><a class="reference internal" href="#steps">Steps</a><ul>
+<li><a class="reference internal" href="#step-1-wire-the-click">Step 1: Wire the Click</a></li>
+<li><a class="reference internal" href="#step-2-start-the-gui-and-set-up-the-project">Step 2: Start the GUI and set up the project</a></li>
+<li><a class="reference internal" href="#step-3-add-the-adxl345">Step 3: Add the ADXL345</a></li>
+<li><a class="reference internal" href="#step-4-set-the-interrupt">Step 4: Set the interrupt</a></li>
+<li><a class="reference internal" href="#step-5-validate">Step 5: Validate</a></li>
+<li><a class="reference internal" href="#step-6-build-and-deploy">Step 6: Build and deploy</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#result">Result</a></li>
+<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>
+<li><a class="reference internal" href="#next-steps">Next steps</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../../../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../../../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../../../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../../../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3" checked=""/><div class="collapse"><a class="reference internal" href="../../index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../../../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="../../index.html">Use Cases</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="use-case-configure-a-device-with-the-gui">
+<span id="use-case-ui"></span><h1>Use case: Configure a device with the GUI<a class="headerlink" href="#use-case-configure-a-device-with-the-gui" title="Link to this heading"></a></h1>
+<section id="goal">
+<h2>Goal<a class="headerlink" href="#goal" title="Link to this heading"></a></h2>
+<p>Add an ADXL345 accelerometer to a Raspberry Pi 4 with the GUI: set up the
+project, add the part and its interrupt, validate, build and deploy the
+overlay, and read the acceleration back over the network.</p>
+</section>
+<section id="what-you-need">
+<h2>What you need<a class="headerlink" href="#what-you-need" title="Link to this heading"></a></h2>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Item</p></th>
+<th class="head"><p>Details</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Board / carrier</p></td>
+<td><p>Raspberry Pi 4 Model B, running ADI Kuiper</p></td>
+</tr>
+<tr class="row-odd"><td><p>Evaluation board / part</p></td>
+<td><p>MikroElektronika Accel Click (ADXL345), set for I2C at address
+<code class="docutils literal notranslate"><span class="pre">0x1d</span></code> with its jumpers</p></td>
+</tr>
+<tr class="row-even"><td><p>Wiring</p></td>
+<td><p>Five jumper wires from the Click to the Pi’s 40-pin header:</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Click</p></th>
+<th class="head"><p>Raspberry Pi header</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>3V3</p></td>
+<td><p>pin 1 (3.3 V)</p></td>
+</tr>
+<tr class="row-odd"><td><p>GND</p></td>
+<td><p>pin 6 (GND)</p></td>
+</tr>
+<tr class="row-even"><td><p>SDA</p></td>
+<td><p>pin 3 (GPIO 2, I2C1 SDA)</p></td>
+</tr>
+<tr class="row-odd"><td><p>SCL</p></td>
+<td><p>pin 5 (GPIO 3, I2C1 SCL)</p></td>
+</tr>
+<tr class="row-even"><td><p>INT</p></td>
+<td><p>pin 13 (GPIO 27)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Cables and power</p></td>
+<td><p>The Pi’s USB-C power supply; an Ethernet cable from the Pi to the host.
+Here the host shares its connection over that cable, and the Pi gets
+<code class="docutils literal notranslate"><span class="pre">10.42.0.196</span></code>. Any address the host can reach works.</p></td>
+</tr>
+<tr class="row-even"><td><p>Host</p></td>
+<td><p>Linux machine with Analog Attach installed (see <a class="reference internal" href="../../../install/index.html"><span class="doc">Installation</span></a>),
+a web browser, <code class="docutils literal notranslate"><span class="pre">ssh</span></code>, <code class="docutils literal notranslate"><span class="pre">scp</span></code> and <code class="docutils literal notranslate"><span class="pre">sshpass</span></code> for the deploy, and the
+libiio tools (<code class="docutils literal notranslate"><span class="pre">iio_info</span></code>) to read the part</p></td>
+</tr>
+<tr class="row-odd"><td><p>Software versions</p></td>
+<td><p>Analog Attach 0.2.0; the ADI Linux tree (<code class="docutils literal notranslate"><span class="pre">analogdevicesinc/linux</span></code>,
+its Raspberry Pi branch) in <code class="docutils literal notranslate"><span class="pre">~/linux</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="steps">
+<h2>Steps<a class="headerlink" href="#steps" title="Link to this heading"></a></h2>
+<section id="step-1-wire-the-click">
+<h3>Step 1: Wire the Click<a class="headerlink" href="#step-1-wire-the-click" title="Link to this heading"></a></h3>
+<p>With the Pi off, connect the Click as in the table above. On the Pi 4,
+GPIO 2 and 3 are the I2C bus labelled <code class="docutils literal notranslate"><span class="pre">i2c1</span></code> and <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code> in its
+devicetree.</p>
+</section>
+<section id="step-2-start-the-gui-and-set-up-the-project">
+<h3>Step 2: Start the GUI and set up the project<a class="headerlink" href="#step-2-start-the-gui-and-set-up-the-project" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>~/work/rpi4-adxl345<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/work/rpi4-adxl345
+analog-attach<span class="w"> </span>gui
+</pre></div>
+</div>
+<p>The browser opens on the <strong>Project setup</strong> (see <a class="reference internal" href="../../../ui-guide/starting.html#ui-project-setup"><span class="std std-ref">The project setup</span></a>):</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Step</p></th>
+<th class="head"><p>Value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Ecosystem</p></td>
+<td><p><strong>Linux</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>Linux tree</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">~/linux</span></code>, from the trees the step found</p></td>
+</tr>
+<tr class="row-even"><td><p>Base devicetree</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bcm2711-rpi-4-b.dts</span></code> (type <code class="docutils literal notranslate"><span class="pre">rpi-4</span></code> in the filter)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Overlay</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">workfile</span></code> empty (<code class="docutils literal notranslate"><span class="pre">overlay.dtso</span></code>), <code class="docutils literal notranslate"><span class="pre">overlay-syntax</span></code>
+<code class="docutils literal notranslate"><span class="pre">fragment</span></code>, <code class="docutils literal notranslate"><span class="pre">output</span></code> <code class="docutils literal notranslate"><span class="pre">overlay</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Then click <strong>Create Overlay</strong>. The workspace opens.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-devicetree.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-devicetree.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-devicetree.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 1 </span><span class="caption-text">The base devicetree step, with bcm2711-rpi-4-b.dts among the suggestions</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="step-3-add-the-adxl345">
+<h3>Step 3: Add the ADXL345<a class="headerlink" href="#step-3-add-the-adxl345" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Click <strong>＋ Add Device</strong> and type <code class="docutils literal notranslate"><span class="pre">adxl345</span></code>. Click <code class="docutils literal notranslate"><span class="pre">adi,adxl345</span></code>.</p></li>
+<li><p><strong>Bus</strong>: <strong>i2c_arm · i2c1</strong> (<code class="docutils literal notranslate"><span class="pre">/soc/i2c&#64;7e804000</span></code>).</p></li>
+<li><p><strong>Address</strong>: <code class="docutils literal notranslate"><span class="pre">1d</span></code>.</p></li>
+<li><p>Keep <strong>Turn i2c1 on</strong> ticked: the bus is disabled in the Pi 4’s base
+devicetree, and the overlay enables it.</p></li>
+<li><p>Leave <strong>Name</strong> and <strong>Label</strong> empty, and click <strong>＋ Add Device</strong> under the
+preview. The console shows the <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">add</span></code> it ran.</p></li>
+</ol>
+<p>See <a class="reference internal" href="../../../ui-guide/linux/adding-devices.html#ui-adding-devices"><span class="std std-ref">Adding devices</span></a> for every field of the panel.</p>
+<figure class="align-default" id="id2">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-add-device.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-add-device.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-add-device.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 2 </span><span class="caption-text">Add Device with adi,adxl345 picked, on the bus i2c1 at the address 1d</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="step-4-set-the-interrupt">
+<h3>Step 4: Set the interrupt<a class="headerlink" href="#step-4-set-the-interrupt" title="Link to this heading"></a></h3>
+<p>The new node opens in the node card. Its required <code class="docutils literal notranslate"><span class="pre">interrupt-parent</span></code> and
+<code class="docutils literal notranslate"><span class="pre">interrupts</span></code> are missing, and validation says so.</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">interrupt-parent</span></code>: pick <code class="docutils literal notranslate"><span class="pre">gpio</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">interrupts</span></code>: <code class="docutils literal notranslate"><span class="pre">27</span></code> in the first cell and <code class="docutils literal notranslate"><span class="pre">IRQ_TYPE_EDGE_RISING</span></code> in
+the second.</p></li>
+</ol>
+<p>Each change is written to the overlay as you make it (see
+<a class="reference internal" href="../../../ui-guide/linux/editing.html#ui-editing-properties"><span class="std std-ref">Properties</span></a>).</p>
+<figure class="align-default" id="id3">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-node-card.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-node-card.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-node-card.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 3 </span><span class="caption-text">The ADXL345’s node card with interrupt-parent and interrupts set</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="step-5-validate">
+<h3>Step 5: Validate<a class="headerlink" href="#step-5-validate" title="Link to this heading"></a></h3>
+<p>The GUI validates after every change. The header now says <code class="docutils literal notranslate"><span class="pre">Valid</span></code>, and the
+<strong>Validation</strong> tab of the right column has no errors. Had the bus been left
+off, a warning there would say that Linux won’t probe the device (see
+<a class="reference internal" href="../../../ui-guide/linux/validate-build-deploy.html#ui-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>).</p>
+</section>
+<section id="step-6-build-and-deploy">
+<h3>Step 6: Build and deploy<a class="headerlink" href="#step-6-build-and-deploy" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Click <strong>Build Overlay</strong>. The console ends with <code class="docutils literal notranslate"><span class="pre">Built</span> <span class="pre">overlay.dtbo</span></code>.</p></li>
+<li><p>Open the settings (the gear), the <strong>Project</strong> tab, and set <code class="docutils literal notranslate"><span class="pre">BOARD_IP</span></code> to
+the Pi’s address, <code class="docutils literal notranslate"><span class="pre">10.42.0.196</span></code>; the default is <code class="docutils literal notranslate"><span class="pre">analog.local</span></code>.
+<code class="docutils literal notranslate"><span class="pre">BOARD_USER</span></code> stays <code class="docutils literal notranslate"><span class="pre">analog</span></code>. See <a class="reference internal" href="../../../ui-guide/linux/validate-build-deploy.html#ui-build-deploy-commands"><span class="std std-ref">Set the target</span></a>.</p></li>
+<li><p>Click <strong>Deploy</strong>, and type the password of <code class="docutils literal notranslate"><span class="pre">analog</span></code> when asked. The
+console shows the script copying <code class="docutils literal notranslate"><span class="pre">overlay.dtbo</span></code> to the Pi, adding
+<code class="docutils literal notranslate"><span class="pre">dtoverlay=overlay</span></code> to <code class="docutils literal notranslate"><span class="pre">config.txt</span></code> and rebooting the Pi.</p></li>
+</ol>
+</section>
+</section>
+<section id="result">
+<h2>Result<a class="headerlink" href="#result" title="Link to this heading"></a></h2>
+<p>When the Pi is back, the ADXL345 is an IIO device:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>iio_info<span class="w"> </span>-u<span class="w"> </span>ip:10.42.0.196<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A3<span class="w"> </span>adxl345
+</pre></div>
+</div>
+<p>lists <code class="docutils literal notranslate"><span class="pre">adxl345</span></code> with its channels <code class="docutils literal notranslate"><span class="pre">accel_x</span></code>, <code class="docutils literal notranslate"><span class="pre">accel_y</span></code> and <code class="docutils literal notranslate"><span class="pre">accel_z</span></code>.
+Read the raw values on the Pi:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ ssh analog@10.42.0.196
+$ cd /sys/bus/iio/devices/iio:device0     # the device whose name is adxl345
+$ cat name in_accel_x_raw in_accel_y_raw in_accel_z_raw
+adxl345
+2
+1
+253
+</pre></div>
+</div>
+<p>With the board lying flat, X and Y are close to 0 and Z reads about 253: 1 g,
+gravity, at about 3.9 mg per count.</p>
+<p>The workfile the GUI wrote:</p>
+<div class="highlight-dts notranslate"><div class="highlight"><pre><span></span><span class="cp">/dts-v1/</span><span class="p">;</span>
+<span class="cp">/plugin/</span><span class="p">;</span>
+<span class="nf">/</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">     </span><span class="nf">fragment</span><span class="o">@</span><span class="mi">0</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">             </span><span class="n">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">i2c_arm</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">             </span><span class="nf">__overlay__</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                     </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"okay"</span><span class="p">;</span>
+<span class="w">                     </span><span class="nl">adxl345</span><span class="p">:</span><span class="w"> </span><span class="nf">accelerometer</span><span class="o">@</span><span class="mi">1d</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                             </span><span class="kr">compatible</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"adi,adxl345"</span><span class="p">;</span>
+<span class="w">                             </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mh">0x1d</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="n">interrupt-parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">gpio</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="n">interrupts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">27</span><span class="w"> </span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                     </span><span class="p">};</span>
+<span class="w">             </span><span class="p">};</span>
+<span class="w">     </span><span class="p">};</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>With <strong>Name</strong> and <strong>Label</strong> left empty, the node is named
+<code class="docutils literal notranslate"><span class="pre">accelerometer&#64;1d</span></code> and labelled <code class="docutils literal notranslate"><span class="pre">adxl345</span></code>. <code class="docutils literal notranslate"><span class="pre">IRQ_TYPE_EDGE_RISING</span></code> is
+written as its value, <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>No adxl345 in iio_info.</strong> On the Pi, <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">i2cdetect</span> <span class="pre">-y</span> <span class="pre">1</span></code> should show
+<code class="docutils literal notranslate"><span class="pre">UU</span></code> at <code class="docutils literal notranslate"><span class="pre">1d</span></code>. A number at <code class="docutils literal notranslate"><span class="pre">53</span></code> means the Click’s address jumper is the
+other way: set <code class="docutils literal notranslate"><span class="pre">reg</span></code> to <code class="docutils literal notranslate"><span class="pre">0x53</span></code> in the node card, then build and deploy
+again. Nothing at all: check the wiring.</p></li>
+<li><p><strong>Deploy can’t reach the Pi.</strong> <code class="docutils literal notranslate"><span class="pre">analog.local</span></code> needs mDNS; set <code class="docutils literal notranslate"><span class="pre">BOARD_IP</span></code>
+to the Pi’s IP address. See <a class="reference internal" href="../../../troubleshooting/index.html"><span class="doc">Troubleshooting</span></a>.</p></li>
+</ul>
+</section>
+<section id="next-steps">
+<h2>Next steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../cli/index.html"><span class="doc">Use case: Configure a device with the CLI only</span></a>: the same from the command line.</p></li>
+<li><p><a class="reference internal" href="../ui-ai-agent/index.html#use-case-ui-ai-agent"><span class="std std-ref">Use case: GUI with an AI agent</span></a>: the GUI with its Assistant, on another board.</p></li>
+<li><p><a class="reference internal" href="../../../ui-guide/index.html"><span class="doc">GUI Guide</span></a>: the GUI in detail.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../../index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Use Cases</a>
+    <a href="../cli/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Use case: Configure a device with the CLI only</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

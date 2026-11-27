@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="Add an AD5593R (8-channel ADC, DAC and GPIO) to the devicetree of an Alif Ensemble DK-E8 with the GUI, let the GUI’s Assistant set up its channels, build the devicetree, flash it, and read the channels back in Scopy." name="description" />
+
+    <title>Use case: GUI with an AI agent &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../../../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../../../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Use case: CLI with an AI agent" href="../cli-ai-agent/index.html" />
+    <link rel="prev" title="Use case: Configure a device with the CLI only" href="../cli/index.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../../../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../../../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Use case: GUI with an AI agent</a><ul>
+<li><a class="reference internal" href="#goal">Goal</a></li>
+<li><a class="reference internal" href="#what-you-need">What you need</a></li>
+<li><a class="reference internal" href="#walkthrough-video">Walkthrough video</a></li>
+<li><a class="reference internal" href="#steps">Steps</a><ul>
+<li><a class="reference internal" href="#step-1-prepare-the-project-folder">Step 1: Prepare the project folder</a></li>
+<li><a class="reference internal" href="#step-2-start-the-gui-and-set-up-the-project">Step 2: Start the GUI and set up the project</a></li>
+<li><a class="reference internal" href="#step-3-add-the-ad5593r">Step 3: Add the AD5593R</a></li>
+<li><a class="reference internal" href="#step-4-set-up-the-channels-with-the-assistant">Step 4: Set up the channels with the Assistant</a></li>
+<li><a class="reference internal" href="#step-5-validate-build-and-flash">Step 5: Validate, build and flash</a></li>
+<li><a class="reference internal" href="#step-6-boot-the-board">Step 6: Boot the board</a></li>
+<li><a class="reference internal" href="#step-7-read-the-channels-in-scopy">Step 7: Read the channels in Scopy</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#result">Result</a></li>
+<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>
+<li><a class="reference internal" href="#next-steps">Next steps</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../../../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../../../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../../../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../../../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3" checked=""/><div class="collapse"><a class="reference internal" href="../../index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../../../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="../../index.html">Use Cases</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="use-case-gui-with-an-ai-agent">
+<span id="use-case-ui-ai-agent"></span><h1>Use case: GUI with an AI agent<a class="headerlink" href="#use-case-gui-with-an-ai-agent" title="Link to this heading"></a></h1>
+<section id="goal">
+<h2>Goal<a class="headerlink" href="#goal" title="Link to this heading"></a></h2>
+<p>Add an AD5593R (8-channel ADC, DAC and GPIO) to the devicetree of an Alif
+Ensemble DK-E8 with the GUI, let the GUI’s Assistant set up its channels, build
+the devicetree, flash it, and read the channels back in Scopy.</p>
+<p>The DK-E8 boots a single devicetree from its MRAM and has no overlay support,
+so this project builds a full devicetree (<code class="docutils literal notranslate"><span class="pre">output</span></code> is <code class="docutils literal notranslate"><span class="pre">devicetree</span></code>) instead
+of an overlay. The steps are the same for a Raspberry Pi, where the result is an
+overlay copied to the board.</p>
+</section>
+<section id="what-you-need">
+<h2>What you need<a class="headerlink" href="#what-you-need" title="Link to this heading"></a></h2>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Item</p></th>
+<th class="head"><p>Details</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Board / carrier</p></td>
+<td><p>Alif Ensemble DK-E8, running Linux built with Buildroot (<code class="docutils literal notranslate"><span class="pre">br2-external</span></code>
+for the DK-E8, kernel <code class="docutils literal notranslate"><span class="pre">linux-APSS-v2.3.0</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Evaluation board / part</p></td>
+<td><p>MikroElektronika ADAC Click (AD5593R), in the DK-E8’s mikroBUS socket
+(GND towards the centre of the board). Click jumpers: ADDR SEL <code class="docutils literal notranslate"><span class="pre">0</span></code>
+(I2C address <code class="docutils literal notranslate"><span class="pre">0x10</span></code>), LOG SEL <code class="docutils literal notranslate"><span class="pre">3V3</span></code>. Board jumper JP7 (Click IO) on
+<code class="docutils literal notranslate"><span class="pre">3V3</span></code>. A wire between the Click’s IO0 and IO1, so a DAC channel can be
+read back by an ADC channel.</p></td>
+</tr>
+<tr class="row-even"><td><p>Cables and power</p></td>
+<td><p>USB-C to the DK-E8’s PRG USB port (power, flashing and the serial
+console); Ethernet to the host, for Scopy</p></td>
+</tr>
+<tr class="row-odd"><td><p>Host</p></td>
+<td><p>Linux machine with Analog Attach installed, Alif SETOOLS (to flash the
+MRAM), <code class="docutils literal notranslate"><span class="pre">picocom</span></code>, Scopy, and an AI coding agent for the Assistant
+(Claude Code here)</p></td>
+</tr>
+<tr class="row-even"><td><p>Software versions</p></td>
+<td><p>Analog Attach 0.2.0, Linux <code class="docutils literal notranslate"><span class="pre">APSS-v2.3.0</span></code> (Alif), Scopy 2.2.1</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="walkthrough-video">
+<h2>Walkthrough video<a class="headerlink" href="#walkthrough-video" title="Link to this heading"></a></h2>
+<div class="embed-video"><video class="only-screen" controls="controls"><source src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-v0.2.0-alif-ad5593r-gui-ai.mp4" type="video/mp4"></source></video><div class="only-screen"><p><a class="icon link reference external" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-v0.2.0-alif-ad5593r-gui-ai.mp4" target="_blank">ADAC Click (AD5593R) on the Alif DK-E8: GUI, Assistant, flashing and Scopy</a></p>
+</div><div class="admonition video only-print"><div><p class="admonition-title">Video</p>
+</div><p><a class="icon link reference external" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-v0.2.0-alif-ad5593r-gui-ai.mp4" target="_blank">ADAC Click (AD5593R) on the Alif DK-E8: GUI, Assistant, flashing and Scopy</a></p>
+</div></div></section>
+<section id="steps">
+<h2>Steps<a class="headerlink" href="#steps" title="Link to this heading"></a></h2>
+<section id="step-1-prepare-the-project-folder">
+<h3>Step 1: Prepare the project folder<a class="headerlink" href="#step-1-prepare-the-project-folder" title="Link to this heading"></a></h3>
+<p>Build and deploy are the project’s <code class="docutils literal notranslate"><span class="pre">aa_build.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code>. The
+starters that <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">init</span></code> writes are for a Raspberry Pi, so for the
+DK-E8 put two scripts of your own in the project folder before the setup (the
+setup keeps scripts that are there):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">aa_build.sh</span></code> compiles <code class="docutils literal notranslate"><span class="pre">$AA_DTS</span></code> (the full devicetree, preprocessed) into
+<code class="docutils literal notranslate"><span class="pre">$AA_DTB</span></code> with the kernel’s own <code class="docutils literal notranslate"><span class="pre">dtc</span></code>, as Buildroot does (without
+<code class="docutils literal notranslate"><span class="pre">-&#64;</span></code>, so the DTB fits the DTB area in MRAM).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code> packs <code class="docutils literal notranslate"><span class="pre">$AA_DTB</span></code> with the Buildroot images and writes the
+MRAM with SETOOLS over the PRG USB port.</p></li>
+</ul>
+<p>The board devicetree <code class="docutils literal notranslate"><span class="pre">devkit-e8-adi.dts</span></code> includes <code class="docutils literal notranslate"><span class="pre">devkit-e8.dts</span></code> from
+its own folder, so the preprocessor needs that folder too. Set the project
+variable <code class="docutils literal notranslate"><span class="pre">AA_PREPROCESS_COMMAND</span></code> (in the GUI: the <strong>Project</strong> tab):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cpp<span class="w"> </span>-nostdinc<span class="w"> </span>-undef<span class="w"> </span>-x<span class="w"> </span>assembler-with-cpp<span class="w"> </span>-P<span class="w"> </span>-I<span class="w"> </span><span class="s2">"</span><span class="nv">$AA_LINUX</span><span class="s2">/include"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-I<span class="w"> </span><span class="s2">"</span><span class="nv">$AA_LINUX</span><span class="s2">/arch/arm/boot/dts/alif/ensemble/devkit"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-o<span class="w"> </span><span class="s2">"</span><span class="nv">$AA_PREPROCESS_OUTPUT</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$AA_PREPROCESS_INPUT</span><span class="s2">"</span>
+</pre></div>
+</div>
+</section>
+<section id="step-2-start-the-gui-and-set-up-the-project">
+<h3>Step 2: Start the GUI and set up the project<a class="headerlink" href="#step-2-start-the-gui-and-set-up-the-project" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>~/aa-demo/adac
+analog-attach<span class="w"> </span>gui
+</pre></div>
+</div>
+<p>The setup asks for:</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Step</p></th>
+<th class="head"><p>Value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Ecosystem</p></td>
+<td><p><strong>Linux</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>Linux tree</p></td>
+<td><p>The kernel Buildroot unpacked, suggested by the GUI:
+<code class="docutils literal notranslate"><span class="pre">…/buildroot/output/build/linux-APSS-v2.3.0</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Base devicetree</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">devkit-e8-adi.dts</span></code>, the board’s devicetree (pick it from the
+suggestions or give its path)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Overlay: workfile</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">adac-click.dtso</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Overlay: output</p></td>
+<td><p><strong>devicetree</strong> (the DK-E8 boots one full DTB)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Then click <strong>Create Overlay</strong>.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-setup.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-setup.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-setup.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 1 </span><span class="caption-text">The project setup: the workfile, the overlay syntax and the output</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="step-3-add-the-ad5593r">
+<h3>Step 3: Add the AD5593R<a class="headerlink" href="#step-3-add-the-ad5593r" title="Link to this heading"></a></h3>
+<p>Click <strong>＋ Add Device</strong>, search for <code class="docutils literal notranslate"><span class="pre">ad5593</span></code> and pick <strong>adi,ad5593r</strong>, on
+the bus <strong>i2c0</strong> (<code class="docutils literal notranslate"><span class="pre">/apb&#64;49010000/i2c&#64;49010000</span></code>, the mikroBUS I2C). Pick
+<code class="docutils literal notranslate"><span class="pre">adi,ad5593r</span></code>, not <code class="docutils literal notranslate"><span class="pre">adi,ad5592r</span></code>: the AD5592R is the SPI version of the
+part, and its driver never binds to a node on an I2C bus.</p>
+<p>On the new node, set the properties the binding requires:</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Property</p></th>
+<th class="head"><p>Value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">reg</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0x10</span></code> (ADDR SEL on 0)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">#address-cells</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">#size-cells</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">vref-supply</span></code> stays unset: the part then uses its internal 2.5 V reference.</p>
+<figure class="align-default" id="id2">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-node.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-node.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-node.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 2 </span><span class="caption-text">The AD5593R on i2c0, its required properties set</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="step-4-set-up-the-channels-with-the-assistant">
+<h3>Step 4: Set up the channels with the Assistant<a class="headerlink" href="#step-4-set-up-the-channels-with-the-assistant" title="Link to this heading"></a></h3>
+<p>Open <strong>✦ Assistant</strong> and ask, for example:</p>
+<blockquote>
+<div><p>On the AD5593R add 3 channels: channel 0 as a DAC, channel 1 as an ADC and
+channel 2 as both. Use numeric adi,mode values. Then validate.</p>
+</div></blockquote>
+<p>The Assistant runs <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> commands only; each one shows in the chat
+and in the console, and the tree updates as it goes:</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Channel</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">reg</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">adi,mode</span></code></p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">channel&#64;0</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2</span></code></p></td>
+<td><p>DAC (drives IO0)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">channel&#64;1</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>ADC (reads IO1, wired to IO0)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">channel&#64;2</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">3</span></code></p></td>
+<td><p>DAC and ADC</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">adi,mode</span></code> takes 1 (ADC), 2 (DAC), 3 (DAC and ADC) or 8 (GPIO).</p>
+<figure class="align-default" id="id3">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-assistant.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-assistant.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-assistant.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 3 </span><span class="caption-text">The Assistant adding the channels, the commands it ran in the chat</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="step-5-validate-build-and-flash">
+<h3>Step 5: Validate, build and flash<a class="headerlink" href="#step-5-validate-build-and-flash" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Click <strong>Validate</strong>: no errors.</p></li>
+<li><p>Click <strong>Build Overlay</strong>: <code class="docutils literal notranslate"><span class="pre">build/adac-click.dtb</span></code>, the board’s devicetree
+with the AD5593R in it.</p></li>
+<li><p>Set the DK-E8’s SW4 to <strong>SE</strong>, then click <strong>Deploy</strong>. Flashing takes a
+couple of minutes and ends with <code class="docutils literal notranslate"><span class="pre">Deploy</span> <span class="pre">completed</span> <span class="pre">successfully</span></code>.</p></li>
+</ol>
+</section>
+<section id="step-6-boot-the-board">
+<h3>Step 6: Boot the board<a class="headerlink" href="#step-6-boot-the-board" title="Link to this heading"></a></h3>
+<ol class="arabic">
+<li><p>Set SW4 to <strong>U2</strong> (the Linux console on the PRG USB port).</p></li>
+<li><p>Open the console and press the reset button:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>picocom<span class="w"> </span>-b<span class="w"> </span><span class="m">115200</span><span class="w"> </span>/dev/ttyACM0
+</pre></div>
+</div>
+</li>
+<li><p>Log in as <code class="docutils literal notranslate"><span class="pre">root</span></code> and check the part:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>i2cdetect<span class="w"> </span>-y<span class="w"> </span>-r<span class="w"> </span><span class="m">0</span>
+<span class="go">...</span>
+<span class="go">10: UU -- -- -- -- -- -- -- -- -- -- -- -- -- -- --</span>
+<span class="gp"># </span>cat<span class="w"> </span>/sys/bus/iio/devices/iio:device0/name
+<span class="go">ad5593r</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p><code class="docutils literal notranslate"><span class="pre">UU</span></code> means the driver has the device.</p>
+<figure class="align-default" id="id4">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-boot.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-boot.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-boot.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 4 </span><span class="caption-text">Linux booting on the DK-E8 with the new devicetree</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="step-7-read-the-channels-in-scopy">
+<h3>Step 7: Read the channels in Scopy<a class="headerlink" href="#step-7-read-the-channels-in-scopy" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Connect the Ethernet cable; the DK-E8 runs <code class="docutils literal notranslate"><span class="pre">iiod</span></code>.</p></li>
+<li><p>In Scopy, add the device with the URI <code class="docutils literal notranslate"><span class="pre">ip:&lt;board</span> <span class="pre">address&gt;</span></code> and connect.</p></li>
+<li><p>In <strong>IIO Explorer</strong> (Debugger), write <code class="docutils literal notranslate"><span class="pre">ad5593r</span></code> <code class="docutils literal notranslate"><span class="pre">voltage0</span></code> (output)
+<code class="docutils literal notranslate"><span class="pre">raw</span></code>: 0 to 4095 is 0 to 2.5 V.</p></li>
+<li><p>In <strong>Data Logger</strong>, plot <code class="docutils literal notranslate"><span class="pre">voltage1</span></code>: it follows the DAC through the
+IO0–IO1 wire.</p></li>
+</ol>
+</section>
+</section>
+<section id="result">
+<h2>Result<a class="headerlink" href="#result" title="Link to this heading"></a></h2>
+<p>The AD5593R probes at boot, its DAC drives IO0 and its ADC reads it back on
+IO1: writing 2048 to <code class="docutils literal notranslate"><span class="pre">out_voltage0_raw</span></code> reads about 2044 on
+<code class="docutils literal notranslate"><span class="pre">in_voltage1_raw</span></code>.</p>
+<figure class="align-default" id="id5">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-scopy.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-scopy.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/aa-alif-scopy.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 5 </span><span class="caption-text">Scopy’s Data Logger following the DAC on voltage1</span><a class="headerlink" href="#id5" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The workfile written by the GUI and the Assistant:</p>
+<div class="highlight-dts notranslate"><div class="highlight"><pre><span></span><span class="cp">/dts-v1/</span><span class="p">;</span>
+<span class="cp">/plugin/</span><span class="p">;</span>
+<span class="nf">/</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">     </span><span class="nf">fragment</span><span class="o">@</span><span class="mi">0</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">             </span><span class="n">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">i2c0</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">             </span><span class="nf">__overlay__</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                     </span><span class="nl">ad5593r</span><span class="p">:</span><span class="w"> </span><span class="nf">dac</span><span class="o">@</span><span class="mi">10</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                             </span><span class="kr">compatible</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"adi,ad5593r"</span><span class="p">;</span>
+<span class="w">                             </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mh">0x10</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="kr">#address-cells</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="kr">#size-cells</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="nf">channel</span><span class="o">@</span><span class="mi">0</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                                     </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                                     </span><span class="n">adi</span><span class="p">,</span><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="p">};</span>
+<span class="w">                             </span><span class="nf">channel</span><span class="o">@</span><span class="mi">1</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                                     </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                                     </span><span class="n">adi</span><span class="p">,</span><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="p">};</span>
+<span class="w">                             </span><span class="nf">channel</span><span class="o">@</span><span class="mi">2</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                                     </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                                     </span><span class="n">adi</span><span class="p">,</span><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">3</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="p">};</span>
+<span class="w">                     </span><span class="p">};</span>
+<span class="w">             </span><span class="p">};</span>
+<span class="w">     </span><span class="p">};</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Deploy says “Target did not respond”.</strong> SW4 is not fully on SE, or the
+board needs a power cycle: set SW4 to SE, unplug and plug the PRG USB cable,
+and deploy again.</p></li>
+<li><p><strong>The console shows nothing.</strong> SW4 must be on U2 for the Linux console, and
+only one program can have <code class="docutils literal notranslate"><span class="pre">/dev/ttyACM0</span></code> open: close <code class="docutils literal notranslate"><span class="pre">picocom</span></code> before
+deploying.</p></li>
+<li><p><strong>No device at 0x10, no error in dmesg.</strong> Check that the node’s compatible is
+<code class="docutils literal notranslate"><span class="pre">adi,ad5593r</span></code> (not <code class="docutils literal notranslate"><span class="pre">adi,ad5592r</span></code>), that the Click is seated with GND
+towards the centre of the board, and that ADDR SEL is on 0.</p></li>
+<li><p><strong>The Assistant writes ``CH_MODE_*`` macros.</strong> Ask it for the numeric
+<code class="docutils literal notranslate"><span class="pre">adi,mode</span></code> values instead.</p></li>
+</ul>
+</section>
+<section id="next-steps">
+<h2>Next steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../template.html#use-case-template"><span class="std std-ref">Use case template</span></a>, to write up another board or part.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../cli/index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Use case: Configure a device with the CLI only</a>
+    <a href="../cli-ai-agent/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Use case: CLI with an AI agent</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

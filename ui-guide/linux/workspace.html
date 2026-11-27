@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="Once the project is set up (see The project setup), the GUI shows the workspace of a Linux project: a header, three columns, and a console at the bottom." name="description" />
+
+    <title>Workspace &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Adding devices" href="adding-devices.html" />
+    <link rel="prev" title="Starting" href="../starting.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Workspace</a><ul>
+<li><a class="reference internal" href="#the-header">The header</a></li>
+<li><a class="reference internal" href="#the-device-tree">The device tree</a></li>
+<li><a class="reference internal" href="#the-node-card">The node card</a></li>
+<li><a class="reference internal" href="#the-right-column">The right column</a></li>
+<li><a class="reference internal" href="#the-console">The console</a></li>
+<li><a class="reference internal" href="#settings-and-preferences">Settings and preferences</a></li>
+<li><a class="reference internal" href="#the-assistant">The assistant</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1" checked=""/><div class="collapse"><a class="reference internal" href="../index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../starting.html">Starting</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="../index.html">GUI Guide</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="workspace">
+<span id="ui-workspace"></span><h1>Workspace<a class="headerlink" href="#workspace" title="Link to this heading"></a></h1>
+<p>Once the project is set up (see <a class="reference internal" href="../starting.html#ui-project-setup"><span class="std std-ref">The project setup</span></a>), the GUI shows the
+workspace of a Linux project: a header, three columns, and a console at the
+bottom.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-workspace.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-workspace.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-workspace.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 1 </span><span class="caption-text">The workspace of a Raspberry Pi 4 project with an ADXL345 added: the
+header, the device tree, the node card, the right column and the console</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<section id="the-header">
+<h2>The header<a class="headerlink" href="#the-header" title="Link to this heading"></a></h2>
+<p>From left to right:</p>
+<ul class="simple">
+<li><p>The <strong>project folder</strong>.</p></li>
+<li><p>The <strong>base devicetree</strong>, for example <code class="docutils literal notranslate"><span class="pre">⌂</span> <span class="pre">bcm2711-rpi-4-b</span></code>. Click it to
+pick another base devicetree.</p></li>
+<li><p>The <strong>status</strong> of the overlay: <code class="docutils literal notranslate"><span class="pre">Updating…</span></code> while a change is written,
+<code class="docutils literal notranslate"><span class="pre">Validating…</span></code> while dt-validate checks it, then <code class="docutils literal notranslate"><span class="pre">Valid</span></code>,
+<code class="docutils literal notranslate"><span class="pre">Valid</span> <span class="pre">·</span> <span class="pre">2</span> <span class="pre">warnings</span></code> or <code class="docutils literal notranslate"><span class="pre">3</span> <span class="pre">errors</span></code>.</p></li>
+<li><p><strong>Validate</strong>, <strong>Build Overlay</strong> and <strong>Deploy</strong>. See
+<a class="reference internal" href="validate-build-deploy.html#ui-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>.</p></li>
+<li><p><strong>↻</strong> reads the whole project again, for example after you edited the
+overlay in another program.</p></li>
+<li><p>The <strong>gear</strong> opens the settings: the project’s and the GUI’s (see
+<a class="reference internal" href="#ui-workspace-settings"><span class="std std-ref">Settings and preferences</span></a>).</p></li>
+</ul>
+</section>
+<section id="the-device-tree">
+<h2>The device tree<a class="headerlink" href="#the-device-tree" title="Link to this heading"></a></h2>
+<p>The left column shows the devicetree as it is with the overlay applied to the
+base devicetree.</p>
+<ul class="simple">
+<li><p>Each node shows its name and its label (<code class="docutils literal notranslate"><span class="pre">&amp;i2c1</span></code>). A node the overlay adds
+is tagged <strong>new</strong>, a base node it changes <strong>changed</strong>, and a disabled node
+<strong>off</strong>. A red number counts the validation errors on a node.</p></li>
+<li><p>Click ▸ to open a node, ▾ to close it. Nodes with changes below them open by
+themselves.</p></li>
+<li><p>Click a node to open it in the node card (see <a class="reference internal" href="editing.html#ui-editing"><span class="std std-ref">Editing</span></a>).</p></li>
+<li><p><strong>Find a node or label…</strong> searches the whole tree by node name, label or
+compatible, for example <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code> or <code class="docutils literal notranslate"><span class="pre">adxl</span></code>. A leading <code class="docutils literal notranslate"><span class="pre">&amp;</span></code> is
+ignored.</p></li>
+<li><p><strong>Focused View</strong>, on by default, shows only what the overlay adds or
+changes, the way to it, and the other nodes on the buses it adds devices to
+(<code class="docutils literal notranslate"><span class="pre">spidev&#64;0</span></code>, for example). Clear it to browse the whole base devicetree.</p></li>
+<li><p><strong>＋ Add Device</strong> adds a device to the overlay (see
+<a class="reference internal" href="adding-devices.html#ui-adding-devices"><span class="std std-ref">Adding devices</span></a>).</p></li>
+</ul>
+</section>
+<section id="the-node-card">
+<h2>The node card<a class="headerlink" href="#the-node-card" title="Link to this heading"></a></h2>
+<p>The middle column shows the node you opened: its properties, its child nodes
+and its actions. With no node open, it says
+<code class="docutils literal notranslate"><span class="pre">Select</span> <span class="pre">a</span> <span class="pre">node</span> <span class="pre">to</span> <span class="pre">see</span> <span class="pre">its</span> <span class="pre">properties</span></code>. See <a class="reference internal" href="editing.html#ui-editing"><span class="std std-ref">Editing</span></a>.</p>
+</section>
+<section id="the-right-column">
+<h2>The right column<a class="headerlink" href="#the-right-column" title="Link to this heading"></a></h2>
+<p>The right column is folded to a narrow ribbon at first. Click the ribbon to
+open it, and <strong>»</strong> to fold it again. Drag its left edge to change its width;
+double-click the edge to reset it. It has three tabs:</p>
+<dl>
+<dt><strong>Overlay · Validation</strong></dt><dd><p>The overlay as saved, with the lines of the last change highlighted for a
+moment. A reference such as <code class="docutils literal notranslate"><span class="pre">&amp;i2c_arm</span></code> or a label is a link to its node.
+<strong>Copy</strong> copies the overlay; <strong>Open With</strong> opens the file in an editor or
+the file manager. Under it, <strong>Validation</strong> lists what dt-validate says of
+the overlay, or <code class="docutils literal notranslate"><span class="pre">No</span> <span class="pre">errors</span> <span class="pre">or</span> <span class="pre">warnings</span></code>. Click an error to open the node
+it is about.</p>
+<p>With the <code class="docutils literal notranslate"><span class="pre">output</span></code> setting at <code class="docutils literal notranslate"><span class="pre">devicetree</span></code>, once you have built, the tab
+can also show the full <code class="docutils literal notranslate"><span class="pre">.dts</span></code> that the build wrote: switch between
+<strong>Overlay</strong> and <strong>Full .dts</strong>. If the overlay changed since that build, the
+tab says the file is older than the overlay.</p>
+</dd>
+<dt><strong>Binding</strong></dt><dd><p>The binding file (YAML) of the node open, from the Linux tree: the one of
+its compatible, or for a node without one (a channel), of the nearest node
+above it that has one.</p>
+</dd>
+<dt><strong>✦ Assistant</strong></dt><dd><p>A chat with an AI agent that changes the project for you (see
+<a class="reference internal" href="#ui-workspace-assistant"><span class="std std-ref">The assistant</span></a>).</p>
+</dd>
+</dl>
+</section>
+<section id="the-console">
+<h2>The console<a class="headerlink" href="#the-console" title="Link to this heading"></a></h2>
+<p>The console at the bottom shows every command the GUI runs, and what the CLI
+answered. Build and deploy write their output there as it comes.</p>
+<ul class="simple">
+<li><p>Under it, the command line takes any <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> command, as on a
+terminal, without the <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code>: for example
+<code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">devices</span> <span class="pre">adxl</span></code> or <code class="docutils literal notranslate"><span class="pre">read</span> <span class="pre">i2c_arm</span></code>. Press <kbd class="kbd docutils literal notranslate">Up</kbd> and <kbd class="kbd docutils literal notranslate">Down</kbd>
+for the commands you typed before. <code class="docutils literal notranslate"><span class="pre">gui</span></code> can’t be run from there.</p></li>
+<li><p><strong>Clear Console</strong> empties it, <strong>Hide Console</strong> folds it.</p></li>
+<li><p>Drag its top edge to change its height; double-click the edge to reset it.</p></li>
+</ul>
+<p>After a command from the command line, the GUI reads the project again, so the
+tree and the node card show its change.</p>
+</section>
+<section id="settings-and-preferences">
+<span id="ui-workspace-settings"></span><h2>Settings and preferences<a class="headerlink" href="#settings-and-preferences" title="Link to this heading"></a></h2>
+<p>The gear in the header opens <strong>Settings</strong>, with two tabs.</p>
+<p>The <strong>Project</strong> tab holds this project’s settings, as <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span></code>
+has them, by category:</p>
+<ul class="simple">
+<li><p>Each setting has its field, <strong>Save</strong> and <strong>Reset</strong> (back to the default).
+Click <strong>ⓘ</strong> for what a setting does. If the CLI refuses a value, the reason
+is shown under the field.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">linux</span></code> tree and the base <code class="docutils literal notranslate"><span class="pre">devicetree</span></code> each have <strong>Change…</strong>, which
+opens the same choice as the project setup.</p></li>
+<li><p><strong>Commands</strong>, <strong>System variables</strong> and <strong>Project variables</strong> set what
+Build and Deploy run, and for which board. See
+<a class="reference internal" href="validate-build-deploy.html#ui-build-deploy-commands"><span class="std std-ref">Set the target</span></a>.</p></li>
+</ul>
+<figure class="align-default" id="id2">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-project-tab.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-project-tab.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-project-tab.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 2 </span><span class="caption-text">Settings → Project: the project’s settings and its variables</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The <strong>Preferences</strong> tab holds the GUI’s own preferences, the same for every
+project:</p>
+<ul class="simple">
+<li><p><strong>Appearance</strong> → <strong>Theme</strong>: System, Light or Dark.</p></li>
+<li><p><strong>Files</strong> → <strong>File picker</strong>: Native (the desktop’s dialog, the default) or
+Built-in.</p></li>
+<li><p><strong>Assistant</strong>: the AI agent of the chat (see
+<a class="reference internal" href="#ui-workspace-assistant"><span class="std std-ref">The assistant</span></a>).</p></li>
+<li><p><strong>Linux</strong> → <strong>Show property types</strong>: shows the type of each property, as
+dt-schema gives it, with its limits (<code class="docutils literal notranslate"><span class="pre">uint32</span> <span class="pre">·</span> <span class="pre">0</span> <span class="pre">to</span> <span class="pre">10000000</span></code>).</p></li>
+<li><p><strong>About</strong>: the version of Analog Attach.</p></li>
+</ul>
+</section>
+<section id="the-assistant">
+<span id="ui-workspace-assistant"></span><h2>The assistant<a class="headerlink" href="#the-assistant" title="Link to this heading"></a></h2>
+<p>The <strong>✦ Assistant</strong> tab, or the <strong>✦ Assistant</strong> button in the console bar,
+opens a chat. Tell it what to change in your own words, for example
+<em>add an ADXL345 on i2c_arm at 0x1d</em> or <em>why does validate fail?</em>. It runs
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> commands for you, and nothing else. Each command shows in
+the chat with its output, and in the console marked ✦. The workspace shows the
+changes as it makes them.</p>
+<ul class="simple">
+<li><p><strong>Stop Answer</strong> stops the answer under way.</p></li>
+<li><p><strong>New Chat</strong> forgets the conversation. Otherwise the GUI keeps one
+conversation per project for as long as it runs.</p></li>
+</ul>
+<p>Choose who answers in <strong>Preferences</strong> → <strong>Assistant</strong>:</p>
+<ul class="simple">
+<li><p><strong>Executable</strong>: an agent installed on your machine, with your own login:
+Claude Code, Codex CLI or Gemini CLI. Claude Code and Gemini CLI may run
+only <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> commands. Codex CLI is held by its sandbox: it writes
+only in the project folder, and has network access (Deploy reaches the
+board).</p></li>
+<li><p><strong>Server</strong>: a model behind an OpenAI-compatible endpoint (a local Ollama or
+LM Studio, for example): its <strong>Endpoint</strong>, <strong>Model name</strong> and <strong>API key</strong>.
+The model must support tool calls. The API key is kept in your own
+settings, never in the project.</p></li>
+</ul>
+<p>If the model can’t answer (its program is not installed, for example), the
+chat says why and offers <strong>Choose Model</strong>. If the <code class="docutils literal notranslate"><span class="pre">analog-attach-linux</span></code>
+skill is not installed for the agent, the chat offers <strong>Install Skill</strong>.</p>
+<figure class="align-default" id="id3">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-assistant.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-assistant.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-assistant.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 3 </span><span class="caption-text">The ✦ Assistant panel</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>See <a class="reference internal" href="../../ai-agents/index.html"><span class="doc">Working with AI Agents</span></a> for working with AI agents.</p>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../starting.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Starting</a>
+    <a href="adding-devices.html" title="Next document (Alt+Shift+RightArrow)" class="next">Adding devices</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

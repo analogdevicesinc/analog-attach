@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="Analog Attach reads its settings from JSON files. You normally change them with analog-attach config rather than by editing the files." name="description" />
+
+    <title>Configuration file &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Troubleshooting" href="../troubleshooting/index.html" />
+    <link rel="prev" title="Workfile" href="linux/workfile.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Configuration file</a><ul>
+<li><a class="reference internal" href="#where-the-files-are">Where the files are</a></li>
+<li><a class="reference internal" href="#how-the-project-folder-is-created">How the project folder is created</a></li>
+<li><a class="reference internal" href="#file-format">File format</a></li>
+<li><a class="reference internal" href="#precedence">Precedence</a></li>
+<li><a class="reference internal" href="#settings">Settings</a><ul>
+<li><a class="reference internal" href="#backend"><code class="docutils literal notranslate"><span class="pre">backend</span></code></a></li>
+<li><a class="reference internal" href="#linux-settings">Linux settings</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#variables">Variables</a><ul>
+<li><a class="reference internal" href="#deploy">Deploy</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#managing-settings-from-the-cli">Managing settings from the CLI</a></li>
+<li><a class="reference internal" href="#other-files-in-analog-attach">Other files in <code class="docutils literal notranslate"><span class="pre">.analog-attach/</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4" checked=""/><div class="collapse"><a class="reference internal" href="index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="index.html">Reference</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="configuration-file">
+<h1>Configuration file<a class="headerlink" href="#configuration-file" title="Link to this heading"></a></h1>
+<p>Analog Attach reads its settings from JSON files. You normally change them with
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span></code> rather than by editing the files.</p>
+<section id="where-the-files-are">
+<h2>Where the files are<a class="headerlink" href="#where-the-files-are" title="Link to this heading"></a></h2>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>File</p></th>
+<th class="head"><p>Location</p></th>
+<th class="head"><p>Purpose</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Local (project)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">.analog-attach/config.json</span></code> in the project root</p></td>
+<td><p>Settings of this project. Only this file holds <code class="docutils literal notranslate"><span class="pre">backend</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Global (user)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">$XDG_CONFIG_HOME/analog-attach/config.json</span></code>, or
+<code class="docutils literal notranslate"><span class="pre">~/.config/analog-attach/config.json</span></code> if <code class="docutils literal notranslate"><span class="pre">XDG_CONFIG_HOME</span></code> is unset,
+empty or relative</p></td>
+<td><p>Defaults shared by all projects.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The <strong>project root</strong> is the nearest directory, from the current directory
+upward, that has a <code class="docutils literal notranslate"><span class="pre">.analog-attach/</span></code> folder (the home directory and the
+filesystem root are not checked unless you are in them). If there is none, the
+project root is the current directory.</p>
+<p>A missing file is not an error: its settings are simply unset. A file that is
+not valid JSON is reported with a hint to fix or remove it. The tool does not
+read settings from environment variables.</p>
+</section>
+<section id="how-the-project-folder-is-created">
+<h2>How the project folder is created<a class="headerlink" href="#how-the-project-folder-is-created" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">.analog-attach/</span></code> is created by the first command that writes a setting of
+the project: <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span> <span class="pre">&lt;key&gt;</span> <span class="pre">&lt;value&gt;</span></code> (usually
+<code class="docutils literal notranslate"><span class="pre">config</span> <span class="pre">backend</span> <span class="pre">linux</span></code>), the guided setup (<code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> with no
+arguments), which saves each answer with <code class="docutils literal notranslate"><span class="pre">config</span></code>, or the GUI’s project
+setup, which does the same. Commands that only read, such as <code class="docutils literal notranslate"><span class="pre">config</span></code> with no
+value, create nothing. Setting <code class="docutils literal notranslate"><span class="pre">linux</span></code> then creates
+<code class="docutils literal notranslate"><span class="pre">.analog-attach/linux/</span></code> for the binding caches.</p>
+</section>
+<section id="file-format">
+<h2>File format<a class="headerlink" href="#file-format" title="Link to this heading"></a></h2>
+<p>Each file is one JSON object. <code class="docutils literal notranslate"><span class="pre">backend</span></code> is at the top level, and the settings
+of the Linux backend are in an object named <code class="docutils literal notranslate"><span class="pre">linux</span></code>, with the project’s
+variables in it. The file <code class="docutils literal notranslate"><span class="pre">init</span></code> leaves in the project of the
+<a class="reference internal" href="../cli-guide/index.html#cli-guide"><span class="std std-ref">CLI Guide</span></a>:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"backend"</span><span class="p">:</span><span class="w"> </span><span class="s2">"linux"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"linux"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"linux"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/home/user/linux"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"devicetree"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/home/user/linux/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"workfile"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/home/user/work/rpi4-adxl345/overlay.dtso"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"variables"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"BOARD_IP"</span><span class="p">:</span><span class="w"> </span><span class="s2">"analog.local"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"BOARD_USER"</span><span class="p">:</span><span class="w"> </span><span class="s2">"analog"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"BOARD_PASSWORD"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"secret"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<ul>
+<li><p>Keys are in kebab-case and the values of settings are strings, <code class="docutils literal notranslate"><span class="pre">interview</span></code>
+included (<code class="docutils literal notranslate"><span class="pre">&quot;false&quot;</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">config</span></code> writes the paths it is given as absolute paths. A relative path
+written by hand in the local file is resolved against the project root, and
+a path that starts with <code class="docutils literal notranslate"><span class="pre">~</span></code> against the home directory. Whether the path
+exists is checked only when a command needs it.</p></li>
+<li><p>An unknown key is reported as an error, with the valid keys:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>/home/user/work/rpi4-adxl345/.analog-attach/config.json: unknown key linux.foo
+
+Remove unknown keys from /home/user/work/rpi4-adxl345/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, interview, output, build-dir, variables.
+</pre></div>
+</div>
+</li>
+<li><p>Only the section of the project’s backend is read. A v0.2.0 file has only
+the <code class="docutils literal notranslate"><span class="pre">linux</span></code> section; any other section in it is ignored.</p></li>
+<li><p>Settings of earlier versions that are gone (<code class="docutils literal notranslate"><span class="pre">preprocess-command</span></code>,
+<code class="docutils literal notranslate"><span class="pre">build-command</span></code>, <code class="docutils literal notranslate"><span class="pre">deploy-command</span></code>, <code class="docutils literal notranslate"><span class="pre">deploy-ip</span></code>, <code class="docutils literal notranslate"><span class="pre">deploy-user</span></code>,
+<code class="docutils literal notranslate"><span class="pre">deploy-password</span></code>) are unknown keys: remove them and set the variables of
+<a class="reference internal" href="#variables">Variables</a> instead. A file of the earlier flat format, with every key at the
+top level, is not converted either.</p></li>
+</ul>
+</section>
+<section id="precedence">
+<h2>Precedence<a class="headerlink" href="#precedence" title="Link to this heading"></a></h2>
+<p>The value of a setting is the local file’s, else the global file’s, else the
+default. <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span> <span class="pre">&lt;key&gt;</span></code> shows the value and where it comes from
+(<code class="docutils literal notranslate"><span class="pre">local</span></code>, <code class="docutils literal notranslate"><span class="pre">global</span></code>, <code class="docutils literal notranslate"><span class="pre">default</span></code> or <code class="docutils literal notranslate"><span class="pre">unset</span></code>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">backend</span></code> and the variables belong to the project: they are not allowed in
+the global file.</p>
+</section>
+<section id="settings">
+<h2>Settings<a class="headerlink" href="#settings" title="Link to this heading"></a></h2>
+<section id="backend">
+<h3><code class="docutils literal notranslate"><span class="pre">backend</span></code><a class="headerlink" href="#backend" title="Link to this heading"></a></h3>
+<p>Required. The ecosystem the project targets. In v0.2.0 the only value is
+<code class="docutils literal notranslate"><span class="pre">linux</span></code> (Linux devicetree overlays).</p>
+</section>
+<section id="linux-settings">
+<h3>Linux settings<a class="headerlink" href="#linux-settings" title="Link to this heading"></a></h3>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 18.0%" />
+<col style="width: 14.0%" />
+<col style="width: 10.0%" />
+<col style="width: 20.0%" />
+<col style="width: 38.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Key</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Required</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">linux</span></code></p></td>
+<td><p>directory</p></td>
+<td><p>yes</p></td>
+<td><p>none</p></td>
+<td><p>Path to the Linux kernel source tree. Setting it builds the binding
+caches.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">devicetree</span></code></p></td>
+<td><p>file</p></td>
+<td><p>yes</p></td>
+<td><p>none</p></td>
+<td><p>Path to the base devicetree (<code class="docutils literal notranslate"><span class="pre">.dts</span></code>) of the target.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">workfile</span></code></p></td>
+<td><p>file</p></td>
+<td><p>no</p></td>
+<td><p>none</p></td>
+<td><p>The overlay (<code class="docutils literal notranslate"><span class="pre">.dtso</span></code>) that <code class="docutils literal notranslate"><span class="pre">init</span></code> creates and the commands edit. See
+<a class="reference internal" href="linux/workfile.html"><span class="doc">Workfile</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">overlay-syntax</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fragment</span></code> or <code class="docutils literal notranslate"><span class="pre">reference</span></code></p></td>
+<td><p>no</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fragment</span></code></p></td>
+<td><p>How the overlay is written: <code class="docutils literal notranslate"><span class="pre">fragment&#64;0</span> <span class="pre">{</span> <span class="pre">target</span> <span class="pre">=</span> <span class="pre">&lt;&amp;spi0&gt;;</span>
+<span class="pre">__overlay__</span> <span class="pre">{</span> <span class="pre">…</span> <span class="pre">};</span> <span class="pre">};</span></code> or <code class="docutils literal notranslate"><span class="pre">&amp;spi0</span> <span class="pre">{</span> <span class="pre">…</span> <span class="pre">};</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">interview</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p>no</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
+<td><p>On a terminal, ask for the parent node of <code class="docutils literal notranslate"><span class="pre">add</span></code> and for the required
+properties a new node lacks.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">output</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">overlay</span></code> or <code class="docutils literal notranslate"><span class="pre">devicetree</span></code></p></td>
+<td><p>no</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">overlay</span></code></p></td>
+<td><p>What <code class="docutils literal notranslate"><span class="pre">build</span></code> makes and <code class="docutils literal notranslate"><span class="pre">deploy</span></code> copies: <code class="docutils literal notranslate"><span class="pre">overlay</span></code> (a <code class="docutils literal notranslate"><span class="pre">.dtbo</span></code>) or
+<code class="docutils literal notranslate"><span class="pre">devicetree</span></code> (the base with the overlay applied: a <code class="docutils literal notranslate"><span class="pre">.dts</span></code> and its
+<code class="docutils literal notranslate"><span class="pre">.dtb</span></code>), for boards that boot one devicetree and have no overlays.
+The scripts get it as <code class="docutils literal notranslate"><span class="pre">$AA_OUTPUT</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">build-dir</span></code></p></td>
+<td><p>folder</p></td>
+<td><p>no</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">build</span></code></p></td>
+<td><p>Folder <code class="docutils literal notranslate"><span class="pre">aa_build.sh</span></code> writes to and <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code> reads from.
+Relative to the project root unless absolute. The scripts get it as
+<code class="docutils literal notranslate"><span class="pre">$AA_BUILD_DIR</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</section>
+<section id="variables">
+<h2>Variables<a class="headerlink" href="#variables" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">build</span></code> and <code class="docutils literal notranslate"><span class="pre">deploy</span></code> don’t have settings of their own: they run commands
+of the project, and the board is described by variables. The <code class="docutils literal notranslate"><span class="pre">variables</span></code>
+object of the <code class="docutils literal notranslate"><span class="pre">linux</span></code> section holds them. It is written by
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span> <span class="pre">var</span></code> (and by <code class="docutils literal notranslate"><span class="pre">init</span></code>, for the starter deploy script),
+and only in the project’s file:</p>
+<ul class="simple">
+<li><p>A plain variable is a string: <code class="docutils literal notranslate"><span class="pre">&quot;BOARD_IP&quot;:</span> <span class="pre">&quot;10.42.0.196&quot;</span></code>. It is passed,
+in the environment, to the build, deploy and preprocess commands.</p></li>
+<li><p>A secret is <code class="docutils literal notranslate"><span class="pre">{</span> <span class="pre">&quot;secret&quot;:</span> <span class="pre">true</span> <span class="pre">}</span></code>: only its name is stored. Its value comes
+from the environment <code class="docutils literal notranslate"><span class="pre">deploy</span></code> runs in, or is asked for, hidden, when
+<code class="docutils literal notranslate"><span class="pre">deploy</span></code> runs on a terminal. Only the deploy command gets it.</p></li>
+<li><p>An executable variable is a command the CLI runs with <code class="docutils literal notranslate"><span class="pre">sh</span> <span class="pre">-c</span></code>. It is in
+the file only while it isn’t its default.</p></li>
+</ul>
+<p>A name is letters, digits and <code class="docutils literal notranslate"><span class="pre">_</span></code>, not starting with a digit. Names that
+start with <code class="docutils literal notranslate"><span class="pre">AA_</span></code> are the CLI’s own, and only the three executable variables
+can be set.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 26.0%" />
+<col style="width: 34.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Variable</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Replaces</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">AA_PREPROCESS_COMMAND</span></code> (executable)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">cpp</span> <span class="pre">-nostdinc</span> <span class="pre">-undef</span> <span class="pre">-x</span> <span class="pre">assembler-with-cpp</span> <span class="pre">-P</span> <span class="pre">-I</span> <span class="pre">&quot;$AA_LINUX/include&quot;</span>
+<span class="pre">-o</span> <span class="pre">&quot;$AA_PREPROCESS_OUTPUT&quot;</span> <span class="pre">&quot;$AA_PREPROCESS_INPUT&quot;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">preprocess-command</span></code>. Run on each devicetree read; add <code class="docutils literal notranslate"><span class="pre">-I</span></code> options
+for includes outside <code class="docutils literal notranslate"><span class="pre">include/</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">AA_BUILD</span></code> (executable)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">./aa_build.sh</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">build-command</span></code>. Run by <code class="docutils literal notranslate"><span class="pre">build</span></code>, in the project root.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code> (executable)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">./aa_deploy.sh</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">deploy-command</span></code>. Run by <code class="docutils literal notranslate"><span class="pre">deploy</span></code>, in the project root.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOARD_IP</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">analog.local</span></code>, set by <code class="docutils literal notranslate"><span class="pre">init</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">deploy-ip</span></code>. Used by the starter <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOARD_USER</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">analog</span></code>, set by <code class="docutils literal notranslate"><span class="pre">init</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">deploy-user</span></code>. Used by the starter <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOARD_PASSWORD</span></code> (secret)</p></td>
+<td><p>a secret, set by <code class="docutils literal notranslate"><span class="pre">init</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">deploy-password</span></code>. Used by the starter <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The system variables (<code class="docutils literal notranslate"><span class="pre">AA_PROJECT</span></code>, <code class="docutils literal notranslate"><span class="pre">AA_DTSO</span></code>, <code class="docutils literal notranslate"><span class="pre">AA_DTBO</span></code>, <code class="docutils literal notranslate"><span class="pre">AA_LINUX</span></code>
+and the others) are computed from the settings and are never in the file.
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span> <span class="pre">var</span></code> lists every variable; <a class="reference internal" href="../cli-guide/configuration.html#cli-variables"><span class="std std-ref">Variables</span></a>
+describes them and shows how to set them.</p>
+<p>The password of the board is never written to the file, so
+<code class="docutils literal notranslate"><span class="pre">.analog-attach/config.json</span></code> holds no secret. It does hold absolute paths of
+your machine.</p>
+<section id="deploy">
+<h3>Deploy<a class="headerlink" href="#deploy" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">deploy</span></code> runs <code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code>, by default the <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code> that <code class="docutils literal notranslate"><span class="pre">init</span></code>
+writes. The starter copies the build to a Raspberry Pi running Kuiper with
+<code class="docutils literal notranslate"><span class="pre">ssh</span></code>, <code class="docutils literal notranslate"><span class="pre">scp</span></code> and <code class="docutils literal notranslate"><span class="pre">sshpass</span></code>, logging in as <code class="docutils literal notranslate"><span class="pre">BOARD_USER</span></code> at
+<code class="docutils literal notranslate"><span class="pre">BOARD_IP</span></code> with the password <code class="docutils literal notranslate"><span class="pre">BOARD_PASSWORD</span></code>, then reboots it. For
+another board, or another way to reach it, edit the script or point
+<code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code> at your own command. See <a class="reference internal" href="../cli-guide/linux/validate-build-deploy.html#cli-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>.</p>
+</section>
+</section>
+<section id="managing-settings-from-the-cli">
+<h2>Managing settings from the CLI<a class="headerlink" href="#managing-settings-from-the-cli" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>analog-attach<span class="w"> </span>config<span class="w">                          </span><span class="c1"># show every setting and variable</span>
+analog-attach<span class="w"> </span>config<span class="w"> </span>&lt;key&gt;<span class="w">                    </span><span class="c1"># show one setting</span>
+analog-attach<span class="w"> </span>config<span class="w"> </span>&lt;key&gt;<span class="w"> </span>&lt;value&gt;<span class="w">            </span><span class="c1"># set it in the project file</span>
+analog-attach<span class="w"> </span>config<span class="w"> </span>&lt;key&gt;<span class="w"> </span>&lt;value&gt;<span class="w"> </span>--global<span class="w">   </span><span class="c1"># set it in the global file</span>
+analog-attach<span class="w"> </span>config<span class="w"> </span>&lt;key&gt;<span class="w"> </span>--reset<span class="w">            </span><span class="c1"># remove it from the file</span>
+analog-attach<span class="w"> </span>config<span class="w"> </span>--reload<span class="w">                 </span><span class="c1"># rebuild the binding caches</span>
+analog-attach<span class="w"> </span>config<span class="w"> </span>var<span class="w">                      </span><span class="c1"># show the variables</span>
+analog-attach<span class="w"> </span>config<span class="w"> </span>var<span class="w"> </span>&lt;NAME&gt;<span class="w"> </span>&lt;value&gt;<span class="w">       </span><span class="c1"># set a variable</span>
+analog-attach<span class="w"> </span>config<span class="w"> </span>var<span class="w"> </span>&lt;NAME&gt;<span class="w"> </span>--secret<span class="w">      </span><span class="c1"># make it a secret</span>
+analog-attach<span class="w"> </span>config<span class="w"> </span>var<span class="w"> </span>&lt;NAME&gt;<span class="w"> </span>--reset<span class="w">       </span><span class="c1"># remove it, or back to the default</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">config</span></code> shows which settings are required but unset, with a hint on how to
+set each. Add <code class="docutils literal notranslate"><span class="pre">--json</span></code> for machine-readable output.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/cli-config.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/cli-config.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/cli-config.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 1 </span><span class="caption-text"><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span></code>: the settings, where each value comes from, and
+the variables</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="other-files-in-analog-attach">
+<h2>Other files in <code class="docutils literal notranslate"><span class="pre">.analog-attach/</span></code><a class="headerlink" href="#other-files-in-analog-attach" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">.analog-attach/linux/</span></code> holds the binding caches (<code class="docutils literal notranslate"><span class="pre">compat-index.json</span></code> and
+<code class="docutils literal notranslate"><span class="pre">validation-cache/</span></code>), the preprocessed base devicetree and scratch files of
+validation and build. It can be deleted. Until the caches are built again,
+commands stop with a configuration error:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach validate
+Configuration errors:
+  compat-index.json not found or unreadable in /home/user/work/rpi4-adxl345/.analog-attach/linux
+  validation.json not found or unreadable in /home/user/work/rpi4-adxl345/.analog-attach/linux/validation-cache
+
+Run 'analog-attach config --reload' to build the binding caches.
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span> <span class="pre">--reload</span></code> builds them again; the rest is recreated as
+needed.</p>
+<p>Analog Attach doesn’t write a <code class="docutils literal notranslate"><span class="pre">.gitignore</span></code>. To keep a project in version
+control, commit the workfile, <code class="docutils literal notranslate"><span class="pre">aa_build.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code>, and add
+the caches to your <code class="docutils literal notranslate"><span class="pre">.gitignore</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>.analog-attach/linux/
+build/
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">.analog-attach/config.json</span></code> can be committed (it holds no password), but
+its paths are those of your machine.</p>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="linux/workfile.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Workfile</a>
+    <a href="../troubleshooting/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Troubleshooting</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

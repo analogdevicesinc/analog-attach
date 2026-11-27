@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="With --json, every command answers with one JSON object, for scripts, CI jobs, the GUI and AI agents. This page describes that answer: the fields every answer has, the exit status, which stream gets what, and the fields of each command’s result. How to use it from a script is in Scripting; the error cases are explained in Error reporting." name="description" />
+
+    <title>JSON protocol &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Workfile" href="linux/workfile.html" />
+    <link rel="prev" title="Commands" href="commands.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">JSON protocol</a><ul>
+<li><a class="reference internal" href="#turning-it-on">Turning it on</a></li>
+<li><a class="reference internal" href="#streams">Streams</a></li>
+<li><a class="reference internal" href="#exit-status">Exit status</a></li>
+<li><a class="reference internal" href="#the-answer">The answer</a><ul>
+<li><a class="reference internal" href="#configuration-errors">Configuration errors</a></li>
+<li><a class="reference internal" href="#error-types">Error types</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#results-by-command">Results by command</a></li>
+<li><a class="reference internal" href="#examples">Examples</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4" checked=""/><div class="collapse"><a class="reference internal" href="index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="commands.html">Commands</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="index.html">Reference</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="json-protocol">
+<span id="ref-json-protocol"></span><h1>JSON protocol<a class="headerlink" href="#json-protocol" title="Link to this heading"></a></h1>
+<p>With <code class="docutils literal notranslate"><span class="pre">--json</span></code>, every command answers with one JSON object, for scripts, CI
+jobs, the GUI and AI agents. This page describes that answer: the fields every
+answer has, the exit status, which stream gets what, and the fields of each
+command’s result. How to use it from a script is in <a class="reference internal" href="../cli-guide/scripting.html#cli-scripting"><span class="std std-ref">Scripting</span></a>; the
+error cases are explained in <a class="reference internal" href="../cli-guide/error-reporting.html"><span class="doc">Error reporting</span></a>.</p>
+<p>The exact format of each command’s answer is a JSON Schema (2020-12), in the
+<a class="icon link reference external" href="https://github.com/analogdevicesinc/analog-attach" target="_blank">source repository</a> under
+<code class="docutils literal notranslate"><span class="pre">packages/cli/docs/spec/04-protocol/</span></code>: <code class="docutils literal notranslate"><span class="pre">&lt;command&gt;.schema.json</span></code>, with
+spaces as <code class="docutils literal notranslate"><span class="pre">-</span></code> (<code class="docutils literal notranslate"><span class="pre">list-parent.schema.json</span></code>). <code class="docutils literal notranslate"><span class="pre">common.schema.json</span></code> has the
+shapes they share. For a command shared by several backends, validate against
+the Linux backend’s definition, <code class="docutils literal notranslate"><span class="pre">$defs/linux</span></code> (<code class="docutils literal notranslate"><span class="pre">read.schema.json#/$defs/linux</span></code>).</p>
+<section id="turning-it-on">
+<h2>Turning it on<a class="headerlink" href="#turning-it-on" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">--json</span></code> can be anywhere on the command line before a <code class="docutils literal notranslate"><span class="pre">--</span></code>:
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">read</span> <span class="pre">accel</span></code> and <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">read</span> <span class="pre">accel</span> <span class="pre">--json</span></code> are
+the same. In JSON mode the CLI never asks a question.</p>
+</section>
+<section id="streams">
+<h2>Streams<a class="headerlink" href="#streams" title="Link to this heading"></a></h2>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Stream</p></th>
+<th class="head"><p>What it gets</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Standard output</p></td>
+<td><p>At most one line: the JSON answer. Nothing else.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Standard error</p></td>
+<td><p>Notes and warnings (the bus <code class="docutils literal notranslate"><span class="pre">add</span></code> picked, an address clash, a cache
+out of date), the progress of long steps, the output of the <code class="docutils literal notranslate"><span class="pre">build</span></code>
+and <code class="docutils literal notranslate"><span class="pre">deploy</span></code> commands, and input errors. This is free text: show it,
+don’t parse it.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="exit-status">
+<h2>Exit status<a class="headerlink" href="#exit-status" title="Link to this heading"></a></h2>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 15.0%" />
+<col style="width: 40.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Status</p></th>
+<th class="head"><p>When</p></th>
+<th class="head"><p>Standard output</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>The command answered: a success, a refusal, or a configuration error.
+Also <code class="docutils literal notranslate"><span class="pre">--help</span></code> and <code class="docutils literal notranslate"><span class="pre">--version</span></code>.</p></td>
+<td><p>The JSON answer (<code class="docutils literal notranslate"><span class="pre">--help</span></code> and <code class="docutils literal notranslate"><span class="pre">--version</span></code> print text).</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>The command failed without answering (an unexpected error).</p></td>
+<td><p>Nothing, or what the command wrote before failing; no answer.</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>An input error: unknown command, flag or setting key, a missing or extra
+argument, a malformed path. Also <code class="docutils literal notranslate"><span class="pre">config</span></code> when it can’t read or write
+a settings file.</p></td>
+<td><p>Nothing. The message is on standard error.</p></td>
+</tr>
+<tr class="row-odd"><td><p>130</p></td>
+<td><p>A question was stopped (not in JSON mode).</p></td>
+<td><p>A line saying so.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Status 0 doesn’t mean success: read <code class="docutils literal notranslate"><span class="pre">ok</span></code>.</p>
+</section>
+<section id="the-answer">
+<h2>The answer<a class="headerlink" href="#the-answer" title="Link to this heading"></a></h2>
+<p>Every answer is a JSON object with these fields, and the command’s own fields
+next to them:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ok</span></code></p></td>
+<td><p>boolean</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code> when the command did what was asked, <code class="docutils literal notranslate"><span class="pre">false</span></code> when it refused.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">message</span></code></p></td>
+<td><p>string</p></td>
+<td><p>What happened, in words: <code class="docutils literal notranslate"><span class="pre">&quot;Added</span> <span class="pre">adxl345&#64;1d</span> <span class="pre">(label:</span> <span class="pre">accel)&quot;</span></code>, or why
+it refused. For people, not to be parsed.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">severity</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">info</span></code>, <code class="docutils literal notranslate"><span class="pre">warn</span></code> or <code class="docutils literal notranslate"><span class="pre">error</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">info</span></code>: success. <code class="docutils literal notranslate"><span class="pre">warn</span></code>: success with something to fix. <code class="docutils literal notranslate"><span class="pre">error</span></code>:
+a refusal, or a <code class="docutils literal notranslate"><span class="pre">validate</span></code> with errors.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">error_type</span></code></p></td>
+<td><p>string</p></td>
+<td><p>On a refusal, and on a success whose <code class="docutils literal notranslate"><span class="pre">severity</span></code> is <code class="docutils literal notranslate"><span class="pre">warn</span></code>: which
+case it is (see <a class="reference internal" href="#error-types">Error types</a>). Absent when <code class="docutils literal notranslate"><span class="pre">severity</span></code> is <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>A success:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Set interrupts on accel"</span><span class="p">,</span><span class="w"> </span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"info"</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>A refusal:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Not found: nope"</span><span class="p">,</span><span class="w"> </span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span><span class="w"> </span><span class="nt">"error_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"not-found"</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>A success that warned, here the preview of <code class="docutils literal notranslate"><span class="pre">delete</span></code> without <code class="docutils literal notranslate"><span class="pre">--force</span></code>:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Would delete 1 node(s) and 4 property(ies)"</span><span class="p">,</span><span class="w"> </span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"warn"</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">"error_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"needs-force"</span><span class="p">,</span><span class="w"> </span><span class="nt">"node_count"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"property_count"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="nt">"paths"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"adxl345@1d"</span><span class="p">]]}</span>
+</pre></div>
+</div>
+<p>(Wrapped here; the CLI writes one line.)</p>
+<p>Node paths are arrays of node names from the root, without the root:
+<code class="docutils literal notranslate"><span class="pre">/soc/i2c&#64;7e804000/adxl345&#64;1d</span></code> is <code class="docutils literal notranslate"><span class="pre">[&quot;soc&quot;,</span> <span class="pre">&quot;i2c&#64;7e804000&quot;,</span> <span class="pre">&quot;adxl345&#64;1d&quot;]</span></code>.</p>
+<section id="configuration-errors">
+<h3>Configuration errors<a class="headerlink" href="#configuration-errors" title="Link to this heading"></a></h3>
+<p>When the project isn’t set up for the command (a setting missing or invalid,
+the workfile missing, a tool missing), the command refuses with two more
+fields: <code class="docutils literal notranslate"><span class="pre">errors</span></code>, one entry per problem, and <code class="docutils literal notranslate"><span class="pre">hints</span></code>, how to fix them.
+<code class="docutils literal notranslate"><span class="pre">error_type</span></code> is the first problem’s:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Missing config field linux"</span><span class="p">,</span><span class="w"> </span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">"error_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"missing-setting"</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"field"</span><span class="p">:</span><span class="w"> </span><span class="s2">"linux"</span><span class="p">,</span><span class="w"> </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"missing"</span><span class="p">,</span><span class="w"> </span><span class="nt">"error_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"missing-setting"</span><span class="p">,</span>
+<span class="w">             </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Missing config field linux"</span><span class="p">,</span>
+<span class="w">             </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Path to Linux kernel source tree (setting it builds the binding caches)"</span><span class="p">}],</span>
+<span class="w"> </span><span class="nt">"hints"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"Run 'analog-attach' on a terminal, or 'analog-attach config linux &lt;path&gt;', to set up a workspace."</span><span class="p">]}</span>
+</pre></div>
+</div>
+<p>Each entry of <code class="docutils literal notranslate"><span class="pre">errors</span></code> has <code class="docutils literal notranslate"><span class="pre">field</span></code> (the setting, tool or script),
+<code class="docutils literal notranslate"><span class="pre">kind</span></code> (<code class="docutils literal notranslate"><span class="pre">missing</span></code>, <code class="docutils literal notranslate"><span class="pre">invalid</span></code>, <code class="docutils literal notranslate"><span class="pre">unknown</span></code>), <code class="docutils literal notranslate"><span class="pre">error_type</span></code>,
+<code class="docutils literal notranslate"><span class="pre">message</span></code> and, when there is one, <code class="docutils literal notranslate"><span class="pre">description</span></code>. The shape is
+<code class="docutils literal notranslate"><span class="pre">common.schema.json#/$defs/config-refusal</span></code>.</p>
+<p>When a settings file can’t be read (it isn’t JSON, or has an unknown key),
+<code class="docutils literal notranslate"><span class="pre">config</span></code> writes <code class="docutils literal notranslate"><span class="pre">{&quot;errors&quot;:</span> <span class="pre">[…],</span> <span class="pre">&quot;hints&quot;:</span> <span class="pre">[…]}</span></code> to <strong>standard error</strong> and
+exits with status 2 (<code class="docutils literal notranslate"><span class="pre">config-error.schema.json</span></code>).</p>
+</section>
+<section id="error-types">
+<h3>Error types<a class="headerlink" href="#error-types" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">error_type</span></code> is one of a fixed list, the same for every backend, so that a
+script can act on the case rather than on the wording. Those the Linux backend
+gives:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">error_type</span></code></p></th>
+<th class="head"><p>Case</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">not-found</span></code></p></td>
+<td><p>A node, property, parent, overlay, example or variable that isn’t there.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ambiguous</span></code></p></td>
+<td><p>Several overlays have the name given.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">unknown-device-type</span></code></p></td>
+<td><p>A compatible no binding has.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">read-only</span></code></p></td>
+<td><p>A node of the base devicetree that <code class="docutils literal notranslate"><span class="pre">delete</span></code>, <code class="docutils literal notranslate"><span class="pre">move</span></code> or <code class="docutils literal notranslate"><span class="pre">rename</span></code>
+can’t change; a system variable.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">invalid-name</span></code></p></td>
+<td><p>A node name, label or variable name that isn’t allowed.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">name-taken</span></code></p></td>
+<td><p>A name or label already used under that parent.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">invalid-value</span></code></p></td>
+<td><p>A value <code class="docutils literal notranslate"><span class="pre">update</span></code> can’t build.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">edit-refused</span></code></p></td>
+<td><p>A <code class="docutils literal notranslate"><span class="pre">move</span></code> the binding doesn’t allow; an edit that would leave an overlay
+that doesn’t parse.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">unchecked</span></code></p></td>
+<td><p>A property written without a binding to check it (a warning).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">out-of-range</span></code></p></td>
+<td><p>A value or count the binding doesn’t allow (a warning of <code class="docutils literal notranslate"><span class="pre">update</span></code>, a
+finding of <code class="docutils literal notranslate"><span class="pre">validate</span></code>).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">missing-required</span></code></p></td>
+<td><p>A required property is missing (a finding of <code class="docutils literal notranslate"><span class="pre">validate</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">resource-conflict</span></code></p></td>
+<td><p>An address or chip select already used.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">unresolved</span></code></p></td>
+<td><p>A reference or fragment target that names no node; a device on a
+disabled parent (<code class="docutils literal notranslate"><span class="pre">validate</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">needs-force</span></code></p></td>
+<td><p>The <code class="docutils literal notranslate"><span class="pre">delete</span></code> preview.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tool-failed</span></code></p></td>
+<td><p>dtc, dt-validate, the preprocessor, <code class="docutils literal notranslate"><span class="pre">AA_BUILD</span></code> or <code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code>
+failed.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">parse-error</span></code></p></td>
+<td><p>The base devicetree or the workfile doesn’t parse.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">write-failed</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">init</span></code> or <code class="docutils literal notranslate"><span class="pre">import</span></code> couldn’t write the workfile.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">output-missing</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">AA_BUILD</span></code> succeeded, but the output file isn’t there (a warning).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">definition-error</span></code></p></td>
+<td><p>A binding that can’t be narrowed down for the node.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">missing-setting</span></code>, <code class="docutils literal notranslate"><span class="pre">invalid-setting</span></code>, <code class="docutils literal notranslate"><span class="pre">invalid-source</span></code>,
+<code class="docutils literal notranslate"><span class="pre">workfile-missing</span></code>, <code class="docutils literal notranslate"><span class="pre">cache-missing</span></code>, <code class="docutils literal notranslate"><span class="pre">tool-missing</span></code>,
+<code class="docutils literal notranslate"><span class="pre">not-generated</span></code></p></td>
+<td><p>Configuration errors; see <a class="reference internal" href="../cli-guide/error-reporting.html"><span class="doc">Error reporting</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">unknown-choice</span></code></p></td>
+<td><p>A value outside a fixed set of choices (a skill, a shell).</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The complete list is the <code class="docutils literal notranslate"><span class="pre">error-type</span></code> definition in <code class="docutils literal notranslate"><span class="pre">common.schema.json</span></code>.
+Input errors (exit status 2) have no JSON and no error type.</p>
+</section>
+</section>
+<section id="results-by-command">
+<h2>Results by command<a class="headerlink" href="#results-by-command" title="Link to this heading"></a></h2>
+<p>The fields each command adds to <code class="docutils literal notranslate"><span class="pre">ok</span></code>, <code class="docutils literal notranslate"><span class="pre">message</span></code> and <code class="docutils literal notranslate"><span class="pre">severity</span></code> on
+success. The schema file named in each row has the details.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 50.0%" />
+<col style="width: 28.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Command</p></th>
+<th class="head"><p>Fields</p></th>
+<th class="head"><p>Schema</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">config</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">configs</span></code>: one entry per setting (<code class="docutils literal notranslate"><span class="pre">field_name</span></code>, <code class="docutils literal notranslate"><span class="pre">category</span></code>,
+<code class="docutils literal notranslate"><span class="pre">description</span></code>, <code class="docutils literal notranslate"><span class="pre">type</span></code>, <code class="docutils literal notranslate"><span class="pre">required</span></code>, <code class="docutils literal notranslate"><span class="pre">default</span></code>, <code class="docutils literal notranslate"><span class="pre">value</span></code>,
+<code class="docutils literal notranslate"><span class="pre">source</span></code>); <code class="docutils literal notranslate"><span class="pre">variables</span></code>: one per variable (<code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">kind</span></code>,
+<code class="docutils literal notranslate"><span class="pre">value</span></code>, <code class="docutils literal notranslate"><span class="pre">scripts</span></code>, …). Setting, resetting and <code class="docutils literal notranslate"><span class="pre">--reload</span></code>: no
+more fields.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">config</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">init</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">created</span></code>, <code class="docutils literal notranslate"><span class="pre">linux</span></code>, <code class="docutils literal notranslate"><span class="pre">devicetree</span></code>, <code class="docutils literal notranslate"><span class="pre">overlay</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">scripts</span></code>: each script’s <code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">created</span></code> and the <code class="docutils literal notranslate"><span class="pre">variables</span></code>
+set now.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">init</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">import</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">path</span></code> (the new workfile), <code class="docutils literal notranslate"><span class="pre">source</span></code>, <code class="docutils literal notranslate"><span class="pre">fit</span></code>, <code class="docutils literal notranslate"><span class="pre">reason</span></code>, and the
+<code class="docutils literal notranslate"><span class="pre">unresolved</span></code> references and <code class="docutils literal notranslate"><span class="pre">unresolved_targets</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">import</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">add</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">key</span></code> (the node name), <code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">label</span></code>, <code class="docutils literal notranslate"><span class="pre">template</span></code>,
+<code class="docutils literal notranslate"><span class="pre">missing_required</span></code> (each <code class="docutils literal notranslate"><span class="pre">property</span></code> with its <code class="docutils literal notranslate"><span class="pre">suggestions</span></code>),
+<code class="docutils literal notranslate"><span class="pre">unresolved</span></code>; with <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code>, <code class="docutils literal notranslate"><span class="pre">dry_run</span></code> and <code class="docutils literal notranslate"><span class="pre">node</span></code> (the node
+as text).</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">add</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">read</span></code></p></td>
+<td><p>The whole overlay, a node (<code class="docutils literal notranslate"><span class="pre">kind</span></code> <code class="docutils literal notranslate"><span class="pre">node</span></code>, <code class="docutils literal notranslate"><span class="pre">key</span></code>,
+<code class="docutils literal notranslate"><span class="pre">properties</span></code>, <code class="docutils literal notranslate"><span class="pre">children</span></code>, <code class="docutils literal notranslate"><span class="pre">alias</span></code>, <code class="docutils literal notranslate"><span class="pre">origin</span></code>, <code class="docutils literal notranslate"><span class="pre">status</span></code>) or a
+property (<code class="docutils literal notranslate"><span class="pre">kind</span></code> <code class="docutils literal notranslate"><span class="pre">property</span></code>, <code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">type</span></code>, <code class="docutils literal notranslate"><span class="pre">value</span></code>,
+<code class="docutils literal notranslate"><span class="pre">source</span></code>, <code class="docutils literal notranslate"><span class="pre">written</span></code>, <code class="docutils literal notranslate"><span class="pre">description</span></code>, <code class="docutils literal notranslate"><span class="pre">required</span></code>,
+<code class="docutils literal notranslate"><span class="pre">definition</span></code>, <code class="docutils literal notranslate"><span class="pre">suggestions</span></code>).</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">read</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">update</span></code></p></td>
+<td><p>A set: no more fields. A read: as <code class="docutils literal notranslate"><span class="pre">read</span></code>. A created child node:
+<code class="docutils literal notranslate"><span class="pre">path</span></code> and <code class="docutils literal notranslate"><span class="pre">missing_required</span></code>. <code class="docutils literal notranslate"><span class="pre">--suggest</span></code>: as <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">value</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">update</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">delete</span></code></p></td>
+<td><p>The preview: <code class="docutils literal notranslate"><span class="pre">node_count</span></code>, <code class="docutils literal notranslate"><span class="pre">property_count</span></code>, <code class="docutils literal notranslate"><span class="pre">paths</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">delete</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">rename</span></code>, <code class="docutils literal notranslate"><span class="pre">move</span></code>, <code class="docutils literal notranslate"><span class="pre">enable</span></code>, <code class="docutils literal notranslate"><span class="pre">disable</span></code></p></td>
+<td><p>None.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">rename</span></code>, <code class="docutils literal notranslate"><span class="pre">move</span></code>, <code class="docutils literal notranslate"><span class="pre">enable-disable</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">devices</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">devices</span></code>: each <code class="docutils literal notranslate"><span class="pre">key</span></code> (the compatible) and <code class="docutils literal notranslate"><span class="pre">tag</span></code> (the category);
+<code class="docutils literal notranslate"><span class="pre">device</span></code>, the binding described, when one device matches.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">list-devices</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">context</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">devicetrees</span></code>: each base devicetree’s <code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">arch</span></code>,
+<code class="docutils literal notranslate"><span class="pre">name</span></code> (its path under <code class="docutils literal notranslate"><span class="pre">arch/&lt;arch&gt;/boot/dts</span></code>) and, for the one
+configured, <code class="docutils literal notranslate"><span class="pre">configured</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">list-context</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">property</span></code></p></td>
+<td><p>Without a path: <code class="docutils literal notranslate"><span class="pre">suggestions</span></code>, the overlay’s nodes. With a path:
+<code class="docutils literal notranslate"><span class="pre">properties</span></code> and <code class="docutils literal notranslate"><span class="pre">child_patterns</span></code>. With a property: <code class="docutils literal notranslate"><span class="pre">property</span></code>,
+<code class="docutils literal notranslate"><span class="pre">type</span></code>, <code class="docutils literal notranslate"><span class="pre">description</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">list-property</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">value</span></code>, <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">parent</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">suggestions</span></code>: each <code class="docutils literal notranslate"><span class="pre">value</span></code> (ready for <code class="docutils literal notranslate"><span class="pre">update</span></code> or
+<code class="docutils literal notranslate"><span class="pre">--parent</span></code>) and <code class="docutils literal notranslate"><span class="pre">display_string</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">list-value</span></code>, <code class="docutils literal notranslate"><span class="pre">list-parent</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">overlay</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">overlays</span></code>: each <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">devices</span></code>, <code class="docutils literal notranslate"><span class="pre">fit</span></code>,
+<code class="docutils literal notranslate"><span class="pre">reason</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">list-overlay</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">node</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nodes</span></code>: each <code class="docutils literal notranslate"><span class="pre">path</span></code>, <code class="docutils literal notranslate"><span class="pre">key</span></code>, <code class="docutils literal notranslate"><span class="pre">labels</span></code>, <code class="docutils literal notranslate"><span class="pre">compatible</span></code>,
+<code class="docutils literal notranslate"><span class="pre">origin</span></code>, <code class="docutils literal notranslate"><span class="pre">change</span></code>, <code class="docutils literal notranslate"><span class="pre">status</span></code>, <code class="docutils literal notranslate"><span class="pre">has_children</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">list-node</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">validate</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">errors</span></code> and <code class="docutils literal notranslate"><span class="pre">warnings</span></code>: each finding’s <code class="docutils literal notranslate"><span class="pre">kind</span></code>, <code class="docutils literal notranslate"><span class="pre">path</span></code> (the
+node’s path, then the property), <code class="docutils literal notranslate"><span class="pre">message</span></code> and <code class="docutils literal notranslate"><span class="pre">error_type</span></code>.
+<code class="docutils literal notranslate"><span class="pre">ok</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code> whatever it finds; <code class="docutils literal notranslate"><span class="pre">severity</span></code> is <code class="docutils literal notranslate"><span class="pre">error</span></code>,
+<code class="docutils literal notranslate"><span class="pre">warn</span></code> or <code class="docutils literal notranslate"><span class="pre">info</span></code> from the findings. With <code class="docutils literal notranslate"><span class="pre">--full</span></code>,
+<code class="docutils literal notranslate"><span class="pre">base_findings</span></code>, the count of the base devicetree’s own.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">validate</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">build</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">path</span></code>: the file written (absolute). With <code class="docutils literal notranslate"><span class="pre">output</span></code> <code class="docutils literal notranslate"><span class="pre">devicetree</span></code>,
+also <code class="docutils literal notranslate"><span class="pre">source</span></code>, the full <code class="docutils literal notranslate"><span class="pre">.dts</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">build</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">deploy</span></code></p></td>
+<td><p>None.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">deploy</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">completion</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">script</span></code>, or what <code class="docutils literal notranslate"><span class="pre">--install</span></code> or <code class="docutils literal notranslate"><span class="pre">--uninstall</span></code> did.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">completion</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">skill</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">path</span></code> and <code class="docutils literal notranslate"><span class="pre">agent</span></code> of the skill installed or removed (<code class="docutils literal notranslate"><span class="pre">agents</span></code>,
+a list of both, with <code class="docutils literal notranslate"><span class="pre">--agent</span> <span class="pre">all</span></code>). Without a name, <code class="docutils literal notranslate"><span class="pre">skills</span></code>:
+each skill’s <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">about</span></code>, <code class="docutils literal notranslate"><span class="pre">installed</span></code>, <code class="docutils literal notranslate"><span class="pre">agent</span></code> and
+<code class="docutils literal notranslate"><span class="pre">path</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">skill</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>When <code class="docutils literal notranslate"><span class="pre">build</span></code> or <code class="docutils literal notranslate"><span class="pre">deploy</span></code> fails, the refusal’s <code class="docutils literal notranslate"><span class="pre">message</span></code> is <code class="docutils literal notranslate"><span class="pre">Build</span>
+<span class="pre">failed:</span> <span class="pre">AA_BUILD</span> <span class="pre">exited</span> <span class="pre">with</span> <span class="pre">status</span> <span class="pre">&lt;n&gt;</span></code> (or <code class="docutils literal notranslate"><span class="pre">Deploy</span> <span class="pre">failed:</span> <span class="pre">…</span></code>), followed
+by a newline and what the command wrote to standard error.</p>
+<p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span></code> with no command answers <code class="docutils literal notranslate"><span class="pre">usage</span></code> (the usage text) and
+<code class="docutils literal notranslate"><span class="pre">missing</span></code> (the required settings still unset).</p>
+</section>
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach --json read accel reg
+{"ok":true,"message":"Read reg of accel","severity":"info","kind":"property","key":"reg","type":{"kind":"array","items":{"kind":"number","subtype":"int"},"min_items":1,"max_items":1},"value":[29],"source":"overlay","written":["0x1d"],"description":"Chip select used by the device.","required":true,"definition":"adi,adxl345.yaml","dt_type":"address · 1 row of 1 cell · 0 to 256","suggestions":{"values":[{"value":"29","display_string":"0x1d — matches the unit address of adxl345@1d"}]}}
+</pre></div>
+</div>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach --json list node accel
+{"ok":true,"message":"1 node matches \"accel\"","severity":"info","nodes":[{"path":"/soc/i2c@7e804000/adxl345@1d","key":"adxl345@1d","labels":["accel"],"compatible":["adi,adxl345"],"origin":"internal","change":"added","has_children":false}]}
+</pre></div>
+</div>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach --json validate
+{"ok":true,"message":"0 error(s), 0 warning(s)","severity":"info","errors":[],"warnings":[]}
+</pre></div>
+</div>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach --json build
+{"ok":true,"message":"Built /home/user/work/rpi4-adxl345/overlay.dtso with AA_BUILD","severity":"info","path":"/home/user/work/rpi4-adxl345/build/overlay.dtbo"}
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="commands.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Commands</a>
+    <a href="linux/workfile.html" title="Next document (Alt+Shift+RightArrow)" class="next">Workfile</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

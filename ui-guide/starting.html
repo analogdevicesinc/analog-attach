@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="The GUI is a page in your browser, served by the analog-attach CLI on your own machine. Each GUI belongs to one project: the folder you start it in." name="description" />
+
+    <title>Starting &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Workspace" href="linux/workspace.html" />
+    <link rel="prev" title="GUI Guide" href="index.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Starting</a><ul>
+<li><a class="reference internal" href="#start-the-gui">Start the GUI</a><ul>
+<li><a class="reference internal" href="#the-port">The port</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#stop-the-gui">Stop the GUI</a></li>
+<li><a class="reference internal" href="#the-project-setup">The project setup</a><ul>
+<li><a class="reference internal" href="#choosing-files">Choosing files</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#using-the-gui-from-another-machine">Using the GUI from another machine</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1" checked=""/><div class="collapse"><a class="reference internal" href="index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="index.html">GUI Guide</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="starting">
+<span id="ui-starting"></span><h1>Starting<a class="headerlink" href="#starting" title="Link to this heading"></a></h1>
+<p>The GUI is a page in your browser, served by the <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> CLI on your
+own machine. Each GUI belongs to one project: the folder you start it in.</p>
+<section id="start-the-gui">
+<h2>Start the GUI<a class="headerlink" href="#start-the-gui" title="Link to this heading"></a></h2>
+<ol class="arabic">
+<li><p>Open a terminal in the project folder. For a new project, make an empty
+folder first:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>~/rpi-adxl345
+<span class="nb">cd</span><span class="w"> </span>~/rpi-adxl345
+</pre></div>
+</div>
+</li>
+<li><p>Run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>analog-attach<span class="w"> </span>gui
+</pre></div>
+</div>
+<p>The CLI prints where the page is, then opens it in your default browser:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>analog-attach GUI on http://127.0.0.1:5177  (project: /home/user/rpi-adxl345). Stop it with Ctrl-C.
+</pre></div>
+</div>
+<p>If no browser opens (there is no <code class="docutils literal notranslate"><span class="pre">xdg-open</span></code>, <code class="docutils literal notranslate"><span class="pre">open</span></code> or <code class="docutils literal notranslate"><span class="pre">explorer</span></code>),
+open that URL yourself.</p>
+</li>
+<li><p>Leave the terminal open: the GUI runs for as long as the command does.</p></li>
+</ol>
+<p>The header of the page shows the project folder. To work on another project,
+start another <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">gui</span></code> in that project’s folder. Several GUIs can
+be open at once, each on its own port.</p>
+<section id="the-port">
+<h3>The port<a class="headerlink" href="#the-port" title="Link to this heading"></a></h3>
+<p>The page is served on <code class="docutils literal notranslate"><span class="pre">127.0.0.1</span></code> only, so only your own machine can reach
+it. Without <code class="docutils literal notranslate"><span class="pre">--port</span></code>, the GUI uses port 5177. If 5177 is taken (for example,
+by another open GUI), it takes the first free port of the 20 after it, else any
+free port. The URL printed always tells you which.</p>
+<p>To choose the port:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>analog-attach<span class="w"> </span>gui<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span><span class="w">   </span><span class="c1"># this port, or an error if it is taken</span>
+analog-attach<span class="w"> </span>gui<span class="w"> </span>--port<span class="w"> </span><span class="m">0</span><span class="w">      </span><span class="c1"># any free port</span>
+</pre></div>
+</div>
+<p>A port you give is never changed. If it is taken, the CLI stops with:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Port 8080 on 127.0.0.1 is in use (another analog-attach gui?): pick another with --port, or --port 0 for any free one
+</pre></div>
+</div>
+<p>To serve the page without opening a browser, add <code class="docutils literal notranslate"><span class="pre">--server-only</span></code>.</p>
+</section>
+</section>
+<section id="stop-the-gui">
+<h2>Stop the GUI<a class="headerlink" href="#stop-the-gui" title="Link to this heading"></a></h2>
+<p>Press <kbd class="kbd docutils literal notranslate">Ctrl</kbd>+<kbd class="kbd docutils literal notranslate">C</kbd> in the terminal where the GUI runs. The CLI prints
+<code class="docutils literal notranslate"><span class="pre">Stopped</span> <span class="pre">the</span> <span class="pre">GUI</span> <span class="pre">at</span> <span class="pre">&lt;url&gt;</span></code> and exits. Close the browser tab too: the page
+can’t do anything without its server.</p>
+<p>The GUI saves each change as you make it, in the project’s settings and its
+workfile, so there is nothing to save before you stop it.</p>
+</section>
+<section id="the-project-setup">
+<span id="ui-project-setup"></span><h2>The project setup<a class="headerlink" href="#the-project-setup" title="Link to this heading"></a></h2>
+<p>A folder with no project settings yet, or one without a workfile, opens on
+the <strong>Project setup</strong>. It has the same steps as the guided setup of the CLI.
+Each step saves one setting with <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span></code>. If the CLI refuses
+a value, the step shows why, and you can correct it. The steps are listed on
+the left: a step that is done has a ✓, and you can click any step to go back
+to it.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-linux-tree.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-linux-tree.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-linux-tree.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 1 </span><span class="caption-text">The project setup on its Linux tree step: the list of steps on the left,
+the Linux trees found, the path field with Browse…, and Next Step.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The example below sets up a project for a Raspberry Pi 4.</p>
+<ol class="arabic">
+<li><p><strong>Ecosystem.</strong> Pick <strong>Linux</strong> (device tree overlays for a Linux board).</p></li>
+<li><p><strong>Linux tree.</strong> Choose the Linux kernel source tree to take the bindings
+and includes from. The step lists the Linux trees it found near the project
+folder and in your home folder. Click one, or type a path (or click
+<strong>Browse…</strong>), then click <strong>Next Step</strong>.</p>
+<p>If you have none yet, the step shows a <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">clone</span></code> command for the ADI
+Linux tree. If you give a folder inside a tree (its <code class="docutils literal notranslate"><span class="pre">arch/</span></code>, for example),
+the step offers the tree’s root folder instead: click <strong>Use It</strong>.</p>
+<p>Saving the tree builds the binding caches. This can take a few seconds,
+and the step says so while it works.</p>
+</li>
+<li><p><strong>Base devicetree.</strong> Choose the devicetree of your board. The step lists
+the <code class="docutils literal notranslate"><span class="pre">.dts</span></code> files of the Linux tree, the Raspberry Pis first, each with the
+board’s name. Type in the filter to find one, for example <code class="docutils literal notranslate"><span class="pre">rpi-4</span></code>, and
+click <code class="docutils literal notranslate"><span class="pre">bcm2711-rpi-4-b.dts</span></code> (Raspberry Pi 4 Model B). For a file that is
+not listed, type its path under <strong>Pick custom path</strong>, or click
+<strong>Browse…</strong>.</p>
+<figure class="align-default" id="id2">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-devicetree.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-devicetree.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-devicetree.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 2 </span><span class="caption-text">The base devicetree step: the suggestions for <code class="docutils literal notranslate"><span class="pre">rpi-4</span></code>, with
+bcm2711-rpi-4-b.dts</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</li>
+<li><p><strong>Overlay.</strong> Set the optional settings of the overlay:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">workfile</span></code>: the file name of the overlay in the project folder. Left
+empty, it is <code class="docutils literal notranslate"><span class="pre">overlay.dtso</span></code>. If a valid workfile of that name exists
+already, the GUI uses it.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">overlay-syntax</span></code>: how the overlay is written, <code class="docutils literal notranslate"><span class="pre">fragment</span></code>
+(<code class="docutils literal notranslate"><span class="pre">fragment&#64;0</span> <span class="pre">{</span> <span class="pre">target</span> <span class="pre">=</span> <span class="pre">&lt;&amp;spi0&gt;;</span> <span class="pre">__overlay__</span> <span class="pre">{</span> <span class="pre">…</span> <span class="pre">};</span> <span class="pre">};</span></code>) or
+<code class="docutils literal notranslate"><span class="pre">reference</span></code> (<code class="docutils literal notranslate"><span class="pre">&amp;spi0</span> <span class="pre">{</span> <span class="pre">…</span> <span class="pre">};</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">output</span></code>: what a build writes: <code class="docutils literal notranslate"><span class="pre">overlay</span></code> (a <code class="docutils literal notranslate"><span class="pre">.dtbo</span></code>) or
+<code class="docutils literal notranslate"><span class="pre">devicetree</span></code> (the base with the overlay applied, as a <code class="docutils literal notranslate"><span class="pre">.dts</span></code> and a
+<code class="docutils literal notranslate"><span class="pre">.dtb</span></code>).</p></li>
+</ul>
+<p>Then start the overlay:</p>
+<ul class="simple">
+<li><p><strong>Create Overlay</strong> creates an empty overlay.</p></li>
+<li><p><strong>Import Overlay</strong> opens the list of the overlays of the Linux tree. Type
+the name of an overlay or of a part it adds (<code class="docutils literal notranslate"><span class="pre">adxl</span></code>, <code class="docutils literal notranslate"><span class="pre">ad7124</span></code>), check
+how it fits your base devicetree (<code class="docutils literal notranslate"><span class="pre">compatible</span></code> or <code class="docutils literal notranslate"><span class="pre">incompatible</span></code>),
+and click <strong>Import Overlay</strong> on its row.</p></li>
+</ul>
+<figure class="align-default" id="id3">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-overlay.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-overlay.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-setup-overlay.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 3 </span><span class="caption-text">The overlay step: the workfile, the overlay syntax and the output</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</li>
+</ol>
+<p>When the overlay exists, the GUI opens the project’s workspace (see
+<a class="reference internal" href="linux/workspace.html#ui-workspace"><span class="std std-ref">Workspace</span></a>).</p>
+<p>If you start the GUI in a project that is set up already, it opens the
+workspace directly. If the overlay is deleted later, or the <code class="docutils literal notranslate"><span class="pre">workfile</span></code>
+setting is changed to a file that doesn’t exist, the GUI goes back to the
+setup’s <strong>Overlay</strong> step.</p>
+<p>To change the Linux tree or the base devicetree later, use the Project tab of
+the settings (see <a class="reference internal" href="linux/workspace.html#ui-workspace-settings"><span class="std std-ref">Settings and preferences</span></a>), or click the base devicetree
+in the header.</p>
+<section id="choosing-files">
+<h3>Choosing files<a class="headerlink" href="#choosing-files" title="Link to this heading"></a></h3>
+<p><strong>Browse…</strong> opens your desktop’s file dialog: the desktop portal’s file
+chooser, else <code class="docutils literal notranslate"><span class="pre">zenity</span></code>, <code class="docutils literal notranslate"><span class="pre">kdialog</span></code> or <code class="docutils literal notranslate"><span class="pre">yad</span></code> (on macOS, its own dialog).
+Where none of them can open, Browse… opens the GUI’s built-in picker and says
+why. To always use the built-in picker, open the settings (the gear in the
+header), then <strong>Preferences</strong> → <strong>Files</strong> → <strong>File picker</strong> → <strong>Built-in</strong>.</p>
+<p>The native dialog only picks files that exist. To name a new file, type its
+name in the field.</p>
+</section>
+</section>
+<section id="using-the-gui-from-another-machine">
+<h2>Using the GUI from another machine<a class="headerlink" href="#using-the-gui-from-another-machine" title="Link to this heading"></a></h2>
+<p>The GUI only answers on <code class="docutils literal notranslate"><span class="pre">127.0.0.1</span></code>. To use it from another computer, for
+example when the Linux tree is on a build server, forward the port over SSH.</p>
+<ol class="arabic">
+<li><p>On your computer, connect with the same port number on both sides:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ssh<span class="w"> </span>-L<span class="w"> </span><span class="m">5177</span>:127.0.0.1:5177<span class="w"> </span>user@build-server
+</pre></div>
+</div>
+<p>The port must be the same on both ends: the GUI refuses requests that are
+not addressed to its own <code class="docutils literal notranslate"><span class="pre">127.0.0.1:&lt;port&gt;</span></code> or <code class="docutils literal notranslate"><span class="pre">localhost:&lt;port&gt;</span></code>.</p>
+</li>
+<li><p>In that SSH session, start the GUI in the project folder, on that port and
+without a browser:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>~/rpi-adxl345
+analog-attach<span class="w"> </span>gui<span class="w"> </span>--server-only<span class="w"> </span>--port<span class="w"> </span><span class="m">5177</span>
+</pre></div>
+</div>
+</li>
+<li><p>On your computer, open <code class="docutils literal notranslate"><span class="pre">http://127.0.0.1:5177</span></code>.</p></li>
+</ol>
+<p>A native file dialog opens on the machine where the GUI runs, not on yours.
+Over SSH, set <strong>Preferences</strong> → <strong>Files</strong> → <strong>File picker</strong> to <strong>Built-in</strong>.</p>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">GUI Guide</a>
+    <a href="linux/workspace.html" title="Next document (Alt+Shift+RightArrow)" class="next">Workspace</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

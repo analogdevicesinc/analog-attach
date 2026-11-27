@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="A device is added to the overlay from the compatibles of the Linux tree: one per binding. The GUI writes it with analog-attach add, then opens it so you can set its properties." name="description" />
+
+    <title>Adding devices &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Editing" href="editing.html" />
+    <link rel="prev" title="Workspace" href="workspace.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Adding devices</a><ul>
+<li><a class="reference internal" href="#find-the-device">Find the device</a></li>
+<li><a class="reference internal" href="#place-it">Place it</a></li>
+<li><a class="reference internal" href="#after-adding">After adding</a></li>
+<li><a class="reference internal" href="#other-ways-to-add">Other ways to add</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1" checked=""/><div class="collapse"><a class="reference internal" href="../index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="workspace.html">Workspace</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="../index.html">GUI Guide</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="adding-devices">
+<span id="ui-adding-devices"></span><h1>Adding devices<a class="headerlink" href="#adding-devices" title="Link to this heading"></a></h1>
+<p>A device is added to the overlay from the compatibles of the Linux tree: one
+per binding. The GUI writes it with <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">add</span></code>, then opens it so
+you can set its properties.</p>
+<p>The example adds an ADXL345 accelerometer to the I2C bus of a Raspberry Pi 4
+(<code class="docutils literal notranslate"><span class="pre">/soc/i2c&#64;7e804000</span></code>, labelled <code class="docutils literal notranslate"><span class="pre">i2c1</span></code> and <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code>), at address
+<code class="docutils literal notranslate"><span class="pre">0x1d</span></code>.</p>
+<section id="find-the-device">
+<h2>Find the device<a class="headerlink" href="#find-the-device" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Optional: open the bus in the device tree first (type <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code> in its
+search box, then click the bus). The panel then preselects it as the
+device’s bus, when the device can go there.</p></li>
+<li><p>Click <strong>＋ Add Device</strong>, above the device tree. The <strong>Add a device</strong> panel
+opens. The first time, it reads the compatibles of the Linux tree, which
+takes a moment.</p></li>
+<li><p>Type in the search box, for example <code class="docutils literal notranslate"><span class="pre">adxl345</span></code>. Every word you type must
+be in the compatible or in its binding’s folder, so <code class="docutils literal notranslate"><span class="pre">accel</span> <span class="pre">adxl</span></code> or
+<code class="docutils literal notranslate"><span class="pre">iio/adc</span> <span class="pre">ad71</span></code> work too.</p>
+<ul class="simple">
+<li><p><strong>Analog Devices parts</strong>, on by default, limits the list to <code class="docutils literal notranslate"><span class="pre">adi,</span></code>
+compatibles. Clear it to search all of them. When no Analog Devices part
+matches, <strong>Search All</strong> does the same.</p></li>
+<li><p>The tags under the search box are the binding folders with the most
+devices (<code class="docutils literal notranslate"><span class="pre">iio/adc</span></code>, <code class="docutils literal notranslate"><span class="pre">iio/accel</span></code>, …), with their counts. Click one to
+list only its devices, and <strong>all</strong> to list them all again.</p></li>
+</ul>
+</li>
+<li><p>Click <code class="docutils literal notranslate"><span class="pre">adi,adxl345</span></code> in the list.</p></li>
+</ol>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-add-device.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-add-device.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-add-device.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 1 </span><span class="caption-text">Add Device with adi,adxl345 picked, on the bus i2c1 at the address 1d</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="place-it">
+<h2>Place it<a class="headerlink" href="#place-it" title="Link to this heading"></a></h2>
+<p>On the right, the panel shows the compatible picked and the fields of the new
+node. Under them, a preview shows the node as it will be written, and follows
+what you type.</p>
+<dl>
+<dt><strong>Start from</strong></dt><dd><p>Shown when there is something to copy. <strong>Empty node</strong> (the default) starts
+with what the binding requires. <strong>Node from example</strong> copies one of the
+binding’s examples, and <strong>Node from overlay</strong> the node of one of the Linux
+tree’s overlays that add this device, with how it fits your board.</p>
+</dd>
+<dt><strong>Bus</strong> or <strong>Parent</strong></dt><dd><p>Where the node goes. It is <strong>Bus</strong> when the device goes on an SPI or I2C
+bus, else <strong>Parent</strong>: the node it goes under. Each bus is listed by its
+labels; <code class="docutils literal notranslate"><span class="pre">·</span> <span class="pre">off</span></code> marks one that is disabled in the base devicetree.</p>
+<p>For the example, pick <strong>i2c_arm · i2c1</strong> (<code class="docutils literal notranslate"><span class="pre">/soc/i2c&#64;7e804000</span></code>): the list
+shows every label of a bus, and <code class="docutils literal notranslate"><span class="pre">·</span> <span class="pre">off</span></code> when it is disabled in the base.</p>
+</dd>
+<dt><strong>Address</strong> (I2C)</dt><dd><p>The device’s I2C address, in hex (<code class="docutils literal notranslate"><span class="pre">1d</span></code> or <code class="docutils literal notranslate"><span class="pre">0x1d</span></code>), from its datasheet.
+It becomes the node’s unit address and its <code class="docutils literal notranslate"><span class="pre">reg</span></code>. The hint lists the
+addresses already used on the bus.</p>
+<p>For the example, type <code class="docutils literal notranslate"><span class="pre">1d</span></code>.</p>
+</dd>
+<dt><strong>Chip select</strong> (SPI)</dt><dd><p>Which CS line the device is wired to. Each one says whether it is free, or
+which node uses it (<code class="docutils literal notranslate"><span class="pre">used</span> <span class="pre">by</span> <span class="pre">spidev&#64;0</span></code>). It becomes the node’s unit
+address and its <code class="docutils literal notranslate"><span class="pre">reg</span></code>. If the line is in use, <strong>Turn off spidev&#64;0, which
+uses this chip select</strong> is ticked: the overlay disables that node.</p>
+</dd>
+<dt><strong>Turn &lt;bus&gt; on</strong></dt><dd><p>Shown, and ticked, when the bus is disabled in the base devicetree. Keep it
+ticked: the overlay then enables the bus too.</p>
+</dd>
+<dt><strong>Name</strong> and <strong>Label</strong></dt><dd><p>Optional. Left empty, the CLI chooses them: the placeholder shows what it
+will write. The name gets the address or the chip select as its unit
+address (<code class="docutils literal notranslate"><span class="pre">accelerometer&#64;1d</span></code>). The label is what references to the node
+use (<code class="docutils literal notranslate"><span class="pre">&amp;label</span></code>).</p>
+</dd>
+</dl>
+<p>Then click <strong>＋ Add Device</strong>.</p>
+</section>
+<section id="after-adding">
+<h2>After adding<a class="headerlink" href="#after-adding" title="Link to this heading"></a></h2>
+<p>The panel closes, the new node opens in the node card, and the device tree
+shows it tagged <strong>new</strong>. Required properties with only one possible value, or
+with a default, are set at once.</p>
+<p>The required properties still to set are listed first, empty and marked in
+red. Set them, and any others you need, as described in <a class="reference internal" href="editing.html#ui-editing"><span class="std std-ref">Editing</span></a>.
+For the ADXL345 wired to GPIO 27 of the Raspberry Pi, for example:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">interrupt-parent</span></code>: <code class="docutils literal notranslate"><span class="pre">gpio</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">interrupts</span></code>: <code class="docutils literal notranslate"><span class="pre">27</span></code> and <code class="docutils literal notranslate"><span class="pre">IRQ_TYPE_EDGE_RISING</span></code></p></li>
+</ul>
+<p>If a property is not in the list, add it with <strong>＋ Add Property</strong>.</p>
+<p>If the CLI refuses to add the device, the panel stays open, with the reason
+under <strong>＋ Add Device</strong>, so you can correct the fields.</p>
+</section>
+<section id="other-ways-to-add">
+<h2>Other ways to add<a class="headerlink" href="#other-ways-to-add" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Start from an overlay of the Linux tree</strong>: the project setup’s
+<strong>Import Overlay</strong> (see <a class="reference internal" href="../starting.html#ui-project-setup"><span class="std std-ref">The project setup</span></a>) makes a new workfile from
+one, with all its devices. Later, the console’s command line does the same,
+for example <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">&lt;overlay&gt;</span></code>. Import writes a new file and makes it the
+project’s workfile: it does not add to the overlay you have.</p></li>
+<li><p><strong>Child nodes</strong>, such as the channels of an ADC, are added from their
+parent’s node card (see <a class="reference internal" href="editing.html#ui-editing-children"><span class="std std-ref">Child nodes</span></a>).</p></li>
+<li><p><strong>A node for a property</strong>: a property that takes a label (a clock, a
+regulator) offers to add a node for it, from its list (see
+<a class="reference internal" href="editing.html#ui-editing-properties"><span class="std std-ref">Properties</span></a>).</p></li>
+<li><p><strong>The assistant</strong> adds devices from a description (see
+<a class="reference internal" href="workspace.html#ui-workspace-assistant"><span class="std std-ref">The assistant</span></a>).</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="workspace.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Workspace</a>
+    <a href="editing.html" title="Next document (Alt+Shift+RightArrow)" class="next">Editing</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>
