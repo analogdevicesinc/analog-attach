@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="The header has three buttons: Validate, Build Overlay and Deploy. Each runs the analog-attach command of the same name, with its output in the console." name="description" />
+
+    <title>Validate, build and deploy &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Error reporting" href="../error-reporting.html" />
+    <link rel="prev" title="Editing" href="editing.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Validate, build and deploy</a><ul>
+<li><a class="reference internal" href="#validate">Validate</a></li>
+<li><a class="reference internal" href="#build">Build</a></li>
+<li><a class="reference internal" href="#deploy">Deploy</a></li>
+<li><a class="reference internal" href="#set-the-target">Set the target</a><ul>
+<li><a class="reference internal" href="#project-variables">Project variables</a></li>
+<li><a class="reference internal" href="#commands">Commands</a></li>
+<li><a class="reference internal" href="#system-variables">System variables</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1" checked=""/><div class="collapse"><a class="reference internal" href="../index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="editing.html">Editing</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="../index.html">GUI Guide</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="validate-build-and-deploy">
+<span id="ui-validate-build-deploy"></span><h1>Validate, build and deploy<a class="headerlink" href="#validate-build-and-deploy" title="Link to this heading"></a></h1>
+<p>The header has three buttons: <strong>Validate</strong>, <strong>Build Overlay</strong> and <strong>Deploy</strong>.
+Each runs the <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> command of the same name, with its output in
+the console.</p>
+<section id="validate">
+<h2>Validate<a class="headerlink" href="#validate" title="Link to this heading"></a></h2>
+<p>You don’t need to click <strong>Validate</strong> to check the overlay: after each change,
+the GUI runs dt-validate on it again. While it works, the status in the
+header says <code class="docutils literal notranslate"><span class="pre">Validating…</span></code>; then it says <code class="docutils literal notranslate"><span class="pre">Valid</span></code>, <code class="docutils literal notranslate"><span class="pre">Valid</span> <span class="pre">·</span> <span class="pre">1</span> <span class="pre">warning</span></code> or
+<code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">errors</span></code>.</p>
+<p>What dt-validate finds is shown in several places:</p>
+<ul class="simple">
+<li><p><strong>Validation</strong>, under the overlay in the right column, lists each error and
+warning with the path of its node. Click one to open that node.</p></li>
+<li><p>In the device tree, a red number on a node counts its errors.</p></li>
+<li><p>In the node card, a chip says whether the node is <strong>Valid</strong>, and an error
+about a property is shown under that property’s field.</p></li>
+</ul>
+<p>Until dt-validate has checked the latest change, the findings shown are those
+of the change before, dimmed.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-validation.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-validation.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-validation.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 1 </span><span class="caption-text">The Overlay · Validation tab with a finding</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p><strong>Validate</strong> runs <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">validate</span></code> and opens the console with its
+full output.</p>
+<p>See <a class="reference internal" href="../../cli-guide/linux/validate-build-deploy.html"><span class="doc">Validate, build and deploy</span></a> for what validation checks.</p>
+</section>
+<section id="build">
+<h2>Build<a class="headerlink" href="#build" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Click <strong>Build Overlay</strong>. The button says <strong>Build Devicetree</strong> when the
+<code class="docutils literal notranslate"><span class="pre">output</span></code> setting is <code class="docutils literal notranslate"><span class="pre">devicetree</span></code>.</p></li>
+<li><p>If dt-validate found errors, the GUI asks first: the build compiles the
+overlay all the same, but the kernel may not probe what is wrong. Click
+<strong>Build Anyway</strong> to go on.</p></li>
+<li><p>The console opens and shows the output of the build as it comes. It ends
+with <code class="docutils literal notranslate"><span class="pre">Built</span> <span class="pre">overlay.dtbo</span></code> (the name of your overlay), or
+<code class="docutils literal notranslate"><span class="pre">✘</span> <span class="pre">Not</span> <span class="pre">built:</span> <span class="pre">the</span> <span class="pre">build</span> <span class="pre">refused,</span> <span class="pre">above</span></code> with the reason above it.</p></li>
+</ol>
+<p>The build runs the project’s build command, <code class="docutils literal notranslate"><span class="pre">AA_BUILD</span></code>, which by default is
+the project’s <code class="docutils literal notranslate"><span class="pre">./aa_build.sh</span></code>. It writes to the <code class="docutils literal notranslate"><span class="pre">build/</span></code> folder of the
+project (the <code class="docutils literal notranslate"><span class="pre">build-dir</span></code> setting):</p>
+<ul class="simple">
+<li><p>with <code class="docutils literal notranslate"><span class="pre">output</span></code> set to <code class="docutils literal notranslate"><span class="pre">overlay</span></code>: <code class="docutils literal notranslate"><span class="pre">build/overlay.dtbo</span></code>;</p></li>
+<li><p>with <code class="docutils literal notranslate"><span class="pre">output</span></code> set to <code class="docutils literal notranslate"><span class="pre">devicetree</span></code>: the full devicetree,
+<code class="docutils literal notranslate"><span class="pre">build/overlay.dts</span></code>, and its <code class="docutils literal notranslate"><span class="pre">build/overlay.dtb</span></code>. The right column can
+then show the <code class="docutils literal notranslate"><span class="pre">.dts</span></code> (see <a class="reference internal" href="workspace.html#ui-workspace"><span class="std std-ref">Workspace</span></a>).</p></li>
+</ul>
+<figure class="align-default" id="id2">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-build-console.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-build-console.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-build-console.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 2 </span><span class="caption-text">The console after Build Overlay: dtc’s output, then the .dtbo it wrote</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="deploy">
+<h2>Deploy<a class="headerlink" href="#deploy" title="Link to this heading"></a></h2>
+<p><strong>Deploy</strong> runs the project’s deploy command, <code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code>, which by default
+is the project’s <code class="docutils literal notranslate"><span class="pre">./aa_deploy.sh</span></code>. That script copies the build to a
+Raspberry Pi running Kuiper, over SSH, and reboots it: an overlay into the
+boot folder’s <code class="docutils literal notranslate"><span class="pre">overlays/</span></code>, with <code class="docutils literal notranslate"><span class="pre">dtoverlay=&lt;name&gt;</span></code> added to
+<code class="docutils literal notranslate"><span class="pre">config.txt</span></code>, or with <code class="docutils literal notranslate"><span class="pre">output</span></code> set to <code class="docutils literal notranslate"><span class="pre">devicetree</span></code>, the <code class="docutils literal notranslate"><span class="pre">.dtb</span></code> over
+the boot folder’s <code class="docutils literal notranslate"><span class="pre">devicetree.dtb</span></code>. It needs <code class="docutils literal notranslate"><span class="pre">ssh</span></code>, <code class="docutils literal notranslate"><span class="pre">scp</span></code> and
+<code class="docutils literal notranslate"><span class="pre">sshpass</span></code> on the machine where the GUI runs.</p>
+<p>Build before you deploy: the script deploys what the last build wrote.</p>
+<ol class="arabic simple">
+<li><p>Set the board’s address and user (see <a class="reference internal" href="#set-the-target">Set the target</a> below).</p></li>
+<li><p>Click <strong>Deploy</strong>.</p></li>
+<li><p>The first time, a dialog asks for <code class="docutils literal notranslate"><span class="pre">BOARD_PASSWORD</span></code>. Type it and click
+<strong>Deploy</strong>. The GUI keeps it in the page until you close the page, and
+gives it to the deploy only. It is never saved, and never shown in the
+console.</p></li>
+<li><p>The console opens and shows the output as it comes. If the board refuses
+the password, the dialog asks for it again. A deploy that fails ends with
+<code class="docutils literal notranslate"><span class="pre">✘</span> <span class="pre">Not</span> <span class="pre">deployed:</span> <span class="pre">the</span> <span class="pre">deploy</span> <span class="pre">refused,</span> <span class="pre">above</span></code>.</p></li>
+</ol>
+</section>
+<section id="set-the-target">
+<span id="ui-build-deploy-commands"></span><h2>Set the target<a class="headerlink" href="#set-the-target" title="Link to this heading"></a></h2>
+<p>What Build and Deploy run, and for which board, is set in the settings: the
+gear in the header, then the <strong>Project</strong> tab.</p>
+<section id="project-variables">
+<h3>Project variables<a class="headerlink" href="#project-variables" title="Link to this heading"></a></h3>
+<p>The project’s own variables, given to the build and deploy commands in their
+environment. When <strong>Create Overlay</strong> wrote <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code>, it also set the
+three variables the script uses, to Kuiper’s defaults:</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Variable</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOARD_IP</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">analog.local</span></code></p></td>
+<td><p>The board’s address or host name</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOARD_USER</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">analog</span></code></p></td>
+<td><p>The user to log in as</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOARD_PASSWORD</span></code></p></td>
+<td><p>a secret</p></td>
+<td><p>That user’s password</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>To point them at your board:</p>
+<ol class="arabic simple">
+<li><p>In the row of <code class="docutils literal notranslate"><span class="pre">BOARD_IP</span></code>, type the board’s address, for example
+<code class="docutils literal notranslate"><span class="pre">192.168.2.10</span></code>, and click <strong>Save</strong>.</p></li>
+<li><p>Do the same for <code class="docutils literal notranslate"><span class="pre">BOARD_USER</span></code> if it isn’t <code class="docutils literal notranslate"><span class="pre">analog</span></code>.</p></li>
+</ol>
+<p>To add a variable, type its name and value in the last row and click
+<strong>Add</strong>. <strong>✕</strong> removes a variable.</p>
+<p><strong>Secret</strong> makes a variable a secret: its value is never stored, only its
+name. Deploy asks for it, or takes it from the environment the GUI was
+started in, for example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">BOARD_PASSWORD</span><span class="o">=</span>analog<span class="w"> </span>analog-attach<span class="w"> </span>gui
+</pre></div>
+</div>
+<p>The row of a secret says where its value comes from: the GUI’s environment,
+given on Deploy, or asked for on Deploy. <strong>Forget</strong> drops a value given on
+Deploy, so the next Deploy asks again.</p>
+<figure class="align-default" id="id3">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-project-variables.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-project-variables.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-project-variables.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 3 </span><span class="caption-text">The project variables of a new Raspberry Pi project: BOARD_IP, BOARD_USER and the secret BOARD_PASSWORD</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="commands">
+<h3>Commands<a class="headerlink" href="#commands" title="Link to this heading"></a></h3>
+<p>The commands the CLI runs, each a shell command of one or more lines, run
+with <code class="docutils literal notranslate"><span class="pre">sh</span></code> in the project folder:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">AA_BUILD</span></code>: what <strong>Build</strong> runs. Default: <code class="docutils literal notranslate"><span class="pre">./aa_build.sh</span></code>, which
+compiles with <code class="docutils literal notranslate"><span class="pre">dtc</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code>: what <strong>Deploy</strong> runs. Default: <code class="docutils literal notranslate"><span class="pre">./aa_deploy.sh</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AA_PREPROCESS_COMMAND</span></code>: what preprocesses the devicetrees, each time a
+command reads one. Default: <code class="docutils literal notranslate"><span class="pre">cpp</span></code> with the includes of the Linux tree.</p></li>
+</ul>
+<p>Edit a command in its box, then click <strong>Save</strong> (or press
+<kbd class="kbd docutils literal notranslate">Ctrl</kbd>+<kbd class="kbd docutils literal notranslate">Enter</kbd>). <strong>Restore Default</strong> goes back to the default. For
+<code class="docutils literal notranslate"><span class="pre">AA_BUILD</span></code> and <code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code>, it also writes the starter <code class="docutils literal notranslate"><span class="pre">aa_build.sh</span></code> or
+<code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code> when the project folder has none. An existing script is
+kept: it may be yours. To write the starter over it, run
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">init</span> <span class="pre">--restore</span> <span class="pre">build</span></code> (or <code class="docutils literal notranslate"><span class="pre">deploy</span></code>).</p>
+<p><strong>Create Overlay</strong> writes both scripts in the project folder, unless they
+are there already. <strong>Import Overlay</strong> doesn’t: in a project started from an
+imported overlay, click <strong>Restore Default</strong> on <code class="docutils literal notranslate"><span class="pre">AA_BUILD</span></code> and <code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code>
+to write them, and the board’s variables with them.</p>
+<p>The scripts are yours to edit: to deploy to another board, change
+<code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code>, or set <code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code> to your own command.</p>
+<figure class="align-default" id="id4">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-project-commands.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-project-commands.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-project-commands.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 4 </span><span class="caption-text">The Commands: AA_BUILD, AA_DEPLOY and AA_PREPROCESS_COMMAND, each with Restore Default</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+</section>
+<section id="system-variables">
+<h3>System variables<a class="headerlink" href="#system-variables" title="Link to this heading"></a></h3>
+<p>What the CLI gives the commands, worked out from the settings, read-only:
+for example <code class="docutils literal notranslate"><span class="pre">AA_OUTPUT</span></code> (the <code class="docutils literal notranslate"><span class="pre">output</span></code> setting), <code class="docutils literal notranslate"><span class="pre">AA_DTSO</span></code> (the
+workfile), <code class="docutils literal notranslate"><span class="pre">AA_DTBO</span></code> (the <code class="docutils literal notranslate"><span class="pre">.dtbo</span></code> to write) and <code class="docutils literal notranslate"><span class="pre">AA_BUILD_DIR</span></code> (the
+build folder). Click <strong>ⓘ</strong> on a row for what it holds and which commands get
+it.</p>
+<p>See <a class="reference internal" href="../../cli-guide/linux/validate-build-deploy.html"><span class="doc">Validate, build and deploy</span></a> for the same steps on the
+command line.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="editing.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Editing</a>
+    <a href="../error-reporting.html" title="Next document (Alt+Shift+RightArrow)" class="next">Error reporting</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

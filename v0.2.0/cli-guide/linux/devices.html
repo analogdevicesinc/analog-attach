@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="This page shows how to find a device in the kernel’s bindings, add it to the overlay on the right bus, and then rename, move, turn off or remove nodes. How to set the properties of a node is in Properties." name="description" />
+
+    <title>Devices &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Properties" href="properties.html" />
+    <link rel="prev" title="Creating and reading the workfile" href="workfile.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Devices</a><ul>
+<li><a class="reference internal" href="#find-the-device">Find the device</a></li>
+<li><a class="reference internal" href="#find-the-bus">Find the bus</a></li>
+<li><a class="reference internal" href="#add-the-device">Add the device</a><ul>
+<li><a class="reference internal" href="#on-a-terminal-the-questions">On a terminal: the questions</a></li>
+<li><a class="reference internal" href="#start-from-an-example-or-an-overlay">Start from an example or an overlay</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#list-the-nodes">List the nodes</a></li>
+<li><a class="reference internal" href="#turn-nodes-on-and-off">Turn nodes on and off</a></li>
+<li><a class="reference internal" href="#rename-and-move-a-node">Rename and move a node</a></li>
+<li><a class="reference internal" href="#delete-nodes-and-properties">Delete nodes and properties</a></li>
+<li><a class="reference internal" href="#next-steps">Next steps</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2" checked=""/><div class="collapse"><a class="reference internal" href="../index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="../index.html">CLI Guide</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="devices">
+<span id="cli-devices"></span><h1>Devices<a class="headerlink" href="#devices" title="Link to this heading"></a></h1>
+<p>This page shows how to find a device in the kernel’s bindings, add it to the
+overlay on the right bus, and then rename, move, turn off or remove nodes. How
+to set the properties of a node is in <a class="reference internal" href="properties.html#cli-properties"><span class="std std-ref">Properties</span></a>.</p>
+<p>The running example adds an ADXL345 accelerometer (<code class="docutils literal notranslate"><span class="pre">adi,adxl345</span></code>) at I2C
+address <code class="docutils literal notranslate"><span class="pre">0x1d</span></code> on the Raspberry Pi 4’s <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code> bus, with its interrupt on
+GPIO 27.</p>
+<section id="find-the-device">
+<h2>Find the device<a class="headerlink" href="#find-the-device" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">devices</span></code> searches the compatible strings of the kernel tree’s
+bindings. Give it part of the part number:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach list devices adxl
+adi,adxl312  iio/accel
+adi,adxl313  iio/accel
+adi,adxl314  iio/accel
+adi,adxl345  iio/accel
+adi,adxl346  iio/accel
+…
+</pre></div>
+</div>
+<p>The second column is the binding’s category (its folder under
+<code class="docutils literal notranslate"><span class="pre">Documentation/devicetree/bindings</span></code>). When the filter is a compatible, or
+only one compatible contains it, <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">devices</span></code> describes that device:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach list devices adi,adxl345
+adi,adxl345
+  Analog Devices ADXL345/ADXL375 3-Axis Digital Accelerometers
+  …
+  binding: /home/user/linux/Documentation/devicetree/bindings/iio/accel/adi,adxl345.yaml
+  40 properties, 0 child node patterns
+</pre></div>
+</div>
+<p>Without a filter, <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">devices</span></code> lists every compatible of the tree.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>The kernel tree may already have an overlay with the device. <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">overlay</span>
+<span class="pre">adi,adxl345</span></code> lists them; you can import one as a whole (see
+<a class="reference internal" href="workfile.html#cli-workfile"><span class="std std-ref">Creating and reading the workfile</span></a>) or copy the device’s node from it (see
+<a class="reference internal" href="#start-from-an-example-or-an-overlay">Start from an example or an overlay</a>).</p>
+</div>
+</section>
+<section id="find-the-bus">
+<h2>Find the bus<a class="headerlink" href="#find-the-bus" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">parent</span></code> lists the nodes of the base devicetree the device can sit on:
+for the ADXL345, which has an SPI and an I2C interface, every SPI and I2C
+controller. Each is shown by its label, ready for <code class="docutils literal notranslate"><span class="pre">--parent</span></code>, then its
+path:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach list parent adi,adxl345
+spi     /soc/spi@7e204000
+spi1    /soc/spi@7e215080
+…
+i2c0if  /soc/i2c@7e205000
+i2c1    /soc/i2c@7e804000
+i2c3    /soc/i2c@7e205600
+…
+</pre></div>
+</div>
+<p>A node can have several labels: <code class="docutils literal notranslate"><span class="pre">i2c1</span></code> and <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code> are the same
+controller, <code class="docutils literal notranslate"><span class="pre">/soc/i2c&#64;7e804000</span></code>. <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">node</span></code> shows them all:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach list node i2c_arm
+/soc/i2c@7e804000  &amp;i2c_arm &amp;i2c1  brcm,bcm2711-i2c, brcm,bcm2835-i2c  (off)
+
+1 node matches "i2c_arm".
+Use: analog-attach read &lt;path&gt;
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">(off)</span></code> means the base devicetree leaves the bus disabled. See <a class="reference internal" href="#turn-nodes-on-and-off">Turn nodes on
+and off</a>.</p>
+</section>
+<section id="add-the-device">
+<h2>Add the device<a class="headerlink" href="#add-the-device" title="Link to this heading"></a></h2>
+<p>Give the compatible, the bus, a label to refer to the node later and, for an
+I2C device, its address in the node name:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach add adi,adxl345 --parent i2c_arm --name adxl345@1d --label accel
+Added adxl345@1d (label: accel) to /home/user/work/rpi4-adxl345/overlay.dtso
+Missing required: interrupt-parent, interrupts
+Set them with: update accel &lt;property&gt; &lt;value&gt;
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">add</span></code> writes the node with its <code class="docutils literal notranslate"><span class="pre">compatible</span></code> and its <code class="docutils literal notranslate"><span class="pre">reg</span></code>, which follows
+the unit address of the name. It then lists the required properties still to
+set. Set them with <code class="docutils literal notranslate"><span class="pre">update</span></code> (see <a class="reference internal" href="properties.html#cli-properties"><span class="std std-ref">Properties</span></a>).</p>
+<div class="table-wrapper colwidths-given docutils container" id="id1">
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-number">Table 1 </span><span class="caption-text">Options of <code class="docutils literal notranslate"><span class="pre">add</span></code></span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Use</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--parent</span> <span class="pre">&lt;node&gt;</span></code></p></td>
+<td><p>The bus, as <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">parent</span></code> shows it, or any node path. Without it, the
+node goes under the first bus <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">parent</span></code> shows, and a note says
+which. <strong>Always give it</strong>: Analog Attach can’t know how the device is
+wired.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--label</span> <span class="pre">&lt;label&gt;</span></code></p></td>
+<td><p>The node’s label. Without it, one is made up from the compatible.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--name</span> <span class="pre">&lt;name&gt;</span></code></p></td>
+<td><p>The node’s name. <code class="docutils literal notranslate"><span class="pre">adxl345&#64;1d</span></code> also sets <code class="docutils literal notranslate"><span class="pre">reg</span> <span class="pre">=</span> <span class="pre">&lt;0x1d&gt;</span></code>. A name
+without <code class="docutils literal notranslate"><span class="pre">&#64;</span></code> keeps the unit address Analog Attach picks.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--template</span> <span class="pre">&lt;template&gt;</span></code></p></td>
+<td><p>What the node starts from (see below). Default: <code class="docutils literal notranslate"><span class="pre">required</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--dry-run</span></code></p></td>
+<td><p>Show the node <code class="docutils literal notranslate"><span class="pre">add</span></code> would write, and write nothing.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--quiet</span></code></p></td>
+<td><p>On a terminal, list the missing properties instead of asking for them.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>To see the node before writing it, add <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach add adi,adxl345 --parent i2c_arm --name adxl345@1d --label accel --dry-run
+Would add adxl345@1d (label: accel) to /home/user/work/rpi4-adxl345/overlay.dtso
+accel: adxl345@1d {
+     compatible = "adi,adxl345";
+     reg = &lt;0x1d&gt;;
+};
+</pre></div>
+</div>
+<p>A compatible that the bindings don’t have is refused, with the closest ones:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach add adi,adxl34
+Unknown compatible 'adi,adxl34'. Did you mean adi,adxl314, adi,adxl345, adi,adxl346? See: analog-attach list devices
+</pre></div>
+</div>
+<section id="on-a-terminal-the-questions">
+<h3>On a terminal: the questions<a class="headerlink" href="#on-a-terminal-the-questions" title="Link to this heading"></a></h3>
+<p>On a terminal, <code class="docutils literal notranslate"><span class="pre">add</span></code> asks for what is missing. Without <code class="docutils literal notranslate"><span class="pre">--parent</span></code>, it first
+asks for the bus: type a letter, a label or a path. Then it asks for each
+required property, with the binding’s suggestions as lettered options:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach add adi,adxl345 --label accel
+Where does adi,adxl345 go? (Enter takes a, a letter picks, or type a label or path, Ctrl-D stops)
+  a) spi  /soc/spi@7e204000
+  …
+  m) i2c6  /soc/i2c@7e205c00
+parent [a]: i2c_arm
+Added adi,adxl345@0 (label: accel) to /home/user/work/rpi4-adxl345/overlay.dtso
+Set reg = &lt;0x2a&gt; (from example 1); renamed to adi,adxl345@2a
+
+2 required properties to set (Enter takes the default, a letter picks an option, - skips, Ctrl-D stops)
+
+[1/2] interrupt-parent
+  (adi,adxl345.yaml)
+  a) gicv2 — interrupt controller, #interrupt-cells = &lt;3&gt;; inherited from /
+  b) gpio — interrupt controller, #interrupt-cells = &lt;2&gt;
+  c) aon_intr (disabled)
+interrupt-parent [a]: b
+Set interrupt-parent on accel
+
+[2/2] interrupts
+  (adi,adxl345.yaml)
+interrupts 1/2 (number): 27
+  interrupts = &lt;27&gt;;
+  a) IRQ_TYPE_NONE
+  b) IRQ_TYPE_EDGE_RISING
+  …
+interrupts 2/2 [a]: b
+  interrupts = &lt;27 IRQ_TYPE_EDGE_RISING&gt;;
+Set interrupts on accel
+
+All required properties are set.
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><kbd class="kbd docutils literal notranslate">Enter</kbd> takes the default shown in brackets, <code class="docutils literal notranslate"><span class="pre">-</span></code> skips a property,
+and <kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">D</kbd> stops the questions (what is set stays set).</p></li>
+<li><p>Before the questions, <code class="docutils literal notranslate"><span class="pre">add</span></code> sets what the binding allows only one value
+for, and takes <code class="docutils literal notranslate"><span class="pre">spi-max-frequency</span></code> (SPI) or <code class="docutils literal notranslate"><span class="pre">reg</span></code> (I2C) from the
+binding’s first example for that bus. Here it set <code class="docutils literal notranslate"><span class="pre">reg</span> <span class="pre">=</span> <span class="pre">&lt;0x2a&gt;</span></code>, the
+example’s address: the ADXL345 Click is at <code class="docutils literal notranslate"><span class="pre">0x1d</span></code>, so set it with
+<code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">accel</span> <span class="pre">reg</span> <span class="pre">0x1d</span></code>. That renames the node to <code class="docutils literal notranslate"><span class="pre">adi,adxl345&#64;1d</span></code>
+(see <a class="reference internal" href="properties.html#cli-properties"><span class="std std-ref">Properties</span></a>).</p></li>
+</ul>
+<p>Piped, with <code class="docutils literal notranslate"><span class="pre">--json</span></code> or with <code class="docutils literal notranslate"><span class="pre">--quiet</span></code>, <code class="docutils literal notranslate"><span class="pre">add</span></code> asks nothing and lists the
+missing properties instead. To turn the questions off for good, run
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span> <span class="pre">interview</span> <span class="pre">false</span></code>.</p>
+</section>
+<section id="start-from-an-example-or-an-overlay">
+<h3>Start from an example or an overlay<a class="headerlink" href="#start-from-an-example-or-an-overlay" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">--template</span></code> copies a whole node, children and references included:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Template</p></th>
+<th class="head"><p>The node starts as</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">required</span></code></p></td>
+<td><p>A bare node, then the missing required properties (the default).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">example:&lt;N&gt;</span></code></p></td>
+<td><p>Example <code class="docutils literal notranslate"><span class="pre">N</span></code> of the binding (1 is the first), as written.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">overlay:&lt;name&gt;</span></code></p></td>
+<td><p>The device’s node from an overlay of the kernel tree (a name from
+<code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">overlay</span></code>) or from a file. Without <code class="docutils literal notranslate"><span class="pre">--parent</span></code>, it goes where
+the overlay puts it.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach add adi,adxl345 --parent i2c_arm --label accel --template example:1 --dry-run
+Copied example 1 of adi,adxl345.yaml (i2c)
+error: 1 reference points to a node neither the base nor the overlay has:
+  accel  interrupt-parent → &amp;gpio0
+  fix with: update &lt;node&gt; &lt;property&gt; &lt;value&gt;, or delete &lt;node&gt; &lt;property&gt;
+Would add accelerometer@2a (label: accel) to /home/user/work/rpi4-adxl345/overlay.dtso
+accel: accelerometer@2a {
+     compatible = "adi,adxl345";
+     reg = &lt;0x2a&gt;;
+     interrupt-parent = &lt;&amp;gpio0&gt;;
+     interrupts = &lt;0 4&gt;;
+};
+</pre></div>
+</div>
+<p>A copied node keeps its name, <code class="docutils literal notranslate"><span class="pre">reg</span></code> and references as written: here the
+example’s address, interrupt and <code class="docutils literal notranslate"><span class="pre">&amp;gpio0</span></code>, which the Raspberry Pi 4 doesn’t
+have. <code class="docutils literal notranslate"><span class="pre">add</span></code> lists such references as errors to fix with <code class="docutils literal notranslate"><span class="pre">update</span></code>.
+<code class="docutils literal notranslate"><span class="pre">--name</span></code> and <code class="docutils literal notranslate"><span class="pre">--label</span></code> apply to the copy.</p>
+</section>
+</section>
+<section id="list-the-nodes">
+<h2>List the nodes<a class="headerlink" href="#list-the-nodes" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">node</span></code> lists every node of the base devicetree with the overlay
+applied, in tree order, with its labels and compatibles. Give a filter to see
+the nodes whose name, label or compatible contains it:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach list node accel
+/soc/i2c@7e804000/adxl345@1d  &amp;accel  adi,adxl345  (new)
+
+1 node matches "accel".
+Use: analog-attach read &lt;path&gt;
+</pre></div>
+</div>
+<p>A node is tagged <code class="docutils literal notranslate"><span class="pre">(new)</span></code> when the overlay adds it, <code class="docutils literal notranslate"><span class="pre">(changed)</span></code> when the
+overlay sets something on it, and <code class="docutils literal notranslate"><span class="pre">(off)</span></code> when its status isn’t <code class="docutils literal notranslate"><span class="pre">okay</span></code>.
+<code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">property</span></code> with no argument lists only the overlay’s nodes.</p>
+</section>
+<section id="turn-nodes-on-and-off">
+<h2>Turn nodes on and off<a class="headerlink" href="#turn-nodes-on-and-off" title="Link to this heading"></a></h2>
+<p>The Raspberry Pi 4 base devicetree leaves <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code> disabled, so Linux would
+not probe the ADXL345. Enable it in the overlay:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach enable i2c_arm
+Enabled i2c_arm in /home/user/work/rpi4-adxl345/overlay.dtso
+</pre></div>
+</div>
+<p>This writes <code class="docutils literal notranslate"><span class="pre">status</span> <span class="pre">=</span> <span class="pre">&quot;okay&quot;</span></code> on the bus. <code class="docutils literal notranslate"><span class="pre">disable</span></code> writes <code class="docutils literal notranslate"><span class="pre">status</span> <span class="pre">=</span>
+<span class="pre">&quot;disabled&quot;</span></code>, for example to turn off a base node that your device replaces,
+such as a <code class="docutils literal notranslate"><span class="pre">spidev</span></code> on the same chip select:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach disable accel
+Disabled accel in /home/user/work/rpi4-adxl345/overlay.dtso
+$ analog-attach enable accel
+Enabled accel (as the overlay adds it: status removed from /home/user/work/rpi4-adxl345/overlay.dtso)
+</pre></div>
+</div>
+<p>When the node already has the status you ask for without the overlay (a node
+the overlay adds is enabled), the overlay’s own <code class="docutils literal notranslate"><span class="pre">status</span></code> is removed rather
+than written. <code class="docutils literal notranslate"><span class="pre">validate</span></code> warns about a device on a disabled bus (see
+<a class="reference internal" href="validate-build-deploy.html#cli-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>).</p>
+</section>
+<section id="rename-and-move-a-node">
+<h2>Rename and move a node<a class="headerlink" href="#rename-and-move-a-node" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">rename</span></code> changes a node’s name. A name without <code class="docutils literal notranslate"><span class="pre">&#64;</span></code> keeps the unit address;
+a name with one changes it, and <code class="docutils literal notranslate"><span class="pre">reg</span></code> follows:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach rename accel adxl345
+Renamed accel to adxl345 in /home/user/work/rpi4-adxl345/overlay.dtso
+$ analog-attach rename accel adxl345@53
+reg first cell set to 0x53
+Renamed accel to adxl345@53 in /home/user/work/rpi4-adxl345/overlay.dtso
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">move</span></code> puts a node under another parent, for example another I2C bus:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach move accel i2c3
+Moved accel to i2c3 in /home/user/work/rpi4-adxl345/overlay.dtso
+</pre></div>
+</div>
+<p>A move to a parent the device’s binding doesn’t allow is refused. <code class="docutils literal notranslate"><span class="pre">move</span></code>
+keeps the node’s name and <code class="docutils literal notranslate"><span class="pre">reg</span></code>, and doesn’t check for an address clash on
+the new bus: run <code class="docutils literal notranslate"><span class="pre">validate</span></code> afterwards.</p>
+</section>
+<section id="delete-nodes-and-properties">
+<h2>Delete nodes and properties<a class="headerlink" href="#delete-nodes-and-properties" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach delete accel interrupts
+Removed interrupts from accel in /home/user/work/rpi4-adxl345/overlay.dtso
+$ analog-attach delete accel
+Deleted accel from /home/user/work/rpi4-adxl345/overlay.dtso
+</pre></div>
+</div>
+<p>A node with children, and the whole overlay (<code class="docutils literal notranslate"><span class="pre">delete</span></code> with no path), are
+only previewed. Add <code class="docutils literal notranslate"><span class="pre">--force</span></code> to delete them:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach delete
+Would delete 1 node(s) and 4 property(ies)
+  adxl345@1d
+$ analog-attach delete --force
+Deleted all overlay content from /home/user/work/rpi4-adxl345/overlay.dtso
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">delete</span></code>, <code class="docutils literal notranslate"><span class="pre">rename</span></code> and <code class="docutils literal notranslate"><span class="pre">move</span></code> only change what the overlay adds. A node
+of the base devicetree can’t be removed by an overlay; disable it instead:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach delete i2c_arm
+i2c_arm is part of the base device tree (/home/user/linux/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts), not this overlay; delete only removes overlay-added nodes
+</pre></div>
+</div>
+</section>
+<section id="next-steps">
+<h2>Next steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="properties.html#cli-properties"><span class="std std-ref">Properties</span></a>: set <code class="docutils literal notranslate"><span class="pre">interrupt-parent</span></code> and <code class="docutils literal notranslate"><span class="pre">interrupts</span></code>.</p></li>
+<li><p><a class="reference internal" href="validate-build-deploy.html#cli-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>: check, build and deploy the overlay.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="workfile.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Creating and reading the workfile</a>
+    <a href="properties.html" title="Next document (Alt+Shift+RightArrow)" class="next">Properties</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

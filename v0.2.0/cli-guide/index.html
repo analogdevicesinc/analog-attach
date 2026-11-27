@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="Everything the GUI does is available from the command line, with no browser. Every command accepts --json for machine-readable output." name="description" />
+
+    <title>CLI Guide &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Configuration" href="configuration.html" />
+    <link rel="prev" title="Error reporting" href="../ui-guide/error-reporting.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">CLI Guide</a><ul>
+<li><a class="reference internal" href="#getting-help">Getting help</a></li>
+<li><a class="reference internal" href="#naming-nodes">Naming nodes</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2" checked=""/><div class="collapse"><a class="current reference internal" href="#">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb empty"><ol></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="cli-guide">
+<span id="id1"></span><h1>CLI Guide<a class="headerlink" href="#cli-guide" title="Link to this heading"></a></h1>
+<p>Everything the GUI does is available from the command line, with no browser.
+Every command accepts <code class="docutils literal notranslate"><span class="pre">--json</span></code> for machine-readable output.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l1"><a class="reference internal" href="linux/devices.html">Devices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="linux/properties.html">Properties</a></li>
+<li class="toctree-l1"><a class="reference internal" href="linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scripting.html">Scripting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="shell-completion.html">Shell completion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="error-reporting.html">Error reporting</a></li>
+</ul>
+</div>
+<p>The pages follow the order of a first project:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="configuration.html#cli-configuration"><span class="std std-ref">Configuration</span></a>: set up the project with the guided setup or
+<code class="docutils literal notranslate"><span class="pre">config</span></code>, and the variables of the build and deploy scripts.</p></li>
+<li><p><a class="reference internal" href="linux/workfile.html#cli-workfile"><span class="std std-ref">Creating and reading the workfile</span></a>: <code class="docutils literal notranslate"><span class="pre">init</span></code>, <code class="docutils literal notranslate"><span class="pre">import</span></code> and <code class="docutils literal notranslate"><span class="pre">read</span></code>.</p></li>
+<li><p><a class="reference internal" href="linux/devices.html#cli-devices"><span class="std std-ref">Devices</span></a>: find a device and its bus, <code class="docutils literal notranslate"><span class="pre">add</span></code> it, and <code class="docutils literal notranslate"><span class="pre">rename</span></code>,
+<code class="docutils literal notranslate"><span class="pre">move</span></code>, <code class="docutils literal notranslate"><span class="pre">enable</span></code>, <code class="docutils literal notranslate"><span class="pre">disable</span></code> or <code class="docutils literal notranslate"><span class="pre">delete</span></code> nodes.</p></li>
+<li><p><a class="reference internal" href="linux/properties.html#cli-properties"><span class="std std-ref">Properties</span></a>: <code class="docutils literal notranslate"><span class="pre">read</span></code>, <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">property</span></code>, <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">value</span></code> and
+<code class="docutils literal notranslate"><span class="pre">update</span></code>.</p></li>
+<li><p><a class="reference internal" href="linux/validate-build-deploy.html#cli-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>: <code class="docutils literal notranslate"><span class="pre">validate</span></code>, <code class="docutils literal notranslate"><span class="pre">build</span></code> and <code class="docutils literal notranslate"><span class="pre">deploy</span></code>.</p></li>
+<li><p><a class="reference internal" href="scripting.html#cli-scripting"><span class="std std-ref">Scripting</span></a>: <code class="docutils literal notranslate"><span class="pre">--json</span></code> and use in scripts and CI.</p></li>
+<li><p><a class="reference internal" href="shell-completion.html"><span class="doc">Shell completion</span></a> and <a class="reference internal" href="error-reporting.html"><span class="doc">Error reporting</span></a>.</p></li>
+</ul>
+<p>Two more commands are described elsewhere: <code class="docutils literal notranslate"><span class="pre">gui</span></code> starts the GUI (see
+<a class="reference internal" href="../ui-guide/starting.html#ui-starting"><span class="std std-ref">Starting</span></a>), and <code class="docutils literal notranslate"><span class="pre">skill</span></code> installs the skill of an AI agent (see
+<a class="reference internal" href="../ai-agents/index.html"><span class="doc">Working with AI Agents</span></a>). Every command, with its options, is listed in
+<a class="reference internal" href="../reference/commands.html#ref-commands"><span class="std std-ref">Commands</span></a>.</p>
+<p>The examples use a Raspberry Pi 4 with an ADXL345 accelerometer
+(<code class="docutils literal notranslate"><span class="pre">adi,adxl345</span></code>) on its I2C bus <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code>: the project is in
+<code class="docutils literal notranslate"><span class="pre">~/work/rpi4-adxl345</span></code> and the Linux kernel tree in <code class="docutils literal notranslate"><span class="pre">~/linux</span></code>. Outputs are
+shortened where marked with <code class="docutils literal notranslate"><span class="pre">…</span></code>.</p>
+<section id="getting-help">
+<h2>Getting help<a class="headerlink" href="#getting-help" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>analog-attach<span class="w"> </span>--help<span class="w">              </span><span class="c1"># the commands</span>
+analog-attach<span class="w"> </span>add<span class="w"> </span>--help<span class="w">          </span><span class="c1"># one command, with examples</span>
+analog-attach<span class="w"> </span><span class="nb">help</span><span class="w"> </span>add<span class="w">            </span><span class="c1"># the same</span>
+analog-attach<span class="w"> </span>--help<span class="w"> </span>--all<span class="w">        </span><span class="c1"># the help of every command</span>
+</pre></div>
+</div>
+</section>
+<section id="naming-nodes">
+<span id="cli-node-paths"></span><h2>Naming nodes<a class="headerlink" href="#naming-nodes" title="Link to this heading"></a></h2>
+<p>Commands that take a node accept three forms:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 40.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Form</p></th>
+<th class="head"><p>Example</p></th>
+<th class="head"><p>Means</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Label</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">accel</span></code>, <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code></p></td>
+<td><p>The node with that label, in the base devicetree or the overlay.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Label-first</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">i2c_arm/adxl345&#64;1d</span></code></p></td>
+<td><p>The child <code class="docutils literal notranslate"><span class="pre">adxl345&#64;1d</span></code> of the node labelled <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p>Absolute</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">/soc/i2c&#64;7e804000/adxl345&#64;1d</span></code></p></td>
+<td><p>The node at that path.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Write a label without <code class="docutils literal notranslate"><span class="pre">&amp;</span></code>: <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code>, not <code class="docutils literal notranslate"><span class="pre">&amp;i2c_arm</span></code>. A node path is one
+argument, and a property is a separate argument: <code class="docutils literal notranslate"><span class="pre">read</span> <span class="pre">accel</span> <span class="pre">reg</span></code>, not
+<code class="docutils literal notranslate"><span class="pre">read</span> <span class="pre">accel/reg</span></code>. <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">node</span></code> shows every node with its path and labels.</p>
+<p>Options can go anywhere after the command name, and <code class="docutils literal notranslate"><span class="pre">--json</span></code> anywhere on the
+line. To pass a value that starts with <code class="docutils literal notranslate"><span class="pre">-</span></code> and a letter, put <code class="docutils literal notranslate"><span class="pre">--</span></code> before
+it: <code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">accel</span> <span class="pre">label</span> <span class="pre">--</span> <span class="pre">-x</span></code>. Negative numbers need no <code class="docutils literal notranslate"><span class="pre">--</span></code>.</p>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../ui-guide/error-reporting.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Error reporting</a>
+    <a href="configuration.html" title="Next document (Alt+Shift+RightArrow)" class="next">Configuration</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

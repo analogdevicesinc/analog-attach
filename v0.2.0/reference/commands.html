@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="Every command of analog-attach with the Linux backend, with its arguments and options. The task-oriented guide is CLI Guide; the --json output of each command is summarized in JSON protocol." name="description" />
+
+    <title>Commands &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="JSON protocol" href="json-protocol.html" />
+    <link rel="prev" title="Reference" href="index.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Commands</a><ul>
+<li><a class="reference internal" href="#conventions">Conventions</a><ul>
+<li><a class="reference internal" href="#options-of-every-command">Options of every command</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#analog-attach-no-command">analog-attach (no command)</a></li>
+<li><a class="reference internal" href="#config">config</a></li>
+<li><a class="reference internal" href="#init">init</a></li>
+<li><a class="reference internal" href="#import">import</a></li>
+<li><a class="reference internal" href="#add">add</a></li>
+<li><a class="reference internal" href="#read">read</a></li>
+<li><a class="reference internal" href="#update">update</a></li>
+<li><a class="reference internal" href="#delete">delete</a></li>
+<li><a class="reference internal" href="#rename">rename</a></li>
+<li><a class="reference internal" href="#list">list</a></li>
+<li><a class="reference internal" href="#move">move</a></li>
+<li><a class="reference internal" href="#enable-disable">enable, disable</a></li>
+<li><a class="reference internal" href="#validate">validate</a></li>
+<li><a class="reference internal" href="#build">build</a></li>
+<li><a class="reference internal" href="#deploy">deploy</a></li>
+<li><a class="reference internal" href="#completion">completion</a></li>
+<li><a class="reference internal" href="#gui">gui</a></li>
+<li><a class="reference internal" href="#skill">skill</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4" checked=""/><div class="collapse"><a class="reference internal" href="index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="index.html">Reference</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="commands">
+<span id="ref-commands"></span><h1>Commands<a class="headerlink" href="#commands" title="Link to this heading"></a></h1>
+<p>Every command of <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> with the Linux backend, with its arguments
+and options. The task-oriented guide is <a class="reference internal" href="../cli-guide/index.html#cli-guide"><span class="std std-ref">CLI Guide</span></a>; the <code class="docutils literal notranslate"><span class="pre">--json</span></code>
+output of each command is summarized in <a class="reference internal" href="json-protocol.html#ref-json-protocol"><span class="std std-ref">JSON protocol</span></a>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">&lt;command&gt;</span> <span class="pre">--help</span></code> prints the same information with examples,
+and <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--help</span> <span class="pre">--all</span></code> prints the help of every command.</p>
+<section id="conventions">
+<h2>Conventions<a class="headerlink" href="#conventions" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;path&gt;</span></code> is a node: a label (<code class="docutils literal notranslate"><span class="pre">accel</span></code>), a label then child names
+(<code class="docutils literal notranslate"><span class="pre">i2c_arm/adxl345&#64;1d</span></code>) or an absolute path (<code class="docutils literal notranslate"><span class="pre">/soc/i2c&#64;7e804000</span></code>). See
+<a class="reference internal" href="../cli-guide/index.html#cli-node-paths"><span class="std std-ref">Naming nodes</span></a>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[…]</span></code> is optional. Options can be given anywhere after the command name, and
+an option’s value either as the next argument or after <code class="docutils literal notranslate"><span class="pre">=</span></code>
+(<code class="docutils literal notranslate"><span class="pre">--parent=i2c_arm</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--</span></code> ends the options: every argument after it is a positional.</p></li>
+</ul>
+<section id="options-of-every-command">
+<h3>Options of every command<a class="headerlink" href="#options-of-every-command" title="Link to this heading"></a></h3>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--json</span></code></p></td>
+<td><p>Anywhere on the line: write one line of JSON to standard output, and
+ask nothing (<a class="reference internal" href="json-protocol.html#ref-json-protocol"><span class="std std-ref">JSON protocol</span></a>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">-h</span></code>, <code class="docutils literal notranslate"><span class="pre">--help</span></code></p></td>
+<td><p>Print the command’s help and do nothing else. <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">help</span>
+<span class="pre">&lt;command&gt;</span></code> is the same.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">-v</span></code>, <code class="docutils literal notranslate"><span class="pre">--version</span></code></p></td>
+<td><p>As the first argument: print the version.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--help</span> <span class="pre">--all</span></code></p></td>
+<td><p>Print the help of every command.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</section>
+<section id="analog-attach-no-command">
+<span id="cmd-setup"></span><h2>analog-attach (no command)<a class="headerlink" href="#analog-attach-no-command" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach
+</pre></div>
+</div>
+<p>On a terminal, the guided setup: chooses the backend, checks the tools, asks
+for the Linux tree, the base devicetree and the workfile name, builds the
+binding caches and runs <code class="docutils literal notranslate"><span class="pre">init</span></code>. Piped, or with <code class="docutils literal notranslate"><span class="pre">--json</span></code>, it prints the usage
+and the required settings still unset.</p>
+<p>Guide: <a class="reference internal" href="../cli-guide/configuration.html#cli-configuration"><span class="std std-ref">Configuration</span></a>.</p>
+</section>
+<section id="config">
+<span id="cmd-config"></span><h2>config<a class="headerlink" href="#config" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach config [&lt;key&gt;]
+analog-attach config &lt;key&gt; &lt;value&gt; [--global]
+analog-attach config &lt;key&gt; --reset [--global]
+analog-attach config --reload
+analog-attach config var [&lt;NAME&gt;]
+analog-attach config var &lt;NAME&gt; &lt;value&gt;
+analog-attach config var &lt;NAME&gt; --secret
+analog-attach config var &lt;NAME&gt; --reset
+</pre></div>
+</div>
+<p>Shows the settings, sets or resets one, rebuilds the binding caches, and shows
+or sets the variables of the build and deploy commands. Setting <code class="docutils literal notranslate"><span class="pre">linux</span></code> also
+builds the binding caches.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Argument or option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;key&gt;</span></code></p></td>
+<td><p>A setting: <code class="docutils literal notranslate"><span class="pre">backend</span></code>, <code class="docutils literal notranslate"><span class="pre">linux</span></code>, <code class="docutils literal notranslate"><span class="pre">devicetree</span></code>, <code class="docutils literal notranslate"><span class="pre">workfile</span></code>,
+<code class="docutils literal notranslate"><span class="pre">overlay-syntax</span></code>, <code class="docutils literal notranslate"><span class="pre">interview</span></code>, <code class="docutils literal notranslate"><span class="pre">output</span></code>, <code class="docutils literal notranslate"><span class="pre">build-dir</span></code>. Omit it to
+show every setting.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;value&gt;</span></code></p></td>
+<td><p>The value to set. Omit it to show the setting.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--global</span></code></p></td>
+<td><p>Set or reset in the global settings file, not the project’s.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--reset</span></code></p></td>
+<td><p>Remove the setting: back to its default, or unset.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--reload</span></code></p></td>
+<td><p>Rebuild the binding caches. Takes no other argument.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">var</span></code></p></td>
+<td><p>The variables: system (<code class="docutils literal notranslate"><span class="pre">AA_…</span></code>), executable (<code class="docutils literal notranslate"><span class="pre">AA_BUILD</span></code>,
+<code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code>, <code class="docutils literal notranslate"><span class="pre">AA_PREPROCESS_COMMAND</span></code>) and the project’s. Always
+written to the project’s file.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--secret</span></code></p></td>
+<td><p>With <code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">&lt;NAME&gt;</span></code>: a secret, stored by name only.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Guide: <a class="reference internal" href="../cli-guide/configuration.html#cli-configuration"><span class="std std-ref">Configuration</span></a>. Settings: <a class="reference internal" href="configuration-file.html"><span class="doc">Configuration file</span></a>.</p>
+</section>
+<section id="init">
+<span id="cmd-init"></span><h2>init<a class="headerlink" href="#init" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach init [--restore build|deploy]
+</pre></div>
+</div>
+<p>Creates the workfile when it doesn’t exist, empty, and keeps it when it does.
+Writes the starter scripts <code class="docutils literal notranslate"><span class="pre">aa_build.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code> in the project
+folder when they aren’t there, and sets the project variables the deploy
+starter uses (<code class="docutils literal notranslate"><span class="pre">BOARD_IP</span></code>, <code class="docutils literal notranslate"><span class="pre">BOARD_USER</span></code>, <code class="docutils literal notranslate"><span class="pre">BOARD_PASSWORD</span></code>) that the
+project doesn’t have. Needs <code class="docutils literal notranslate"><span class="pre">linux</span></code>, <code class="docutils literal notranslate"><span class="pre">devicetree</span></code> and <code class="docutils literal notranslate"><span class="pre">workfile</span></code> set. Never
+asks.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--restore</span> <span class="pre">build</span></code>, <code class="docutils literal notranslate"><span class="pre">--restore</span> <span class="pre">deploy</span></code></p></td>
+<td><p>Write that starter script again, over the file. Needs nothing else
+configured.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/workfile.html#cli-workfile"><span class="std std-ref">Creating and reading the workfile</span></a>.</p>
+</section>
+<section id="import">
+<span id="cmd-import"></span><h2>import<a class="headerlink" href="#import" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach import &lt;source&gt;
+</pre></div>
+</div>
+<p>Creates a workfile from an overlay of the Linux tree (a name from <code class="docutils literal notranslate"><span class="pre">list</span>
+<span class="pre">overlay</span></code>) or from an overlay file, and makes it the configured workfile. The
+fragments are imported as written; <code class="docutils literal notranslate"><span class="pre">__overrides__</span></code> is dropped; targets and
+references the base doesn’t have are listed as warnings.</p>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/workfile.html#cli-workfile"><span class="std std-ref">Creating and reading the workfile</span></a>.</p>
+</section>
+<section id="add">
+<span id="cmd-add"></span><h2>add<a class="headerlink" href="#add" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach add &lt;compatible&gt; [--parent &lt;path&gt;] [--name &lt;name&gt;] [--label &lt;label&gt;]
+                  [--template &lt;template&gt;] [--dry-run] [--quiet]
+</pre></div>
+</div>
+<p>Adds a device node to the overlay. On a terminal, asks for the parent when
+<code class="docutils literal notranslate"><span class="pre">--parent</span></code> is missing, then for the required properties still missing;
+otherwise lists them.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Argument or option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;compatible&gt;</span></code></p></td>
+<td><p>The device’s compatible string (<code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">devices</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--parent</span> <span class="pre">&lt;path&gt;</span></code></p></td>
+<td><p>The parent node. Default: the first bus <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">parent</span></code> shows.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--name</span> <span class="pre">&lt;name&gt;</span></code></p></td>
+<td><p>The node name. <code class="docutils literal notranslate"><span class="pre">adxl345&#64;1d</span></code> also sets <code class="docutils literal notranslate"><span class="pre">reg</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--label</span> <span class="pre">&lt;label&gt;</span></code></p></td>
+<td><p>The node’s label. Default: one made from the compatible.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--template</span> <span class="pre">&lt;template&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">required</span></code> (default: a bare node), <code class="docutils literal notranslate"><span class="pre">example:&lt;N&gt;</span></code> (the binding’s
+example N) or <code class="docutils literal notranslate"><span class="pre">overlay:&lt;name&gt;</span></code> (the node from an overlay of the
+Linux tree, or a file).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--dry-run</span></code></p></td>
+<td><p>Show the node, write nothing, ask nothing.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--quiet</span></code></p></td>
+<td><p>Don’t ask for the missing properties; list them.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/devices.html#cli-devices"><span class="std std-ref">Devices</span></a>.</p>
+</section>
+<section id="read">
+<span id="cmd-read"></span><h2>read<a class="headerlink" href="#read" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach read [&lt;path&gt;] [&lt;property&gt;] [--quiet]
+</pre></div>
+</div>
+<p>Without a path, prints the whole overlay. With a path, prints the node (from
+the base and the overlay) and the required properties it lacks. With a
+property, prints its value with the binding’s description, allowed values and
+suggestions.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--quiet</span></code></p></td>
+<td><p>Print only the values.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/workfile.html#cli-workfile"><span class="std std-ref">Creating and reading the workfile</span></a>, <a class="reference internal" href="../cli-guide/linux/properties.html#cli-properties"><span class="std std-ref">Properties</span></a>.</p>
+</section>
+<section id="update">
+<span id="cmd-update"></span><h2>update<a class="headerlink" href="#update" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach update &lt;path&gt; &lt;property&gt; [&lt;value&gt;...] [--suggest] [--quiet]
+</pre></div>
+</div>
+<p>Sets a property, replacing its value. Without a value, sets a flag, or reads
+the property when it has a value. When <code class="docutils literal notranslate"><span class="pre">&lt;property&gt;</span></code> names a child node of
+the binding (<code class="docutils literal notranslate"><span class="pre">channel&#64;0</span></code>), creates the child, or reads it when it exists.
+Setting <code class="docutils literal notranslate"><span class="pre">reg</span></code> also renames the node’s unit address.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Argument or option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">&lt;value&gt;...</span></code></p></td>
+<td><p>Numbers, macros, labels or words; several values make an array, <code class="docutils literal notranslate"><span class="pre">,</span></code>
+separates rows. See <a class="reference internal" href="../cli-guide/linux/properties.html#cli-properties"><span class="std std-ref">Properties</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--suggest</span></code></p></td>
+<td><p>List what the property can be set to, as <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">value</span></code> does, and set
+nothing.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--quiet</span></code></p></td>
+<td><p>When reading: print only the value. When creating a child node: don’t
+ask.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/properties.html#cli-properties"><span class="std std-ref">Properties</span></a>.</p>
+</section>
+<section id="delete">
+<span id="cmd-delete"></span><h2>delete<a class="headerlink" href="#delete" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach delete [&lt;path&gt;] [&lt;property&gt;] [--force]
+</pre></div>
+</div>
+<p>Removes a property, or a node, from the overlay. A node with children, and the
+whole overlay (no path), are only previewed without <code class="docutils literal notranslate"><span class="pre">--force</span></code>. Nodes of the
+base devicetree can’t be deleted.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--force</span></code></p></td>
+<td><p>Delete a node that has children, or the whole overlay.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/devices.html#cli-devices"><span class="std std-ref">Devices</span></a>.</p>
+</section>
+<section id="rename">
+<span id="cmd-rename"></span><h2>rename<a class="headerlink" href="#rename" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach rename &lt;path&gt; &lt;new-name&gt;
+</pre></div>
+</div>
+<p>Renames a node the overlay adds. A name without <code class="docutils literal notranslate"><span class="pre">&#64;</span></code> keeps the unit address;
+one with <code class="docutils literal notranslate"><span class="pre">&#64;</span></code> changes it, and <code class="docutils literal notranslate"><span class="pre">reg</span></code> follows.</p>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/devices.html#cli-devices"><span class="std std-ref">Devices</span></a>.</p>
+</section>
+<section id="list">
+<span id="cmd-list"></span><h2>list<a class="headerlink" href="#list" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach list devices [&lt;filter&gt;]
+analog-attach list context [&lt;filter&gt;]
+analog-attach list property [&lt;path&gt;] [&lt;property&gt;]
+analog-attach list value &lt;path&gt; &lt;property&gt;
+analog-attach list parent &lt;compatible&gt;
+analog-attach list overlay [&lt;compatible&gt;]
+analog-attach list node [&lt;filter&gt;]
+</pre></div>
+</div>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Command</p></th>
+<th class="head"><p>Lists</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">devices</span></code></p></td>
+<td><p>The compatible strings of the Linux tree’s bindings, with their
+category. With a filter, those that contain it; when only one matches,
+or the filter is a compatible, that device’s binding.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">context</span></code></p></td>
+<td><p>The base devicetrees (<code class="docutils literal notranslate"><span class="pre">.dts</span></code>) of the Linux tree, overlays left out:
+what <code class="docutils literal notranslate"><span class="pre">config</span> <span class="pre">devicetree</span></code> takes. Needs only <code class="docutils literal notranslate"><span class="pre">linux</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">property</span></code></p></td>
+<td><p>Without a path: the overlay’s nodes. With a path: the properties the
+node’s binding defines, marked set and required, and its child-node
+patterns. With a property: its type, description and constraints.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">value</span></code></p></td>
+<td><p>The values a property can be set to, each ready for <code class="docutils literal notranslate"><span class="pre">update</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">parent</span></code></p></td>
+<td><p>The nodes a device can be added under, by label, then path.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">overlay</span></code></p></td>
+<td><p>The overlays of the Linux tree that add the device, and whether they
+fit the board. Without a compatible, every overlay.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">node</span></code></p></td>
+<td><p>Every node of the base with the overlay applied, with its labels and
+compatibles, tagged <code class="docutils literal notranslate"><span class="pre">(new)</span></code>, <code class="docutils literal notranslate"><span class="pre">(changed)</span></code> or <code class="docutils literal notranslate"><span class="pre">(off)</span></code>. With a
+filter, the nodes whose name, label or compatible contains it.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">list</span></code> alone prints this usage.</p>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/devices.html#cli-devices"><span class="std std-ref">Devices</span></a>, <a class="reference internal" href="../cli-guide/linux/properties.html#cli-properties"><span class="std std-ref">Properties</span></a>, <a class="reference internal" href="../cli-guide/configuration.html#cli-configuration"><span class="std std-ref">Configuration</span></a>.</p>
+</section>
+<section id="move">
+<span id="cmd-move"></span><h2>move<a class="headerlink" href="#move" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach move &lt;path&gt; &lt;destination&gt;
+</pre></div>
+</div>
+<p>Moves a node the overlay adds under another parent. A parent the node’s binding
+doesn’t allow is refused.</p>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/devices.html#cli-devices"><span class="std std-ref">Devices</span></a>.</p>
+</section>
+<section id="enable-disable">
+<span id="cmd-enable-disable"></span><h2>enable, disable<a class="headerlink" href="#enable-disable" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach enable &lt;path&gt;
+analog-attach disable &lt;path&gt;
+</pre></div>
+</div>
+<p>Sets the node’s <code class="docutils literal notranslate"><span class="pre">status</span></code> to <code class="docutils literal notranslate"><span class="pre">&quot;okay&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;disabled&quot;</span></code> in the overlay. When
+the node already has that status without the overlay, the overlay’s
+<code class="docutils literal notranslate"><span class="pre">status</span></code> is removed instead.</p>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/devices.html#cli-devices"><span class="std std-ref">Devices</span></a>.</p>
+</section>
+<section id="validate">
+<span id="cmd-validate"></span><h2>validate<a class="headerlink" href="#validate" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach validate [--full]
+</pre></div>
+</div>
+<p>Runs dt-validate on the nodes the overlay writes, and checks addresses, chip
+selects, references and disabled parents. Exits with 0 whatever it finds.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--full</span></code></p></td>
+<td><p>Also validate the base devicetree with the overlay applied, reporting
+what the overlay adds or sets and counting the base’s own findings.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/validate-build-deploy.html#cli-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>.</p>
+</section>
+<section id="build">
+<span id="cmd-build"></span><h2>build<a class="headerlink" href="#build" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach build
+</pre></div>
+</div>
+<p>Runs <code class="docutils literal notranslate"><span class="pre">AA_BUILD</span></code> (default <code class="docutils literal notranslate"><span class="pre">./aa_build.sh</span></code>) in the project folder. The
+starter script compiles the overlay with <code class="docutils literal notranslate"><span class="pre">dtc</span></code> into
+<code class="docutils literal notranslate"><span class="pre">&lt;build-dir&gt;/&lt;overlay&gt;.dtbo</span></code>. With <code class="docutils literal notranslate"><span class="pre">config</span> <span class="pre">output</span> <span class="pre">devicetree</span></code>, <code class="docutils literal notranslate"><span class="pre">build</span></code>
+first writes and preprocesses the base with the overlay applied, and the script
+compiles it into a <code class="docutils literal notranslate"><span class="pre">.dtb</span></code>. Doesn’t validate.</p>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/validate-build-deploy.html#cli-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>.</p>
+</section>
+<section id="deploy">
+<span id="cmd-deploy"></span><h2>deploy<a class="headerlink" href="#deploy" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach deploy
+</pre></div>
+</div>
+<p>Runs <code class="docutils literal notranslate"><span class="pre">AA_DEPLOY</span></code> (default <code class="docutils literal notranslate"><span class="pre">./aa_deploy.sh</span></code>) in the project folder, with
+the project’s secrets in its environment. The starter script copies the
+<code class="docutils literal notranslate"><span class="pre">.dtbo</span></code> to a Raspberry Pi running Kuiper over SSH, adds it to
+<code class="docutils literal notranslate"><span class="pre">config.txt</span></code> and reboots the board. On a terminal, asks for a secret the
+environment doesn’t give.</p>
+<p>Guide: <a class="reference internal" href="../cli-guide/linux/validate-build-deploy.html#cli-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>.</p>
+</section>
+<section id="completion">
+<span id="cmd-completion"></span><h2>completion<a class="headerlink" href="#completion" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach completion [&lt;shell&gt;] [--install | --uninstall]
+</pre></div>
+</div>
+<p>Prints the shell completion script for <code class="docutils literal notranslate"><span class="pre">bash</span></code>, <code class="docutils literal notranslate"><span class="pre">zsh</span></code> or <code class="docutils literal notranslate"><span class="pre">fish</span></code> (default:
+the shell <code class="docutils literal notranslate"><span class="pre">$SHELL</span></code> names), or installs or removes it.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--install</span></code></p></td>
+<td><p>Install the script where the shell loads it, in your home folder.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--uninstall</span></code></p></td>
+<td><p>Remove the installed script.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Guide: <a class="reference internal" href="../cli-guide/shell-completion.html"><span class="doc">Shell completion</span></a>.</p>
+</section>
+<section id="gui">
+<span id="cmd-gui"></span><h2>gui<a class="headerlink" href="#gui" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach gui [--port &lt;port&gt;] [--server-only]
+</pre></div>
+</div>
+<p>Opens the GUI for the project in the current folder, in the browser. Serves it
+on <code class="docutils literal notranslate"><span class="pre">127.0.0.1</span></code> until stopped with <kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">C</kbd>.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--port</span> <span class="pre">&lt;port&gt;</span></code></p></td>
+<td><p>The port. Default: 5177, or the next free one; <code class="docutils literal notranslate"><span class="pre">0</span></code> for any free port.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--server-only</span></code></p></td>
+<td><p>Serve the page without opening the browser.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Guide: <a class="reference internal" href="../ui-guide/index.html"><span class="doc">GUI Guide</span></a>.</p>
+</section>
+<section id="skill">
+<span id="cmd-skill"></span><h2>skill<a class="headerlink" href="#skill" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>analog-attach skill install [&lt;name&gt;] [--agent &lt;agent&gt;] [--force]
+analog-attach skill uninstall [&lt;name&gt;] [--agent &lt;agent&gt;]
+</pre></div>
+</div>
+<p>Installs or removes the backend’s skill for an AI agent. The Linux backend’s
+skill is <code class="docutils literal notranslate"><span class="pre">analog-attach-linux</span></code>. Without a name, lists the skills and whether
+each is installed.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--agent</span> <span class="pre">&lt;agent&gt;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">claude</span></code> (Claude Code, the default), <code class="docutils literal notranslate"><span class="pre">codex</span></code> (Codex CLI),
+<code class="docutils literal notranslate"><span class="pre">gemini</span></code> (Gemini CLI), or <code class="docutils literal notranslate"><span class="pre">all</span></code> (each of them that is installed).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--force</span></code></p></td>
+<td><p>Install over an installed copy.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Guide: <a class="reference internal" href="../ai-agents/index.html"><span class="doc">Working with AI Agents</span></a>.</p>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Reference</a>
+    <a href="json-protocol.html" title="Next document (Alt+Shift+RightArrow)" class="next">JSON protocol</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

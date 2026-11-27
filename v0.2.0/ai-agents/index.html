@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="Analog Attach can be driven by an AI agent. The agent runs the same analog-attach commands you would, reads their --json answers, and asks you what only you know: which part you have and how it is wired. The skill is written and tested for Claude Code; it can also be installed for Codex CLI and Gemini CLI." name="description" />
+
+    <title>Working with AI Agents &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Use Cases" href="../use-cases/index.html" />
+    <link rel="prev" title="Error reporting" href="../cli-guide/error-reporting.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Working with AI Agents</a><ul>
+<li><a class="reference internal" href="#installing-the-skills">Installing the skills</a></li>
+<li><a class="reference internal" href="#how-an-agent-uses-analog-attach">How an agent uses Analog Attach</a></li>
+<li><a class="reference internal" href="#what-you-confirm">What you confirm</a></li>
+<li><a class="reference internal" href="#use-cases">Use cases</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb empty"><ol></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="working-with-ai-agents">
+<h1>Working with AI Agents<a class="headerlink" href="#working-with-ai-agents" title="Link to this heading"></a></h1>
+<p>Analog Attach can be driven by an AI agent. The agent runs the same
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> commands you would, reads their <code class="docutils literal notranslate"><span class="pre">--json</span></code> answers, and asks
+you what only you know: which part you have and how it is wired. The skill is
+written and tested for <strong>Claude Code</strong>; it can also be installed for Codex CLI
+and Gemini CLI.</p>
+<p>There are two ways to work with an agent:</p>
+<ul class="simple">
+<li><p>In a terminal, with the agent and the <code class="docutils literal notranslate"><span class="pre">analog-attach-linux</span></code> skill (see
+<a class="reference internal" href="../use-cases/linux/cli-ai-agent/index.html"><span class="doc">Use case: CLI with an AI agent</span></a>).</p></li>
+<li><p>In the GUI, with its <strong>✦ Assistant</strong> (see <a class="reference internal" href="../ui-guide/linux/workspace.html#ui-workspace-assistant"><span class="std std-ref">The assistant</span></a> and
+<a class="reference internal" href="../use-cases/linux/ui-ai-agent/index.html#use-case-ui-ai-agent"><span class="std std-ref">Use case: GUI with an AI agent</span></a>).</p></li>
+</ul>
+<section id="installing-the-skills">
+<h2>Installing the skills<a class="headerlink" href="#installing-the-skills" title="Link to this heading"></a></h2>
+<p>A <em>skill</em> is a set of instructions the agent loads when a task needs it: here,
+how to use the CLI, in which order, and what to ask the user. The package
+ships one skill for each backend; in v0.2.0 that is <code class="docutils literal notranslate"><span class="pre">analog-attach-linux</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>analog-attach<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>analog-attach-linux
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">skill</span> <span class="pre">install</span></code> with no name lists the skills and whether each is
+installed:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach skill install
+Skills of the linux backend:
+  analog-attach-linux  Linux device tree overlays (installed)
+
+Install one with: analog-attach skill install &lt;name&gt;
+</pre></div>
+</div>
+<p>The skill is copied to the agent’s skills folder. <code class="docutils literal notranslate"><span class="pre">--agent</span></code> picks the agent:</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">--agent</span></code></p></th>
+<th class="head"><p>Agent</p></th>
+<th class="head"><p>Installed in</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">claude</span></code> (default)</p></td>
+<td><p>Claude Code</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">~/.claude/skills/analog-attach-linux/</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">codex</span></code></p></td>
+<td><p>Codex CLI</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">~/.agents/skills/analog-attach-linux/</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemini</span></code></p></td>
+<td><p>Gemini CLI</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">~/.gemini/skills/analog-attach-linux/</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">all</span></code></p></td>
+<td><p>Each of them that is installed</p></td>
+<td><p>Each agent’s folder</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>analog-attach<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>analog-attach-linux<span class="w"> </span>--agent<span class="w"> </span>codex<span class="w">   </span><span class="c1"># for Codex CLI</span>
+analog-attach<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>analog-attach-linux<span class="w"> </span>--force<span class="w">         </span><span class="c1"># update an installed copy</span>
+analog-attach<span class="w"> </span>skill<span class="w"> </span>uninstall<span class="w"> </span>analog-attach-linux<span class="w">               </span><span class="c1"># remove it</span>
+</pre></div>
+</div>
+<p>Install the skill again with <code class="docutils literal notranslate"><span class="pre">--force</span></code> after you update Analog Attach, so
+its instructions match the CLI.</p>
+</section>
+<section id="how-an-agent-uses-analog-attach">
+<h2>How an agent uses Analog Attach<a class="headerlink" href="#how-an-agent-uses-analog-attach" title="Link to this heading"></a></h2>
+<p>The agent never runs a bare <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> (the guided setup is for a
+person). It runs every command with <code class="docutils literal notranslate"><span class="pre">--json</span></code> and reads the one line of JSON
+each prints (see <a class="reference internal" href="../reference/json-protocol.html#ref-json-protocol"><span class="std std-ref">JSON protocol</span></a>): <code class="docutils literal notranslate"><span class="pre">ok</span></code> says whether the command
+did what was asked, and a refusal or a configuration error says why, with a
+hint the agent can follow. The loop is:</p>
+<ol class="arabic simple">
+<li><p><strong>Check the project.</strong> <code class="docutils literal notranslate"><span class="pre">config</span></code> shows what is set. If the project is new,
+the agent asks you for the kernel tree and the board, then runs
+<code class="docutils literal notranslate"><span class="pre">config</span> <span class="pre">linux</span></code>, <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">context</span></code>, <code class="docutils literal notranslate"><span class="pre">config</span> <span class="pre">devicetree</span></code>,
+<code class="docutils literal notranslate"><span class="pre">config</span> <span class="pre">workfile</span></code> and <code class="docutils literal notranslate"><span class="pre">init</span></code>.</p></li>
+<li><p><strong>Find the device.</strong> <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">devices</span> <span class="pre">&lt;part&gt;</span></code> gives the compatible, and
+<code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">overlay</span> <span class="pre">&lt;compatible&gt;</span></code> an overlay of the kernel tree to start from,
+if there is one.</p></li>
+<li><p><strong>Find the bus.</strong> <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">parent</span> <span class="pre">&lt;compatible&gt;</span></code> lists the buses the device
+can sit on. The agent asks you which one it is wired to.</p></li>
+<li><p><strong>Add it.</strong> <code class="docutils literal notranslate"><span class="pre">add</span> <span class="pre">&lt;compatible&gt;</span> <span class="pre">--parent</span> <span class="pre">&lt;bus&gt;</span></code>. Under <code class="docutils literal notranslate"><span class="pre">--json</span></code>, <code class="docutils literal notranslate"><span class="pre">add</span></code>
+asks nothing: the required properties still missing come back in
+<code class="docutils literal notranslate"><span class="pre">missing_required</span></code>, with suggestions.</p></li>
+<li><p><strong>Set the properties.</strong> <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">value</span></code> and <code class="docutils literal notranslate"><span class="pre">update</span></code> for each. The agent
+asks you for the wiring (address, interrupt line and edge, GPIOs) rather
+than guessing it.</p></li>
+<li><p><strong>Validate.</strong> <code class="docutils literal notranslate"><span class="pre">validate</span></code> until there are no errors and the warnings are
+dealt with (a disabled bus is fixed with <code class="docutils literal notranslate"><span class="pre">enable</span></code>).</p></li>
+<li><p><strong>Build and deploy, when you ask.</strong> <code class="docutils literal notranslate"><span class="pre">build</span></code>, then <code class="docutils literal notranslate"><span class="pre">deploy</span></code>.</p></li>
+</ol>
+</section>
+<section id="what-you-confirm">
+<h2>What you confirm<a class="headerlink" href="#what-you-confirm" title="Link to this heading"></a></h2>
+<p>The agent edits the workfile on its own: every change is one command, which
+you can read, and undo with another. What touches the board is yours to
+approve:</p>
+<ul class="simple">
+<li><p><strong>Deploy.</strong> The starter <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code> copies the build to the board and
+<strong>reboots it</strong>. The skill tells the agent to ask you first.</p></li>
+<li><p><strong>The board’s password.</strong> It is never stored. The agent asks you for it and
+passes it in the environment of <code class="docutils literal notranslate"><span class="pre">deploy</span></code> only.</p></li>
+<li><p><strong>Flashing</strong>, and any other command that writes to a board, such as a
+deploy script that writes a full devicetree to the board’s flash.</p></li>
+<li><p><strong>The wiring.</strong> Check the bus, address and interrupt the agent proposes
+against your hardware: the CLI validates the overlay against the bindings,
+not against what is on the bench.</p></li>
+</ul>
+<p>Claude Code asks before it runs a command you haven’t allowed. You can allow
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> commands for the session, but keep <code class="docutils literal notranslate"><span class="pre">deploy</span></code> behind a
+question.</p>
+</section>
+<section id="use-cases">
+<h2>Use cases<a class="headerlink" href="#use-cases" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../use-cases/linux/ui-ai-agent/index.html"><span class="doc">Use case: GUI with an AI agent</span></a></p></li>
+<li><p><a class="reference internal" href="../use-cases/linux/cli-ai-agent/index.html"><span class="doc">Use case: CLI with an AI agent</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../cli-guide/error-reporting.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Error reporting</a>
+    <a href="../use-cases/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Use Cases</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

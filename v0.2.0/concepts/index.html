@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="The words this guide uses, with a short definition each. The GUI and CLI guides use them the same way." name="description" />
+
+    <title>Concepts &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="GUI Guide" href="../ui-guide/index.html" />
+    <link rel="prev" title="Quick Start" href="../quick-start/index.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Concepts</a><ul>
+<li><a class="reference internal" href="#project-and-settings">Project and settings</a></li>
+<li><a class="reference internal" href="#linux-tree-base-devicetree-and-bindings">Linux tree, base devicetree and bindings</a></li>
+<li><a class="reference internal" href="#workfile-and-overlay">Workfile and overlay</a></li>
+<li><a class="reference internal" href="#validation">Validation</a></li>
+<li><a class="reference internal" href="#build-and-deploy">Build and deploy</a></li>
+<li><a class="reference internal" href="#json-protocol">JSON protocol</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb empty"><ol></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="concepts">
+<h1>Concepts<a class="headerlink" href="#concepts" title="Link to this heading"></a></h1>
+<p>The words this guide uses, with a short definition each. The GUI and CLI
+guides use them the same way.</p>
+<section id="project-and-settings">
+<h2>Project and settings<a class="headerlink" href="#project-and-settings" title="Link to this heading"></a></h2>
+<p>A <em>project</em> is a directory that contains a <code class="docutils literal notranslate"><span class="pre">.analog-attach/</span></code> folder. The tool
+finds it by walking up from the current directory to the nearest directory that
+has one. If none is found, the current directory is used.</p>
+<p>The project’s settings are stored in <code class="docutils literal notranslate"><span class="pre">.analog-attach/config.json</span></code>. A second,
+optional file in your home directory holds defaults shared by all projects.
+The tool keeps its caches and scratch files in <code class="docutils literal notranslate"><span class="pre">.analog-attach/linux/</span></code>.</p>
+<p>See <a class="reference internal" href="../reference/configuration-file.html"><span class="doc">Configuration file</span></a> for every setting.</p>
+</section>
+<section id="linux-tree-base-devicetree-and-bindings">
+<h2>Linux tree, base devicetree and bindings<a class="headerlink" href="#linux-tree-base-devicetree-and-bindings" title="Link to this heading"></a></h2>
+<p>The <em>Linux tree</em> (the <code class="docutils literal notranslate"><span class="pre">linux</span></code> setting) is a kernel source tree, the one your
+board runs. Analog Attach takes two things from it: the <em>bindings</em>, YAML files
+in <code class="docutils literal notranslate"><span class="pre">Documentation/devicetree/bindings/</span></code> that say which properties each
+device takes, and the includes the devicetrees use.</p>
+<p>The <em>base devicetree</em> (the <code class="docutils literal notranslate"><span class="pre">devicetree</span></code> setting) is the <code class="docutils literal notranslate"><span class="pre">.dts</span></code> of your
+board, for example <code class="docutils literal notranslate"><span class="pre">bcm2711-rpi-4-b.dts</span></code> for a Raspberry Pi 4. It describes
+what is on the board already: the buses, the GPIO controller, their labels.
+The overlay is written against it.</p>
+</section>
+<section id="workfile-and-overlay">
+<h2>Workfile and overlay<a class="headerlink" href="#workfile-and-overlay" title="Link to this heading"></a></h2>
+<p>The <em>workfile</em> is the devicetree overlay (a <code class="docutils literal notranslate"><span class="pre">.dtso</span></code> file) that you build up
+with <code class="docutils literal notranslate"><span class="pre">add</span></code> and <code class="docutils literal notranslate"><span class="pre">update</span></code>. The <code class="docutils literal notranslate"><span class="pre">workfile</span></code> setting names it, and
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">init</span></code> creates it. See <a class="reference internal" href="../reference/linux/workfile.html"><span class="doc">Workfile</span></a>.</p>
+<p>A devicetree is a tree of <em>nodes</em>, one per device or bus, each with
+<em>properties</em>. A device node sits under the bus it is wired to, and its
+properties say what the driver needs: <code class="docutils literal notranslate"><span class="pre">compatible</span></code> picks the driver, <code class="docutils literal notranslate"><span class="pre">reg</span></code>
+is its address on the bus, <code class="docutils literal notranslate"><span class="pre">interrupts</span></code> its interrupt line. A <em>label</em>
+(<code class="docutils literal notranslate"><span class="pre">accel:</span></code>) names a node so that others can refer to it as <code class="docutils literal notranslate"><span class="pre">&amp;accel</span></code>. An
+<em>overlay</em> adds nodes and properties to a base devicetree: here, a node for the
+ADXL345 under the I2C bus <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code>. For an introduction, see the
+<a class="icon link reference external" href="https://docs.kernel.org/devicetree/usage-model.html" target="_blank">devicetree usage guide</a>
+and the
+<a class="icon link reference external" href="https://docs.kernel.org/devicetree/overlay-notes.html" target="_blank">overlay notes</a>
+of the kernel documentation.</p>
+</section>
+<section id="validation">
+<h2>Validation<a class="headerlink" href="#validation" title="Link to this heading"></a></h2>
+<p><em>Validation</em> checks the nodes of the overlay, as they sit in the base
+devicetree, against the bindings of the Linux tree with dt-validate (from
+dt-schema): required properties, types, allowed values and ranges. Analog
+Attach adds its own checks: addresses and chip selects that clash or don’t fit
+the bus, references to nodes that don’t exist, and devices on a bus that is
+disabled. <code class="docutils literal notranslate"><span class="pre">validate</span> <span class="pre">--full</span></code> also checks the whole devicetree with the overlay
+applied. The GUI validates after every change.</p>
+<p>Validation checks the overlay against the bindings, not against your
+hardware: it can’t tell that a part is at another address than the one you
+gave.</p>
+</section>
+<section id="build-and-deploy">
+<h2>Build and deploy<a class="headerlink" href="#build-and-deploy" title="Link to this heading"></a></h2>
+<p><em>Build</em> compiles the workfile with <code class="docutils literal notranslate"><span class="pre">dtc</span></code> into an overlay blob (<code class="docutils literal notranslate"><span class="pre">.dtbo</span></code>) in
+the project’s <code class="docutils literal notranslate"><span class="pre">build/</span></code> folder. For a board that boots one devicetree and has
+no overlay support, set <code class="docutils literal notranslate"><span class="pre">output</span></code> to <code class="docutils literal notranslate"><span class="pre">devicetree</span></code>: the build then writes the
+base devicetree with the overlay applied (<code class="docutils literal notranslate"><span class="pre">.dts</span></code>) and compiles it (<code class="docutils literal notranslate"><span class="pre">.dtb</span></code>).</p>
+<p><em>Deploy</em> puts the result on the board. Both are scripts of the project,
+<code class="docutils literal notranslate"><span class="pre">aa_build.sh</span></code> and <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code>, which <code class="docutils literal notranslate"><span class="pre">init</span></code> writes and which you can
+edit. The starter <code class="docutils literal notranslate"><span class="pre">aa_deploy.sh</span></code> copies the <code class="docutils literal notranslate"><span class="pre">.dtbo</span></code> to a Raspberry Pi over
+SSH, into the boot folder’s <code class="docutils literal notranslate"><span class="pre">overlays/</span></code>, adds <code class="docutils literal notranslate"><span class="pre">dtoverlay=&lt;name&gt;</span></code> to
+<code class="docutils literal notranslate"><span class="pre">config.txt</span></code> and reboots the board. The firmware applies the overlay at boot,
+and the kernel probes the new device.</p>
+<p>The scripts get what they need in environment variables: the files from
+Analog Attach (<code class="docutils literal notranslate"><span class="pre">AA_DTSO</span></code>, <code class="docutils literal notranslate"><span class="pre">AA_DTBO</span></code>, …), and the board from <em>project
+variables</em> such as <code class="docutils literal notranslate"><span class="pre">BOARD_IP</span></code> (see <a class="reference internal" href="../cli-guide/configuration.html#cli-variables"><span class="std std-ref">Variables</span></a>).</p>
+</section>
+<section id="json-protocol">
+<h2>JSON protocol<a class="headerlink" href="#json-protocol" title="Link to this heading"></a></h2>
+<p>Every command accepts <code class="docutils literal notranslate"><span class="pre">--json</span></code>. It then prints one line of JSON on standard
+output instead of text: <code class="docutils literal notranslate"><span class="pre">ok</span></code> says whether the command did what was asked,
+<code class="docutils literal notranslate"><span class="pre">message</span></code> and <code class="docutils literal notranslate"><span class="pre">error_type</span></code> say why not, and the rest is the command’s
+answer (the properties of a node, the findings of validation). The text output
+is for people. Scripts, CI and AI agents read the JSON instead of parsing the
+text. See <a class="reference internal" href="../reference/json-protocol.html#ref-json-protocol"><span class="std std-ref">JSON protocol</span></a>.</p>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../quick-start/index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Quick Start</a>
+    <a href="../ui-guide/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">GUI Guide</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

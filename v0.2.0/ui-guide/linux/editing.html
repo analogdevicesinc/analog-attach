@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="The node card, in the middle of the workspace, shows the node you opened and changes it. Each change is one analog-attach command (update, delete, rename, move, enable or disable), written to the overlay as soon as you make it. The console shows each command." name="description" />
+
+    <title>Editing &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Validate, build and deploy" href="validate-build-deploy.html" />
+    <link rel="prev" title="Adding devices" href="adding-devices.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Editing</a><ul>
+<li><a class="reference internal" href="#open-a-node">Open a node</a></li>
+<li><a class="reference internal" href="#properties">Properties</a><ul>
+<li><a class="reference internal" href="#change-a-value">Change a value</a></li>
+<li><a class="reference internal" href="#add-a-property">Add a property</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#child-nodes">Child nodes</a></li>
+<li><a class="reference internal" href="#enable-or-disable-a-node">Enable or disable a node</a></li>
+<li><a class="reference internal" href="#rename-move-and-delete">Rename, move and delete</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1" checked=""/><div class="collapse"><a class="reference internal" href="../index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="../index.html">GUI Guide</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="editing">
+<span id="ui-editing"></span><h1>Editing<a class="headerlink" href="#editing" title="Link to this heading"></a></h1>
+<p>The node card, in the middle of the workspace, shows the node you opened and
+changes it. Each change is one <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> command (<code class="docutils literal notranslate"><span class="pre">update</span></code>,
+<code class="docutils literal notranslate"><span class="pre">delete</span></code>, <code class="docutils literal notranslate"><span class="pre">rename</span></code>, <code class="docutils literal notranslate"><span class="pre">move</span></code>, <code class="docutils literal notranslate"><span class="pre">enable</span></code> or <code class="docutils literal notranslate"><span class="pre">disable</span></code>), written to the
+overlay as soon as you make it. The console shows each command.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-node-card.png"><img alt="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-node-card.png" src="https://github.com/analogdevicesinc/analog-attach/raw/doc_resources/resources/gui-node-card.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-number">Figure 1 </span><span class="caption-text">The node card of the ADXL345 (<a class="reference external" href="mailto:accelerometer&#37;&#52;&#48;1d">accelerometer<span>&#64;</span>1d</a>), with interrupt-parent
+and interrupts set</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<section id="open-a-node">
+<h2>Open a node<a class="headerlink" href="#open-a-node" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Click it in the device tree.</p></li>
+<li><p>Click a reference (<code class="docutils literal notranslate"><span class="pre">&amp;gpio</span></code>) or a label in the overlay, on the right.</p></li>
+<li><p>Click an error in the Validation list.</p></li>
+<li><p>Click <strong>go to &lt;label&gt;</strong> under a field that holds a label, to open the node
+it names. The node opened this way has <strong>← back to &lt;name&gt;</strong>, to go back
+one step.</p></li>
+</ul>
+<p>The head of the card shows the node’s path and tags: its label
+(<code class="docutils literal notranslate"><span class="pre">&amp;accelerometer</span></code>), whether the overlay added it (<strong>added by the
+overlay</strong>), changes it (<strong>base, changed by the overlay</strong>) or not
+(<strong>base only</strong>), its compatible, and the bus it was added on
+(<code class="docutils literal notranslate"><span class="pre">on</span> <span class="pre">&amp;i2c_arm</span></code>). For a node the overlay added, a chip says whether it is
+<strong>Valid</strong> or how many errors it has. <strong>ⓘ</strong> next to the path shows what the
+binding says of the device.</p>
+</section>
+<section id="properties">
+<span id="ui-editing-properties"></span><h2>Properties<a class="headerlink" href="#properties" title="Link to this heading"></a></h2>
+<p>The properties are listed in one column, each with a field for its value:</p>
+<ul class="simple">
+<li><p>The properties the binding requires come first, marked <code class="docutils literal notranslate"><span class="pre">*</span></code>. Those still to
+set are empty and marked in red, until you give them a value. For a device
+with <code class="docutils literal notranslate"><span class="pre">interrupts</span></code>, <code class="docutils literal notranslate"><span class="pre">interrupt-parent</span></code> comes just before it, since it
+sets the shape of <code class="docutils literal notranslate"><span class="pre">interrupts</span></code>.</p></li>
+<li><p>The node’s other properties follow, as the overlay has them.</p></li>
+<li><p>A property of the base devicetree is tagged <strong>base</strong>. A change to it is
+written to the overlay; the base devicetree is never changed.</p></li>
+</ul>
+<section id="change-a-value">
+<h3>Change a value<a class="headerlink" href="#change-a-value" title="Link to this heading"></a></h3>
+<p>Type in the field. The change is written when you leave the field, or press
+<kbd class="kbd docutils literal notranslate">Enter</kbd>. The field matches the property’s type:</p>
+<ul class="simple">
+<li><p><strong>A number or text</strong> is one field. While you type a number, its other
+form is shown greyed at the right (<code class="docutils literal notranslate"><span class="pre">29</span></code> shows <code class="docutils literal notranslate"><span class="pre">0x1d</span></code>, <code class="docutils literal notranslate"><span class="pre">0x1d</span></code> shows
+<code class="docutils literal notranslate"><span class="pre">29</span></code>); what you type is what is written.</p></li>
+<li><p><strong>A choice</strong> is a list.</p></li>
+<li><p><strong>A flag</strong> (a property with no value) is a switch.</p></li>
+<li><p><strong>A list of cells</strong> (<code class="docutils literal notranslate"><span class="pre">interrupts</span></code>, <code class="docutils literal notranslate"><span class="pre">reg</span></code>, a GPIO) has one field per
+cell, with named values offered where the binding lists them. For the
+ADXL345 on GPIO 27, <code class="docutils literal notranslate"><span class="pre">interrupts</span></code> takes <code class="docutils literal notranslate"><span class="pre">27</span></code> and
+<code class="docutils literal notranslate"><span class="pre">IRQ_TYPE_EDGE_RISING</span></code>. Where a property takes several rows (or a
+list of any length), <strong>＋ Row</strong> (or <strong>＋ Cell</strong>) adds one and ✕ removes
+one. The value is written once all of its cells are filled.</p></li>
+<li><p><strong>A label</strong> (<code class="docutils literal notranslate"><span class="pre">interrupt-parent</span></code>, a clock, a regulator) is typed or picked
+without its <code class="docutils literal notranslate"><span class="pre">&amp;</span></code>, for example <code class="docutils literal notranslate"><span class="pre">gpio</span></code>. When the field holds a label that
+exists, <strong>go to &lt;label&gt;</strong> opens that node. Where you can add a node for
+it, the list ends with entries such as <strong>＋ Add a fixed-clock…</strong>: pick one
+to add that node, set the property to its label, and open it.</p></li>
+<li><p><strong>A value the binding fixes</strong> shows that value. If it isn’t set yet,
+a button sets it (<strong>Set &lt;value&gt;</strong>, or <strong>Set Flag</strong>).</p></li>
+</ul>
+<p>Next to each property, <strong>ⓘ</strong> shows what the binding says of it, and <strong>✕</strong>
+removes it. Properties that can’t be removed have no ✕: the
+<code class="docutils literal notranslate"><span class="pre">compatible</span></code>, a property the binding requires, and one of the base
+devicetree.</p>
+<p>If the CLI refuses a value, the field keeps what you typed, marked, with the
+reason under it, so you can correct it. What dt-validate says of a property is
+also shown under its field (see <a class="reference internal" href="validate-build-deploy.html#ui-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>).</p>
+<p>To see the type of each property (<code class="docutils literal notranslate"><span class="pre">uint32</span> <span class="pre">·</span> <span class="pre">0</span> <span class="pre">to</span> <span class="pre">10000000</span></code>), turn on
+<strong>Preferences</strong> → <strong>Linux</strong> → <strong>Show property types</strong>.</p>
+</section>
+<section id="add-a-property">
+<h3>Add a property<a class="headerlink" href="#add-a-property" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>Click <strong>＋ Add Property</strong> under the properties.</p></li>
+<li><p>On the left, the list has the binding’s properties not set yet, the
+required ones first and tagged <strong>required</strong>. Numbered properties
+(<code class="docutils literal notranslate"><span class="pre">pinctrl-0</span></code>) are tagged <strong>numbered</strong>. Type in the filter to find one,
+for example <code class="docutils literal notranslate"><span class="pre">supply</span></code>, and click it.</p></li>
+<li><p>On the right, the panel shows what the binding says of it, and its value
+field, with suggestions where there are some. Fill the value.</p></li>
+<li><p>Click <strong>＋ Add &lt;property&gt;</strong>. A flag, or a value the binding fixes, can also
+be added with a double-click in the list.</p></li>
+</ol>
+<p>For a property the binding doesn’t have, open <strong>Custom Property</strong>: type its
+name, choose the kind of its value (<strong>Numbers</strong>, <strong>Text</strong>, <strong>Reference</strong> or
+<strong>Flag</strong>), type the value, and click <strong>Add Property</strong>.</p>
+<p><strong>Close</strong> closes the panel.</p>
+</section>
+</section>
+<section id="child-nodes">
+<span id="ui-editing-children"></span><h2>Child nodes<a class="headerlink" href="#child-nodes" title="Link to this heading"></a></h2>
+<p>A node whose binding has child nodes (the channels of an ADC, for example)
+has a <strong>Child nodes</strong> section, or <strong>Channels</strong>, under its properties. It lists
+the children, each with its number of properties: click one to open it.</p>
+<p>To add one, pick its name in the list (the next free one is preselected, for
+example <code class="docutils literal notranslate"><span class="pre">channel&#64;0</span></code>), and click <strong>＋ Add Channel</strong> (or <strong>＋ Add Child
+Node</strong>). The new child opens. A child node that the overlay added has a
+button with its parent’s name, to go back up to it.</p>
+</section>
+<section id="enable-or-disable-a-node">
+<h2>Enable or disable a node<a class="headerlink" href="#enable-or-disable-a-node" title="Link to this heading"></a></h2>
+<p>The <strong>Enabled</strong> switch sets the node’s <code class="docutils literal notranslate"><span class="pre">status</span></code> to <code class="docutils literal notranslate"><span class="pre">okay</span></code> or
+<code class="docutils literal notranslate"><span class="pre">disabled</span></code>. It works on base nodes too: to turn off <code class="docutils literal notranslate"><span class="pre">spidev&#64;0</span></code> so that
+your device can take its chip select, open it and turn <strong>Enabled</strong> off. The
+change goes to the overlay. A disabled node is tagged <strong>off</strong> in the device
+tree.</p>
+</section>
+<section id="rename-move-and-delete">
+<h2>Rename, move and delete<a class="headerlink" href="#rename-move-and-delete" title="Link to this heading"></a></h2>
+<p>These are offered on nodes that the overlay added.</p>
+<dl class="simple">
+<dt><strong>Rename Node</strong></dt><dd><p>Changes the node’s <strong>Name</strong> and <strong>Unit address</strong>. The unit address is hex,
+and it sets <code class="docutils literal notranslate"><span class="pre">reg</span></code> too: renaming <code class="docutils literal notranslate"><span class="pre">accelerometer&#64;1d</span></code> to
+<code class="docutils literal notranslate"><span class="pre">accelerometer&#64;53</span></code> moves the device to address <code class="docutils literal notranslate"><span class="pre">0x53</span></code>. The label is
+shown but can’t be changed yet.</p>
+</dd>
+<dt><strong>Move Node</strong></dt><dd><p>Moves the device, and what is below it, to another bus or parent. The
+dialog lists the buses the device can go on, <code class="docutils literal notranslate"><span class="pre">·</span> <span class="pre">here</span></code> marking its own.
+Type in the filter to find one, click it, then click <strong>Move Node</strong>. It is
+offered on the devices themselves, not on their child nodes.</p>
+</dd>
+<dt><strong>Delete Node</strong></dt><dd><p>Removes the node and what is below it from the overlay, after you confirm.
+References to it are cleared.</p>
+</dd>
+</dl>
+<p>If the CLI refuses a change, the reason is shown on the card or in the dialog.</p>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="adding-devices.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Adding devices</a>
+    <a href="validate-build-deploy.html" title="Next document (Alt+Shift+RightArrow)" class="next">Validate, build and deploy</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

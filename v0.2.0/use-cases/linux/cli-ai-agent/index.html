@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="Add an ADXL345 accelerometer to a Raspberry Pi 4 by asking an AI agent in a terminal: Claude Code, with the analog-attach-linux skill, runs the analog-attach commands, and you answer its questions and approve the deploy. At the end the overlay is on the board and the acceleration reads back over the network." name="description" />
+
+    <title>Use case: CLI with an AI agent &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../../../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../../../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Use case template" href="../../template.html" />
+    <link rel="prev" title="Use case: GUI with an AI agent" href="../ui-ai-agent/index.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../../../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../../../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Use case: CLI with an AI agent</a><ul>
+<li><a class="reference internal" href="#goal">Goal</a></li>
+<li><a class="reference internal" href="#what-you-need">What you need</a></li>
+<li><a class="reference internal" href="#steps">Steps</a><ul>
+<li><a class="reference internal" href="#step-1-wire-the-click">Step 1: Wire the Click</a></li>
+<li><a class="reference internal" href="#step-2-install-the-skill">Step 2: Install the skill</a></li>
+<li><a class="reference internal" href="#step-3-start-the-agent-in-the-project-folder">Step 3: Start the agent in the project folder</a></li>
+<li><a class="reference internal" href="#step-4-ask-for-the-device">Step 4: Ask for the device</a></li>
+<li><a class="reference internal" href="#step-5-deploy">Step 5: Deploy</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#result">Result</a></li>
+<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>
+<li><a class="reference internal" href="#next-steps">Next steps</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../../../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../../../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../../../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../../../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3" checked=""/><div class="collapse"><a class="reference internal" href="../../index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../../../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="../../index.html">Use Cases</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="use-case-cli-with-an-ai-agent">
+<span id="use-case-cli-ai-agent"></span><h1>Use case: CLI with an AI agent<a class="headerlink" href="#use-case-cli-with-an-ai-agent" title="Link to this heading"></a></h1>
+<section id="goal">
+<h2>Goal<a class="headerlink" href="#goal" title="Link to this heading"></a></h2>
+<p>Add an ADXL345 accelerometer to a Raspberry Pi 4 by asking an AI agent in a
+terminal: Claude Code, with the <code class="docutils literal notranslate"><span class="pre">analog-attach-linux</span></code> skill, runs the
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> commands, and you answer its questions and approve the
+deploy. At the end the overlay is on the board and the acceleration reads back
+over the network.</p>
+</section>
+<section id="what-you-need">
+<h2>What you need<a class="headerlink" href="#what-you-need" title="Link to this heading"></a></h2>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Item</p></th>
+<th class="head"><p>Details</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Board / carrier</p></td>
+<td><p>Raspberry Pi 4 Model B, running ADI Kuiper</p></td>
+</tr>
+<tr class="row-odd"><td><p>Evaluation board / part</p></td>
+<td><p>MikroElektronika Accel Click (ADXL345), set for I2C at address
+<code class="docutils literal notranslate"><span class="pre">0x1d</span></code> with its jumpers</p></td>
+</tr>
+<tr class="row-even"><td><p>Wiring</p></td>
+<td><p>Five jumper wires from the Click to the Pi’s 40-pin header:</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Click</p></th>
+<th class="head"><p>Raspberry Pi header</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>3V3</p></td>
+<td><p>pin 1 (3.3 V)</p></td>
+</tr>
+<tr class="row-odd"><td><p>GND</p></td>
+<td><p>pin 6 (GND)</p></td>
+</tr>
+<tr class="row-even"><td><p>SDA</p></td>
+<td><p>pin 3 (GPIO 2, I2C1 SDA)</p></td>
+</tr>
+<tr class="row-odd"><td><p>SCL</p></td>
+<td><p>pin 5 (GPIO 3, I2C1 SCL)</p></td>
+</tr>
+<tr class="row-even"><td><p>INT</p></td>
+<td><p>pin 13 (GPIO 27)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Cables and power</p></td>
+<td><p>The Pi’s USB-C power supply; an Ethernet cable from the Pi to the host.
+Here the host shares its connection over that cable, and the Pi gets
+<code class="docutils literal notranslate"><span class="pre">10.42.0.196</span></code>. Any address the host can reach works.</p></td>
+</tr>
+<tr class="row-even"><td><p>Host</p></td>
+<td><p>Linux machine with Analog Attach installed (see <a class="reference internal" href="../../../install/index.html"><span class="doc">Installation</span></a>),
+Claude Code, <code class="docutils literal notranslate"><span class="pre">ssh</span></code>, <code class="docutils literal notranslate"><span class="pre">scp</span></code> and <code class="docutils literal notranslate"><span class="pre">sshpass</span></code> for the deploy, and the
+libiio tools (<code class="docutils literal notranslate"><span class="pre">iio_info</span></code>) to read the part</p></td>
+</tr>
+<tr class="row-odd"><td><p>Software versions</p></td>
+<td><p>Analog Attach 0.2.0; the ADI Linux tree (<code class="docutils literal notranslate"><span class="pre">analogdevicesinc/linux</span></code>,
+its Raspberry Pi branch) in <code class="docutils literal notranslate"><span class="pre">~/linux</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="steps">
+<h2>Steps<a class="headerlink" href="#steps" title="Link to this heading"></a></h2>
+<section id="step-1-wire-the-click">
+<h3>Step 1: Wire the Click<a class="headerlink" href="#step-1-wire-the-click" title="Link to this heading"></a></h3>
+<p>With the Pi off, connect the Click as in the table above.</p>
+</section>
+<section id="step-2-install-the-skill">
+<h3>Step 2: Install the skill<a class="headerlink" href="#step-2-install-the-skill" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>analog-attach<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>analog-attach-linux
+</pre></div>
+</div>
+<p>This copies the skill to <code class="docutils literal notranslate"><span class="pre">~/.claude/skills/analog-attach-linux/</span></code>, where
+Claude Code finds it. See <a class="reference internal" href="../../../ai-agents/index.html"><span class="doc">Working with AI Agents</span></a>.</p>
+</section>
+<section id="step-3-start-the-agent-in-the-project-folder">
+<h3>Step 3: Start the agent in the project folder<a class="headerlink" href="#step-3-start-the-agent-in-the-project-folder" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>~/work/rpi4-adxl345<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/work/rpi4-adxl345
+claude
+</pre></div>
+</div>
+<p>The project can be new: the agent sets it up. It asks for the kernel tree and
+the board rather than guessing them. Answer <code class="docutils literal notranslate"><span class="pre">~/linux</span></code> and
+<code class="docutils literal notranslate"><span class="pre">bcm2711-rpi-4-b.dts</span></code>, or set the project up first (see
+<a class="reference internal" href="../../../cli-guide/configuration.html#cli-configuration"><span class="std std-ref">Configuration</span></a>).</p>
+</section>
+<section id="step-4-ask-for-the-device">
+<h3>Step 4: Ask for the device<a class="headerlink" href="#step-4-ask-for-the-device" title="Link to this heading"></a></h3>
+<p>Type, for example:</p>
+<blockquote>
+<div><p>Add an ADXL345 accelerometer on the Raspberry Pi’s I2C bus at 0x1d,
+interrupt on GPIO 27 rising edge, then validate and build.</p>
+</div></blockquote>
+<p>The agent runs <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> commands with <code class="docutils literal notranslate"><span class="pre">--json</span></code> and reads their
+answers. Claude Code shows each command and asks before it runs one you
+haven’t allowed. The commands differ from run to run; a run goes like this:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 55.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Command</p></th>
+<th class="head"><p>What it is for</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">config</span></code></p></td>
+<td><p>What the project has set. For a new project, <code class="docutils literal notranslate"><span class="pre">config</span> <span class="pre">backend</span></code>,
+<code class="docutils literal notranslate"><span class="pre">config</span> <span class="pre">linux</span></code>, <code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">context</span> <span class="pre">rpi-4</span></code>, <code class="docutils literal notranslate"><span class="pre">config</span> <span class="pre">devicetree</span></code>,
+<code class="docutils literal notranslate"><span class="pre">config</span> <span class="pre">workfile</span></code> and <code class="docutils literal notranslate"><span class="pre">init</span></code> follow.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">list</span> <span class="pre">devices</span> <span class="pre">adxl345</span></code></p></td>
+<td><p>The compatible: <code class="docutils literal notranslate"><span class="pre">adi,adxl345</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">list</span> <span class="pre">overlay</span> <span class="pre">adi,adxl345</span></code></p></td>
+<td><p>Whether the kernel tree has an overlay to start from
+(<code class="docutils literal notranslate"><span class="pre">i2c-sensor-overlay.dts</span></code>). The agent may offer it.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">list</span> <span class="pre">parent</span> <span class="pre">adi,adxl345</span></code></p></td>
+<td><p>The buses. You named the I2C bus, so it takes <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code> (<code class="docutils literal notranslate"><span class="pre">i2c1</span></code>),
+or asks which one.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">add</span> <span class="pre">adi,adxl345</span> <span class="pre">--parent</span> <span class="pre">i2c_arm</span> <span class="pre">--name</span> <span class="pre">adxl345&#64;1d</span></code></p></td>
+<td><p>The node, at <code class="docutils literal notranslate"><span class="pre">0x1d</span></code>. The answer lists <code class="docutils literal notranslate"><span class="pre">interrupt-parent</span></code> and
+<code class="docutils literal notranslate"><span class="pre">interrupts</span></code> in <code class="docutils literal notranslate"><span class="pre">missing_required</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">list</span> <span class="pre">value</span> <span class="pre">adxl345</span> <span class="pre">interrupt-parent</span></code></p></td>
+<td><p>The interrupt controllers: <code class="docutils literal notranslate"><span class="pre">gpio</span></code> for a GPIO line.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">update</span> <span class="pre">adxl345</span> <span class="pre">interrupt-parent</span> <span class="pre">'&amp;gpio'</span></code></p></td>
+<td><p>The GPIO controller as the interrupt parent.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">update</span> <span class="pre">adxl345</span> <span class="pre">interrupts</span> <span class="pre">27</span> <span class="pre">IRQ_TYPE_EDGE_RISING</span></code></p></td>
+<td><p>GPIO 27, rising edge, as you said.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">validate</span></code></p></td>
+<td><p>A warning: the bus is disabled, Linux won’t probe the device.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">enable</span> <span class="pre">i2c_arm</span></code></p></td>
+<td><p>Turns the bus on in the overlay.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">validate</span></code></p></td>
+<td><p>No errors.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">--json</span> <span class="pre">build</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">build/overlay.dtbo</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>When it is done, the agent says what it wrote, and offers to deploy.</p>
+</section>
+<section id="step-5-deploy">
+<h3>Step 5: Deploy<a class="headerlink" href="#step-5-deploy" title="Link to this heading"></a></h3>
+<p>Deploy copies the overlay to the Pi and <strong>reboots it</strong>, so the agent asks
+first. Tell it the Pi’s address and password, for example <em>deploy it to
+10.42.0.196, user analog</em>. It then runs:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>analog-attach<span class="w"> </span>--json<span class="w"> </span>config<span class="w"> </span>var<span class="w"> </span>BOARD_IP<span class="w"> </span><span class="m">10</span>.42.0.196
+<span class="nv">BOARD_PASSWORD</span><span class="o">=</span>…<span class="w"> </span>analog-attach<span class="w"> </span>--json<span class="w"> </span>deploy
+</pre></div>
+</div>
+<p>The password goes in the environment of <code class="docutils literal notranslate"><span class="pre">deploy</span></code> only, never in a file.
+Approve the command when Claude Code asks. To keep the password out of the
+conversation, run the deploy yourself instead: <code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">deploy</span></code> asks
+for it, hidden.</p>
+</section>
+</section>
+<section id="result">
+<h2>Result<a class="headerlink" href="#result" title="Link to this heading"></a></h2>
+<p>When the Pi is back, the ADXL345 is an IIO device:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>iio_info<span class="w"> </span>-u<span class="w"> </span>ip:10.42.0.196<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A3<span class="w"> </span>adxl345
+</pre></div>
+</div>
+<p>lists <code class="docutils literal notranslate"><span class="pre">adxl345</span></code> with its channels <code class="docutils literal notranslate"><span class="pre">accel_x</span></code>, <code class="docutils literal notranslate"><span class="pre">accel_y</span></code> and <code class="docutils literal notranslate"><span class="pre">accel_z</span></code>.
+Read the raw values on the Pi:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ ssh analog@10.42.0.196
+$ cd /sys/bus/iio/devices/iio:device0     # the device whose name is adxl345
+$ cat name in_accel_x_raw in_accel_y_raw in_accel_z_raw
+adxl345
+2
+1
+253
+</pre></div>
+</div>
+<p>With the board lying flat, X and Y are close to 0 and Z reads about 253: 1 g.
+You can also ask the agent to explain the workfile, or to change it: each
+change is another <code class="docutils literal notranslate"><span class="pre">update</span></code>, and the agent validates again.</p>
+<p>The workfile, as in <a class="reference internal" href="../cli/index.html"><span class="doc">Use case: Configure a device with the CLI only</span></a> (the node’s name and
+label are the agent’s choice and may differ):</p>
+<div class="highlight-dts notranslate"><div class="highlight"><pre><span></span><span class="cp">/dts-v1/</span><span class="p">;</span>
+<span class="cp">/plugin/</span><span class="p">;</span>
+<span class="nf">/</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">     </span><span class="nf">fragment</span><span class="o">@</span><span class="mi">0</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">             </span><span class="n">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">i2c_arm</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">             </span><span class="nf">__overlay__</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                     </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"okay"</span><span class="p">;</span>
+<span class="w">                     </span><span class="nl">adxl345</span><span class="p">:</span><span class="w"> </span><span class="nf">adxl345</span><span class="o">@</span><span class="mi">1d</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                             </span><span class="kr">compatible</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"adi,adxl345"</span><span class="p">;</span>
+<span class="w">                             </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mh">0x1d</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="n">interrupt-parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">gpio</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="n">interrupts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">27</span><span class="w"> </span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                     </span><span class="p">};</span>
+<span class="w">             </span><span class="p">};</span>
+<span class="w">     </span><span class="p">};</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>The agent doesn’t use analog-attach.</strong> Check that the skill is installed
+(<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">skill</span> <span class="pre">install</span></code> lists it as <code class="docutils literal notranslate"><span class="pre">installed</span></code>), and start
+<code class="docutils literal notranslate"><span class="pre">claude</span></code> again after installing it.</p></li>
+<li><p><strong>The agent guesses the wiring.</strong> Say the bus, address and interrupt in the
+prompt, as above, and check what it set before you deploy:
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">read</span> <span class="pre">adxl345</span></code>.</p></li>
+<li><p><strong>No adxl345 in iio_info.</strong> See the troubleshooting of
+<a class="reference internal" href="../cli/index.html"><span class="doc">Use case: Configure a device with the CLI only</span></a>.</p></li>
+</ul>
+</section>
+<section id="next-steps">
+<h2>Next steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../ui-ai-agent/index.html#use-case-ui-ai-agent"><span class="std std-ref">Use case: GUI with an AI agent</span></a>: an agent in the GUI, as its Assistant.</p></li>
+<li><p><a class="reference internal" href="../../../ai-agents/index.html"><span class="doc">Working with AI Agents</span></a>: the skill, and what the agent does on its own.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../ui-ai-agent/index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Use case: GUI with an AI agent</a>
+    <a href="../../template.html" title="Next document (Alt+Shift+RightArrow)" class="next">Use case template</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

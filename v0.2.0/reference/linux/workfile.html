@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="The workfile is the devicetree overlay that Analog Attach creates and edits. Which file it is, is decided by the workfile setting (Configuration file)." name="description" />
+
+    <title>Workfile &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Configuration file" href="../configuration-file.html" />
+    <link rel="prev" title="JSON protocol" href="../json-protocol.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Workfile</a><ul>
+<li><a class="reference internal" href="#how-the-workfile-is-created">How the workfile is created</a></li>
+<li><a class="reference internal" href="#how-the-workfile-is-written-afterwards">How the workfile is written afterwards</a></li>
+<li><a class="reference internal" href="#overlay-syntax">Overlay syntax</a></li>
+<li><a class="reference internal" href="#a-complete-workfile">A complete workfile</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2"/><div class="collapse"><a class="reference internal" href="../../cli-guide/index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/devices.html">Devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/properties.html">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../cli-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4" checked=""/><div class="collapse"><a class="reference internal" href="../index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="../index.html">Reference</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="workfile">
+<h1>Workfile<a class="headerlink" href="#workfile" title="Link to this heading"></a></h1>
+<p>The workfile is the devicetree overlay that Analog Attach creates and edits.
+Which file it is, is decided by the <code class="docutils literal notranslate"><span class="pre">workfile</span></code> setting
+(<a class="reference internal" href="../configuration-file.html"><span class="doc">Configuration file</span></a>).</p>
+<section id="how-the-workfile-is-created">
+<h2>How the workfile is created<a class="headerlink" href="#how-the-workfile-is-created" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">workfile</span></code> setting names the file. Set it with
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span> <span class="pre">workfile</span> <span class="pre">&lt;name&gt;</span></code> or when answering the questions of
+a bare <code class="docutils literal notranslate"><span class="pre">analog-attach</span></code> run.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">init</span></code> checks that the Linux kernel tree and the base
+devicetree are configured and load correctly. It does not read or validate
+the overlay.</p></li>
+<li><p>If the named file exists, <code class="docutils literal notranslate"><span class="pre">init</span></code> keeps it. Otherwise it creates it at that
+path.</p></li>
+</ol>
+<p><code class="docutils literal notranslate"><span class="pre">init</span></code> never overwrites a file and never picks another name. If the path
+names something that is not a file, or its folder does not exist, <code class="docutils literal notranslate"><span class="pre">init</span></code>
+refuses and tells you to configure another with
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">config</span> <span class="pre">workfile</span> <span class="pre">&lt;name&gt;</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">init</span></code> changes no setting, builds no cache and adds no device. Use
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">add</span></code> for that.</p>
+<p>A new workfile is an empty overlay, with a blank line before the root node
+(28 bytes, ending in a newline):</p>
+<div class="highlight-dts notranslate"><div class="highlight"><pre><span></span><span class="cp">/dts-v1/</span><span class="p">;</span>
+<span class="cp">/plugin/</span><span class="p">;</span>
+
+<span class="nf">/</span><span class="cm"> </span><span class="p">{</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>The first command that writes the file prints it again as described below,
+without the blank line.</p>
+</section>
+<section id="how-the-workfile-is-written-afterwards">
+<h2>How the workfile is written afterwards<a class="headerlink" href="#how-the-workfile-is-written-afterwards" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Every command that changes the workfile rewrites the <strong>whole file</strong>, printed
+from the parsed tree and indented with tabs.</p></li>
+<li><p><strong>Comments and the original layout are not kept.</strong> A comment you add by hand
+is dropped the next time a command writes the file.</p></li>
+<li><p>The workfile can’t contain preprocessor directives (<code class="docutils literal notranslate"><span class="pre">#include</span></code>,
+<code class="docutils literal notranslate"><span class="pre">#define</span></code>) or macros such as <code class="docutils literal notranslate"><span class="pre">IRQ_TYPE_EDGE_FALLING</span></code>. A file that does
+not parse is reported with its line and column, and must be fixed by hand.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The base devicetree is different: it is preprocessed before it is read, so
+it can use includes and macros.</p>
+</div>
+</section>
+<section id="overlay-syntax">
+<h2>Overlay syntax<a class="headerlink" href="#overlay-syntax" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">overlay-syntax</span></code> setting selects how the overlay is printed. It applies
+to the whole file on every write, whatever syntax the file was in.</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>Output</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fragment</span></code> (default)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fragment&#64;&lt;n&gt;</span> <span class="pre">{</span> <span class="pre">target</span> <span class="pre">=</span> <span class="pre">&lt;&amp;label&gt;;</span> <span class="pre">__overlay__</span> <span class="pre">{</span> <span class="pre">...</span> <span class="pre">};</span> <span class="pre">};</span></code>
+inside <code class="docutils literal notranslate"><span class="pre">/</span> <span class="pre">{</span> <span class="pre">...</span> <span class="pre">};</span></code>. A target given by path uses
+<code class="docutils literal notranslate"><span class="pre">target-path</span> <span class="pre">=</span> <span class="pre">&quot;&lt;path&gt;&quot;;</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">reference</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&amp;label</span> <span class="pre">{</span> <span class="pre">...</span> <span class="pre">};</span></code> at the top level, or <code class="docutils literal notranslate"><span class="pre">&amp;{/path}</span> <span class="pre">{</span> <span class="pre">...</span> <span class="pre">};</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The same overlay in both syntaxes:</p>
+<div class="highlight-dts notranslate"><div class="highlight"><pre><span></span><span class="cm">/* overlay-syntax = fragment */</span>
+<span class="cp">/dts-v1/</span><span class="p">;</span>
+<span class="cp">/plugin/</span><span class="p">;</span>
+<span class="nf">/</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">     </span><span class="nf">fragment</span><span class="o">@</span><span class="mi">0</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">             </span><span class="n">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">spi0</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">             </span><span class="nf">__overlay__</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                     </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"okay"</span><span class="p">;</span>
+<span class="w">             </span><span class="p">};</span>
+<span class="w">     </span><span class="p">};</span>
+<span class="p">};</span>
+
+<span class="cm">/* overlay-syntax = reference */</span>
+<span class="cp">/dts-v1/</span><span class="p">;</span>
+<span class="cp">/plugin/</span><span class="p">;</span>
+<span class="o">&amp;</span><span class="nf">spi0</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">     </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"okay"</span><span class="p">;</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+</section>
+<section id="a-complete-workfile">
+<h2>A complete workfile<a class="headerlink" href="#a-complete-workfile" title="Link to this heading"></a></h2>
+<p>The overlay of the examples in the <a class="reference internal" href="../../cli-guide/index.html#cli-guide"><span class="std std-ref">CLI Guide</span></a>: an ADXL345 at <code class="docutils literal notranslate"><span class="pre">0x1d</span></code>
+on the I2C bus <code class="docutils literal notranslate"><span class="pre">i2c_arm</span></code> of a Raspberry Pi 4, its interrupt on GPIO 27,
+rising edge, and the bus enabled. It is what these commands write, with
+<code class="docutils literal notranslate"><span class="pre">overlay-syntax</span></code> <code class="docutils literal notranslate"><span class="pre">fragment</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>analog-attach<span class="w"> </span>add<span class="w"> </span>adi,adxl345<span class="w"> </span>--parent<span class="w"> </span>i2c_arm<span class="w"> </span>--name<span class="w"> </span>adxl345@1d<span class="w"> </span>--label<span class="w"> </span>accel
+analog-attach<span class="w"> </span>update<span class="w"> </span>accel<span class="w"> </span>interrupt-parent<span class="w"> </span><span class="s1">'&amp;gpio'</span>
+analog-attach<span class="w"> </span>update<span class="w"> </span>accel<span class="w"> </span>interrupts<span class="w"> </span><span class="m">27</span><span class="w"> </span>IRQ_TYPE_EDGE_RISING
+analog-attach<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>i2c_arm
+</pre></div>
+</div>
+<div class="highlight-dts notranslate"><div class="highlight"><pre><span></span><span class="cp">/dts-v1/</span><span class="p">;</span>
+<span class="cp">/plugin/</span><span class="p">;</span>
+<span class="nf">/</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">     </span><span class="nf">fragment</span><span class="o">@</span><span class="mi">0</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">             </span><span class="n">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">i2c_arm</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">             </span><span class="nf">__overlay__</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                     </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"okay"</span><span class="p">;</span>
+<span class="w">                     </span><span class="nl">accel</span><span class="p">:</span><span class="w"> </span><span class="nf">adxl345</span><span class="o">@</span><span class="mi">1d</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">                             </span><span class="kr">compatible</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"adi,adxl345"</span><span class="p">;</span>
+<span class="w">                             </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mh">0x1d</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="n">interrupt-parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">gpio</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                             </span><span class="n">interrupts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">27</span><span class="w"> </span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">                     </span><span class="p">};</span>
+<span class="w">             </span><span class="p">};</span>
+<span class="w">     </span><span class="p">};</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">IRQ_TYPE_EDGE_RISING</span></code> is written as its value, <code class="docutils literal notranslate"><span class="pre">1</span></code>, since the workfile
+can’t hold macros. With <code class="docutils literal notranslate"><span class="pre">overlay-syntax</span></code> <code class="docutils literal notranslate"><span class="pre">reference</span></code> the same overlay is:</p>
+<div class="highlight-dts notranslate"><div class="highlight"><pre><span></span><span class="cp">/dts-v1/</span><span class="p">;</span>
+<span class="cp">/plugin/</span><span class="p">;</span>
+<span class="o">&amp;</span><span class="nf">i2c_arm</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">     </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"okay"</span><span class="p">;</span>
+<span class="w">     </span><span class="nl">accel</span><span class="p">:</span><span class="w"> </span><span class="nf">adxl345</span><span class="o">@</span><span class="mi">1d</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">             </span><span class="kr">compatible</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"adi,adxl345"</span><span class="p">;</span>
+<span class="w">             </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mh">0x1d</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">             </span><span class="n">interrupt-parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">gpio</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">             </span><span class="n">interrupts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">27</span><span class="w"> </span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">     </span><span class="p">};</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">build</span></code> compiles it, with the starter <code class="docutils literal notranslate"><span class="pre">aa_build.sh</span></code>, into
+the <code class="docutils literal notranslate"><span class="pre">build</span></code> folder (the <code class="docutils literal notranslate"><span class="pre">build-dir</span></code> setting), named after the workfile:</p>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">output</span></code></p></th>
+<th class="head"><p>Files written</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">overlay</span></code> (default)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">build/overlay.dtbo</span></code>, the compiled overlay.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">devicetree</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">build/overlay.dts</span></code>, the base devicetree with the overlay applied and
+preprocessed, and <code class="docutils literal notranslate"><span class="pre">build/overlay.dtb</span></code>, compiled from it.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>See <a class="reference internal" href="../../cli-guide/linux/validate-build-deploy.html#cli-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a> for the output of <code class="docutils literal notranslate"><span class="pre">build</span></code>.</p>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../json-protocol.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">JSON protocol</a>
+    <a href="../configuration-file.html" title="Next document (Alt+Shift+RightArrow)" class="next">Configuration file</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>

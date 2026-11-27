@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="Once a device is in the overlay (see Devices), its properties say how it is wired: its address, its interrupt line, its GPIOs, its supplies. This page shows how to find what a node needs, what values a property can take, and how to set and remove them." name="description" />
+
+    <title>Properties &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../../_static/app.min.css?v=7db40558" />
+    <script async="async" src="../../_static/app.umd.js?v=2fe15c61"></script>
+    <link rel="icon" href="../../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Validate, build and deploy" href="validate-build-deploy.html" />
+    <link rel="prev" title="Devices" href="devices.html" />
+   
+  
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://developer.analog.com/" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Documentation</label>
+        
+        <a id="logo" href="../../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Properties</a><ul>
+<li><a class="reference internal" href="#what-a-node-can-have">What a node can have</a></li>
+<li><a class="reference internal" href="#what-values-a-property-can-take">What values a property can take</a></li>
+<li><a class="reference internal" href="#set-a-property">Set a property</a><ul>
+<li><a class="reference internal" href="#value-syntax">Value syntax</a></li>
+<li><a class="reference internal" href="#checks-and-warnings">Checks and warnings</a></li>
+<li><a class="reference internal" href="#the-address-reg">The address: <code class="docutils literal notranslate"><span class="pre">reg</span></code></a></li>
+<li><a class="reference internal" href="#child-nodes">Child nodes</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#remove-a-property">Remove a property</a></li>
+<li><a class="reference internal" href="#let-the-shell-complete-it">Let the shell complete it</a></li>
+<li><a class="reference internal" href="#next-steps">Next steps</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Introduction</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../introduction/index.html">Introduction</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Installation</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../install/index.html">Installation</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Quick Start</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quick-start/index.html">Quick Start</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Concepts</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concepts/index.html">Concepts</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">GUI Guide</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-1" id="toctree-collapse-1"/><div class="collapse"><a class="reference internal" href="../../ui-guide/index.html">GUI Guide</a><label for="toctree-collapse-1"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/starting.html">Starting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/workspace.html">Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/adding-devices.html">Adding devices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/editing.html">Editing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/linux/validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui-guide/error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">CLI Guide</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-2" id="toctree-collapse-2" checked=""/><div class="collapse"><a class="reference internal" href="../index.html">CLI Guide</a><label for="toctree-collapse-2"><div class="icon"></div></label></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../configuration.html">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="workfile.html">Creating and reading the workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="devices.html">Devices</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="validate-build-deploy.html">Validate, build and deploy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../scripting.html">Scripting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shell-completion.html">Shell completion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../error-reporting.html">Error reporting</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Working with AI Agents</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../ai-agents/index.html">Working with AI Agents</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Use Cases</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-3" id="toctree-collapse-3"/><div class="collapse"><a class="reference internal" href="../../use-cases/index.html">Use Cases</a><label for="toctree-collapse-3"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui/index.html">Use case: Configure a device with the GUI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli/index.html">Use case: Configure a device with the CLI only</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/ui-ai-agent/index.html">Use case: GUI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/linux/cli-ai-agent/index.html">Use case: CLI with an AI agent</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../use-cases/template.html">Use case template</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Reference</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><input class="toctree-collapse" type="checkbox" name="toctree-collapse-4" id="toctree-collapse-4"/><div class="collapse"><a class="reference internal" href="../../reference/index.html">Reference</a><label for="toctree-collapse-4"><div class="icon"></div></label></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/commands.html">Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/json-protocol.html">JSON protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/linux/workfile.html">Workfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/configuration-file.html">Configuration file</a></li>
+</ul>
+</li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Troubleshooting</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../troubleshooting/index.html">Troubleshooting</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb"><ol><li><a href="../index.html">CLI Guide</a></li></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="properties">
+<span id="cli-properties"></span><h1>Properties<a class="headerlink" href="#properties" title="Link to this heading"></a></h1>
+<p>Once a device is in the overlay (see <a class="reference internal" href="devices.html#cli-devices"><span class="std std-ref">Devices</span></a>), its properties say
+how it is wired: its address, its interrupt line, its GPIOs, its supplies. This
+page shows how to find what a node needs, what values a property can take, and
+how to set and remove them.</p>
+<p>The running example finishes the ADXL345 that <code class="docutils literal notranslate"><span class="pre">add</span></code> left with two required
+properties missing:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach read accel
+accel: adxl345@1d {
+    compatible = "adi,adxl345";
+    reg = &lt;0x1d&gt;;
+};
+Missing required: interrupt-parent, interrupts
+</pre></div>
+</div>
+<section id="what-a-node-can-have">
+<h2>What a node can have<a class="headerlink" href="#what-a-node-can-have" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">property</span></code> lists the properties the node’s binding defines, with their
+types. <code class="docutils literal notranslate"><span class="pre">set</span></code> marks those the node has, <code class="docutils literal notranslate"><span class="pre">required</span></code> those it must have:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach list property accel
+compatible        (set, required)  enum("adi,adxl346", "adi,adxl345" | adi,adxl345 | adi,adxl375)
+reg               (set, required)  number[1]
+interrupts        (required)       (number, number, enum(IRQ_TYPE_NONE | IRQ_TYPE_EDGE_RISING | …))[3]
+interrupt-parent                   enum(gpio | gicv2 | aon_intr)
+status                             enum(okay | disabled | reserved | fail | fail-needs-probe)
+…
+</pre></div>
+</div>
+<p>Give a property to see its description and constraints:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach list property accel reg
+reg (required): number[1]
+  Chip select used by the device.
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">read</span> <span class="pre">&lt;node&gt;</span> <span class="pre">&lt;property&gt;</span></code> shows a property’s current value with the same
+explanation, and the suggestions (see <a class="reference internal" href="workfile.html#cli-workfile"><span class="std std-ref">Creating and reading the workfile</span></a>).</p>
+</section>
+<section id="what-values-a-property-can-take">
+<h2>What values a property can take<a class="headerlink" href="#what-values-a-property-can-take" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">value</span></code> lists the values that fit, each ready to pass to <code class="docutils literal notranslate"><span class="pre">update</span></code>. For
+a reference such as <code class="docutils literal notranslate"><span class="pre">interrupt-parent</span></code>, those are the nodes of the base and
+the overlay that can be named:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach list value accel interrupt-parent
+gpio   gpio — interrupt controller, #interrupt-cells = &lt;2&gt;; the node's own
+gicv2  gicv2 — interrupt controller, #interrupt-cells = &lt;3&gt;
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">--suggest</span> <span class="pre">&lt;node&gt;</span> <span class="pre">&lt;property&gt;</span></code> answers the same, and sets nothing. For
+the wiring (<code class="docutils literal notranslate"><span class="pre">reg</span></code>, <code class="docutils literal notranslate"><span class="pre">interrupts</span></code>, <code class="docutils literal notranslate"><span class="pre">*-gpios</span></code>), the values come from your
+board’s schematic: the suggestions only tell you what the binding accepts.</p>
+</section>
+<section id="set-a-property">
+<h2>Set a property<a class="headerlink" href="#set-a-property" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">&lt;node&gt;</span> <span class="pre">&lt;property&gt;</span> <span class="pre">&lt;value&gt;...</span></code> sets a property, replacing the value it
+had. The ADXL345’s interrupt pin is on GPIO 27, rising edge:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach update accel interrupt-parent gpio
+Set interrupt-parent on accel
+$ analog-attach update accel interrupts 27 IRQ_TYPE_EDGE_RISING
+Set interrupts on accel
+$ analog-attach read accel interrupts
+interrupts = &lt;27 1&gt;;
+  (adi,adxl345.yaml)
+</pre></div>
+</div>
+<p>Set <code class="docutils literal notranslate"><span class="pre">interrupt-parent</span></code> before <code class="docutils literal notranslate"><span class="pre">interrupts</span></code>: the interrupt controller decides
+how many cells <code class="docutils literal notranslate"><span class="pre">interrupts</span></code> has.</p>
+<p><code class="docutils literal notranslate"><span class="pre">update</span></code> can set a property of a base node too. The overlay then changes it
+on the board: <code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">i2c_arm</span> <span class="pre">clock-frequency</span> <span class="pre">400000</span></code>.</p>
+<section id="value-syntax">
+<h3>Value syntax<a class="headerlink" href="#value-syntax" title="Link to this heading"></a></h3>
+<p>The values after the property name are joined with spaces, so
+<code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">accel</span> <span class="pre">interrupts</span> <span class="pre">27</span> <span class="pre">1</span></code> and <code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">accel</span> <span class="pre">interrupts</span> <span class="pre">&quot;27</span> <span class="pre">1&quot;</span></code> are the
+same.</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 35.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>Example</p></th>
+<th class="head"><p>Written as</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Numbers, decimal or hexadecimal</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">accel</span> <span class="pre">reg</span> <span class="pre">0x1d</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">reg</span> <span class="pre">=</span> <span class="pre">&lt;0x1d&gt;;</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Several cells</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">accel</span> <span class="pre">interrupts</span> <span class="pre">27</span> <span class="pre">1</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">interrupts</span> <span class="pre">=</span> <span class="pre">&lt;27</span> <span class="pre">1&gt;;</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Macros (<code class="docutils literal notranslate"><span class="pre">IRQ_TYPE_…</span></code>, <code class="docutils literal notranslate"><span class="pre">GPIO_…</span></code>)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">accel</span> <span class="pre">interrupts</span> <span class="pre">27</span> <span class="pre">IRQ_TYPE_EDGE_RISING</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">interrupts</span> <span class="pre">=</span> <span class="pre">&lt;27</span> <span class="pre">1&gt;;</span></code> (the macro’s value)</p></td>
+</tr>
+<tr class="row-odd"><td><p>A label, with or without <code class="docutils literal notranslate"><span class="pre">&amp;</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">accel</span> <span class="pre">interrupt-parent</span> <span class="pre">gpio</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">interrupt-parent</span> <span class="pre">=</span> <span class="pre">&lt;&amp;gpio&gt;;</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Rows, separated by <code class="docutils literal notranslate"><span class="pre">,</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">adc</span> <span class="pre">reset-gpios</span> <span class="pre">gpio</span> <span class="pre">5</span> <span class="pre">0,</span> <span class="pre">gpio</span> <span class="pre">6</span> <span class="pre">0</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">reset-gpios</span> <span class="pre">=</span> <span class="pre">&lt;&amp;gpio</span> <span class="pre">5</span> <span class="pre">0&gt;,</span> <span class="pre">&lt;&amp;gpio</span> <span class="pre">6</span> <span class="pre">0&gt;;</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Words, where the binding expects strings</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">accel</span> <span class="pre">status</span> <span class="pre">okay</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">status</span> <span class="pre">=</span> <span class="pre">&quot;okay&quot;;</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>No value: a flag</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">accel</span> <span class="pre">wakeup-source</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">wakeup-source;</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Negative numbers</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">adc</span> <span class="pre">offset</span> <span class="pre">-5</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">offset</span> <span class="pre">=</span> <span class="pre">&lt;(-5)&gt;;</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Quote what your shell would change: a property name that starts with <code class="docutils literal notranslate"><span class="pre">#</span></code>
+(<code class="docutils literal notranslate"><span class="pre">update</span> <span class="pre">adc</span> <span class="pre">'#address-cells'</span> <span class="pre">1</span></code>), and a string with spaces.</p>
+</section>
+<section id="checks-and-warnings">
+<h3>Checks and warnings<a class="headerlink" href="#checks-and-warnings" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">update</span></code> checks each value against the node’s binding:</p>
+<ul>
+<li><p>A value that can’t be built is refused, and nothing is written:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach update accel interrupts 27 RISING
+'RISING' is not a number, a known macro, or a label in the base tree/overlay
+</pre></div>
+</div>
+</li>
+<li><p>A value the binding doesn’t allow is written, with a warning on standard
+error, so that you can set values the binding is stricter about than the
+driver:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach update accel status bogus
+warning: status takes one of okay, disabled, reserved, fail, fail-needs-probe, got bogus
+Set status on accel
+$ analog-attach update accel interrupts 27 1 5
+warning: interrupts takes 2 values, got 3
+Set interrupts on accel
+</pre></div>
+</div>
+</li>
+<li><p>A property the binding doesn’t define is written without checking:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach update accel foo-bar 3
+Property foo-bar not defined by adi,adxl345 binding; written without schema validation
+Set foo-bar on accel
+</pre></div>
+</div>
+</li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">validate</span></code> reports what is still wrong (see <a class="reference internal" href="validate-build-deploy.html#cli-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>).</p>
+</section>
+<section id="the-address-reg">
+<h3>The address: <code class="docutils literal notranslate"><span class="pre">reg</span></code><a class="headerlink" href="#the-address-reg" title="Link to this heading"></a></h3>
+<p>Setting <code class="docutils literal notranslate"><span class="pre">reg</span></code> also renames the node, so that its unit address matches:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach update accel reg 0x53
+Set reg on accel; renamed to adxl345@53
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">update</span></code> warns when another device on the bus already uses that address or
+chip select. <code class="docutils literal notranslate"><span class="pre">rename</span> <span class="pre">accel</span> <span class="pre">adxl345&#64;53</span></code> does the same from the other side (see
+<a class="reference internal" href="devices.html#cli-devices"><span class="std std-ref">Devices</span></a>).</p>
+</section>
+<section id="child-nodes">
+<h3>Child nodes<a class="headerlink" href="#child-nodes" title="Link to this heading"></a></h3>
+<p>Some devices have child nodes, such as the channels of an ADC. When the name
+is a child node of the binding, <code class="docutils literal notranslate"><span class="pre">update</span></code> with no value creates it and lists
+its required properties. Then set them with the child’s path:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach update adc channel@0
+Added channel@0 to adc
+Missing required: diff-channels
+Set them with: update adc/channel@0 &lt;property&gt; &lt;value&gt;
+$ analog-attach update adc/channel@0 diff-channels 0 1
+Set diff-channels on adc/channel@0
+</pre></div>
+</div>
+<p>On a terminal, <code class="docutils literal notranslate"><span class="pre">update</span></code> asks for the child’s required properties, as <code class="docutils literal notranslate"><span class="pre">add</span></code>
+does.</p>
+</section>
+</section>
+<section id="remove-a-property">
+<h2>Remove a property<a class="headerlink" href="#remove-a-property" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>$ analog-attach delete accel wakeup-source
+Removed wakeup-source from accel in /home/user/work/rpi4-adxl345/overlay.dtso
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">delete</span></code> removes what the overlay sets. A property of the base devicetree
+stays as the base has it.</p>
+</section>
+<section id="let-the-shell-complete-it">
+<h2>Let the shell complete it<a class="headerlink" href="#let-the-shell-complete-it" title="Link to this heading"></a></h2>
+<p>With shell completion installed, <kbd class="kbd docutils literal notranslate">Tab</kbd> completes node paths, property
+names and values from the binding and the board, for example after
+<code class="docutils literal notranslate"><span class="pre">analog-attach</span> <span class="pre">update</span> <span class="pre">accel</span> <span class="pre">interrupt-parent</span></code>. See <a class="reference internal" href="../shell-completion.html"><span class="doc">Shell completion</span></a>.</p>
+</section>
+<section id="next-steps">
+<h2>Next steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="validate-build-deploy.html#cli-validate-build-deploy"><span class="std std-ref">Validate, build and deploy</span></a>: check the overlay against the bindings, then
+build and deploy it.</p>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="devices.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Devices</a>
+    <a href="validate-build-deploy.html" title="Next document (Alt+Shift+RightArrow)" class="next">Validate, build and deploy</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>
