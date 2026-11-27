@@ -1,0 +1,14 @@
+# Numeric cases plus a `_` default, mirroring the MAX32690/MAX32650 SPI tables.
+$type: struct
+$symbol: child
+$override:
+  $parent:
+    - $switch:
+        $on: device_id
+        $cases:
+          0:
+            speed:
+              minimum: 100
+          _:
+            speed:
+              maximum: 10

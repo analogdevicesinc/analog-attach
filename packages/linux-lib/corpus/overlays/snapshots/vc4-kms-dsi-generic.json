@@ -1,0 +1,34 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "panel-dsi-generic@0",
+          "mode"
+        ],
+        "message": "panel-dsi-generic@0 (Generic,panel-dsi): mode: ['MODE_VIDEO'] is too short\n\tfrom schema $id: http://devicetree.org/schemas/display/panel/panel-dsi.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "panel-dsi-generic@0",
+          "port",
+          "endpoint"
+        ],
+        "message": "panel-dsi-generic@0 (Generic,panel-dsi): port:endpoint: Unevaluated properties are not allowed ('data-lanes' was unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/display/panel/panel-dsi.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

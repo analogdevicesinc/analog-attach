@@ -1,0 +1,4 @@
+$type: enum
+$symbol: bad_default_enum
+values: [A, B, C]
+default: D

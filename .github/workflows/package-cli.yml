@@ -1,0 +1,112 @@
+name: Build and Package CLI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, dev, ci/**]
+    paths:
+      - 'packages/cli/**'
+      - 'packages/linux-lib/**'
+      - 'packages/capi-lib/**'
+      - 'packages/gui/**'
+      - '.github/workflows/package-cli.yml'
+  pull_request:
+    paths:
+      - 'packages/cli/**'
+      - 'packages/linux-lib/**'
+      - 'packages/capi-lib/**'
+      - 'packages/gui/**'
+      - '.github/workflows/package-cli.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      # linux-lib and capi-lib, then the CLI, which bundles both and copies its
+      # assets into packages/cli/bundled/ (no tools: users install dtc and dt-schema)
+      # and the repository's skills/ into packages/cli/skills/.
+      - name: Build the CLI
+        run: yarn build:cli
+
+      - name: Package CLI
+        run: |
+          cd packages/cli
+          yarn pack --out ../../analog-attach-cli.tgz
+          tar -tzf ../../analog-attach-cli.tgz | grep -q '^package/bundled/linux/dt-mk-schema.py$'
+          ! tar -tzf ../../analog-attach-cli.tgz | grep -q '^package/bundled/linux/tools/'
+          tar -tzf ../../analog-attach-cli.tgz | grep -q '^package/skills/analog-attach-linux/SKILL.md$'
+          tar -tzf ../../analog-attach-cli.tgz | grep -q '^package/skills/analog-attach-noos/SKILL.md$'
+
+      - name: Upload CLI package
+        uses: actions/upload-artifact@v4
+        with:
+          name: analog-attach-cli
+          path: analog-attach-cli.tgz
+
+  # Optional: Test the packaged CLI installs correctly
+  test-package:
+    needs: build-and-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Download CLI package
+        uses: actions/download-artifact@v4
+        with:
+          name: analog-attach-cli
+
+      - name: Install packaged CLI
+        run: npm install -g ./analog-attach-cli.tgz
+
+      - name: Verify CLI works
+        run: |
+          analog-attach --version
+          analog-attach --help
+
+      # The tools the CLI runs, installed as its README tells users to: dtc from the
+      # distribution, dt-schema pinned from PyPI with pipx (whose bin directory is on the
+      # runner's PATH).
+      - name: Install dtc and dt-schema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y device-tree-compiler
+          pipx install dtschema==2026.9
+          pipx inject dtschema ruamel.yaml.clib
+          dtc --version
+          dt-mk-schema --version
+
+      # The binding caches of an empty Linux tree: the installed dt-schema found through
+      # dt-mk-schema, and the package's dt-mk-schema.py run with its Python.
+      - name: Build binding caches with the installed tools
+        run: |
+          work=$(mktemp -d)
+          mkdir -p "$work/linux/Documentation/devicetree/bindings" "$work/linux/include" "$work/project"
+          cd "$work/project"
+          analog-attach config backend linux
+          analog-attach config linux "$work/linux"
+          test -s .analog-attach/linux/validation-cache/validation.json
+          test -s .analog-attach/linux/compat-index.json

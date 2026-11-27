@@ -1,0 +1,13 @@
+$type: struct
+$symbol: test_sensor_config
+$description: "Generic sensor configuration: names only the interface, the driver fills it"
+extra:
+  type: driver_init_param
+  interface: test_sensor
+  required: true
+  description: "The selected driver's own init_param"
+ops:
+  type: driver_ops
+  interface: test_sensor
+  required: true
+  description: "The selected driver's ops table"

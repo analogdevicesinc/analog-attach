@@ -1,0 +1,26 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": false,
+    "unresolved_targets": [],
+    "unresolved": [
+      {
+        "path": [
+          "soc",
+          "i2c@7e804000",
+          "temperature-sensor@42"
+        ],
+        "property": "vref-supply",
+        "reference": "&reg_vdd"
+      }
+    ]
+  },
+  "validate": {
+    "errors": [],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

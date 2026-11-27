@@ -1,0 +1,15 @@
+coverage/*
+
+test/expected/cache/*
+test/legacy/expected/cache/*
+
+#SYMLINKS
+test/dt-schema
+test/linux
+
+plans/
+corpus/cache
+# scripts/pipeline-view/build.mjs's default output
+pipeline-view.html
+# yarn docs:pipeline's output
+docs/pipeline.md

@@ -1,0 +1,48 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "shutdown_button_pins@3",
+          "brcm,function"
+        ],
+        "message": "shutdown_button_pins@3: brcm,function: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "shutdown_button_pins@3",
+          "brcm,pins"
+        ],
+        "message": "shutdown_button_pins@3: brcm,pins: b'\\x00\\x00\\x00\\x03' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "shutdown_button_pins@3",
+          "brcm,pull"
+        ],
+        "message": "shutdown_button_pins@3: brcm,pull: b'\\x00\\x00\\x00\\x02' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "shutdown_button@3"
+        ],
+        "message": "shutdown_button@3 (gpio-keys): 'shutdown' does not match any of the regexes: '^(button|event|key|switch|(button|event|key|switch)-[a-z0-9-]+|[a-z0-9-]+-(button|event|key|switch))$', '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/input/gpio-keys.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

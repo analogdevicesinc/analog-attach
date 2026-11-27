@@ -1,0 +1,7 @@
+<%
+/* The Kconfig symbols this app needs: the platform interfaces used, and each driver. */
+const project = it.h.capi_project(it.workfile);
+-%>
+<% for (const symbol of project.kconfig) { -%>
+CONFIG_<%= symbol %>=y
+<% } -%>

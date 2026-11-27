@@ -1,0 +1,15 @@
+$type: struct
+$symbol: override_param
+flag:
+  type: bool
+
+value:
+  type: uint8_t
+
+$override:
+  - $if:
+      flag:
+        value: true
+    $then:
+      value:
+        required: true

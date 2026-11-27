@@ -1,0 +1,20 @@
+$type: struct
+$symbol: test_spi_config
+$description: "Controller configuration, referenced from a board BSP"
+identifier:
+  type: uint32_t
+  required: true
+  description: "Which controller instance"
+dma_handle:
+  type: uint32_t
+  description: "Transmit DMA handle"
+rx_dma_handle:
+  type: uint32_t
+  description: "Receive DMA handle, only meaningful alongside dma_handle"
+$override:
+  - $if:
+      rx_dma_handle:
+        value: $any
+    $then:
+      dma_handle:
+        required: true

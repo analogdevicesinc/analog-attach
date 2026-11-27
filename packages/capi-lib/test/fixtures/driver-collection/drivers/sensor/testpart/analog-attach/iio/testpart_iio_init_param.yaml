@@ -1,0 +1,9 @@
+$type: struct
+$symbol: testpart_iio_init_param
+$description: "The part's IIO device configuration. In the `iio` group, so never offered
+  as the generic handle's init_param, though it is a struct of a driver implementing it."
+testpart_dev_init:
+  include: testpart_init_param
+  pointer: true
+  required: true
+  description: "The part's own configuration"

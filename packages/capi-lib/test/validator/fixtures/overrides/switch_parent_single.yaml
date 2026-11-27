@@ -1,0 +1,10 @@
+$type: struct
+$symbol: child
+$override:
+  $parent:
+    - $switch:
+        $on: mode
+        $cases:
+          fast:
+            speed:
+              minimum: 100

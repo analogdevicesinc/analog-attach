@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "read.schema.json",
+  "title": "read response",
+  "description": "Standard output of read in JSON mode: the workfile (READ-011), a node (READ-024), a property (READ-035), or a refusal. An answer has ok, message and severity alongside the node's or property's fields (READ-012); nested nodes don't. $defs/base is ReadResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": {
+      "description": "ReadResponse: a Node or a ReadProperty, with the CommonResponse fields.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
+      "anyOf": [{ "$ref": "common.schema.json#/$defs/node" }, { "$ref": "common.schema.json#/$defs/read-property" }]
+    },
+    "found": {
+      "description": "What an answer has alongside the node or property (READ-012): ok true, a message naming what was read, severity info.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^Read (the workfile|.+)$" },
+        "severity": { "const": "info" }
+      }
+    },
+    "linux": {
+      "oneOf": [
+        { "$ref": "#/$defs/overlay" },
+        { "$ref": "#/$defs/read-node-answer" },
+        { "$ref": "#/$defs/read-property" },
+        { "$ref": "common.schema.json#/$defs/refusal" },
+        { "$ref": "common.schema.json#/$defs/config-refusal" }
+      ]
+    },
+    "source": { "enum": ["base", "overlay"] },
+    "overlay-property": {
+      "description": "A property the overlay sets, as read / has it (READ-011): source is always overlay.",
+      "allOf": [{ "$ref": "#/$defs/read-property-entry" }],
+      "properties": { "source": { "const": "overlay" } }
+    },
+    "overlay-node-fields": {
+      "description": "A node of read / that the overlay reaches (READ-011): its properties the overlay's only, its children the reached ones (no collapsed child).",
+      "allOf": [{ "$ref": "#/$defs/read-node-fields" }],
+      "properties": {
+        "properties": { "type": "array", "items": { "$ref": "#/$defs/overlay-property" } },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/overlay-node" } }
+      }
+    },
+    "overlay-node": {
+      "allOf": [{ "$ref": "#/$defs/overlay-node-fields" }],
+      "unevaluatedProperties": false
+    },
+    "overlay": {
+      "description": "read without a path (READ-011): read / without its collapsed children and the properties the base sets, so each node of the overlay is at its place in the merged tree.",
+      "allOf": [{ "$ref": "#/$defs/found" }, { "$ref": "#/$defs/overlay-node-fields" }],
+      "unevaluatedProperties": false,
+      "properties": { "key": { "const": "/" }, "message": { "const": "Read the workfile" } }
+    },
+    "written": {
+      "description": "value with each number as the overlay (or the preprocessed base) writes it, a string: \"0x53\" where value has 83, \"83\" for a decimal one, \"(-1)\" for a negative one. Same nesting as value (a scalar, a row, rows; a one-item array where READ-053 makes value one); a string, reference, expression or null as in value. Only when the value has a number (READ-054).",
+      "anyOf": [
+        { "type": ["null", "string", "boolean"] },
+        { "type": "array", "items": { "$ref": "#/$defs/written" } }
+      ]
+    },
+    "read-property-entry": {
+      "description": "A property of a merged node, with where its value is set, and its numbers as written (READ-054).",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/property" }],
+      "required": ["source"],
+      "properties": { "source": { "$ref": "#/$defs/source" }, "written": { "$ref": "#/$defs/written" } },
+      "unevaluatedProperties": false
+    },
+    "read-node-fields": {
+      "description": "A merged node (READ-022, READ-052). origin is internal when the overlay has a node at its path (it adds or changes it), external when only the base has it, a base node the overlay only reaches through a fragment target inside it included. A collapsed child has origin external, no properties or children, and has_children.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/node" }],
+      "required": ["alias"],
+      "properties": {
+        "properties": { "type": "array", "items": { "$ref": "#/$defs/read-property-entry" } },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/read-node" } },
+        "origin": { "enum": ["internal", "external"] },
+        "status": { "type": "string", "description": "The node's status property (okay, disabled, ...) when it has one, a collapsed child's too: whether it is enabled shows without reading it." },
+        "has_children": { "type": "boolean", "description": "A collapsed child's only: whether it has children, which read on its path gives (READ-052)." }
+      }
+    },
+    "read-node": {
+      "description": "A merged node nested in another.",
+      "allOf": [{ "$ref": "#/$defs/read-node-fields" }],
+      "unevaluatedProperties": false
+    },
+    "read-node-answer": {
+      "description": "read <path> (READ-024): the merged node, with ok, message and severity.",
+      "allOf": [{ "$ref": "#/$defs/found" }, { "$ref": "#/$defs/read-node-fields" }],
+      "unevaluatedProperties": false,
+      "not": { "properties": { "message": { "const": "Read the workfile" } } }
+    },
+    "read-property": {
+      "description": "One property of a merged node (READ-035), with the binding's type when it defines the property (READ-050), its description and the suggestions (READ-036).",
+      "allOf": [{ "$ref": "#/$defs/found" }, { "$ref": "common.schema.json#/$defs/read-property" }],
+      "required": ["source"],
+      "properties": {
+        "source": { "$ref": "#/$defs/source" },
+        "written": { "$ref": "#/$defs/written" },
+        "dt_type": { "type": "string", "minLength": 1, "description": "Its type in dt-schema's words, as list property gives it (LIST-057); untyped when the binding gives none or the node has no binding. Absent with --quiet (READ-035)." },
+        "suggestions": { "properties": { "can_create": { "minItems": 1 } } }
+      },
+      "unevaluatedProperties": false
+    },
+    "noos": {
+      "anyOf": [
+        { "$ref": "#/$defs/noos-workfile" },
+        { "$ref": "#/$defs/noos-node-answer" },
+        { "$ref": "#/$defs/noos-property" },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    },
+    "noos-property-entry": {
+      "description": "Where the backend is noos: a property of a node. $compatible names the node's schema; an external node also has $symbol and $provides (READ-502). source when the property has a value (READ-501).",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/property" }],
+      "properties": {
+        "source": { "$ref": "#/$defs/noos-source" }
+      },
+      "unevaluatedProperties": false
+    },
+    "noos-source": {
+      "description": "Where the backend is noos: who set the value. user for a value the user set or cleared, bootstrap for one bootstrap filled in.",
+      "enum": ["user", "bootstrap"]
+    },
+    "noos-node-fields": {
+      "description": "Where the backend is noos: a node (READ-501). origin is internal for a node the workfile stores, external for a board or driver resource it only names; alias is always empty.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/node" }],
+      "required": ["alias"],
+      "properties": {
+        "properties": { "type": "array", "items": { "$ref": "#/$defs/noos-property-entry" } },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/noos-node" } },
+        "origin": { "enum": ["internal", "external"] },
+        "alias": { "type": "array", "maxItems": 0 }
+      }
+    },
+    "noos-node": {
+      "allOf": [{ "$ref": "#/$defs/noos-node-fields" }],
+      "unevaluatedProperties": false
+    },
+    "noos-node-answer": {
+      "description": "Where the backend is noos: read <node>, with ok, message and severity.",
+      "allOf": [{ "$ref": "#/$defs/found" }, { "$ref": "#/$defs/noos-node-fields" }],
+      "unevaluatedProperties": false
+    },
+    "noos-workfile": {
+      "description": "Where the backend is noos: read without a node (READ-500). The root is the workfile: its target (platform, and board when it has one) as properties, the stored nodes as children.",
+      "allOf": [{ "$ref": "#/$defs/found" }, { "$ref": "#/$defs/noos-node-fields" }],
+      "unevaluatedProperties": false,
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "description": "The workfile's file name without its extension: workfile for workfile.json." },
+        "origin": { "const": "internal" },
+        "properties": {
+          "type": "array",
+          "items": { "properties": { "key": { "enum": ["platform", "board"] }, "type": { "const": { "kind": "string" } }, "value": { "type": ["string", "null"], "description": "null for a board when the workfile has none." } } }
+        }
+      }
+    },
+    "noos-property": {
+      "description": "Where the backend is noos: one property (READ-503), with its definition and what it can be set to. suggestions.values are the values update takes; can_create the schemas the user could add instead, [] when none.",
+      "allOf": [{ "$ref": "#/$defs/found" }, { "$ref": "common.schema.json#/$defs/read-property" }],
+      "required": ["suggestions", "required", "definition"],
+      "properties": {
+        "source": { "$ref": "#/$defs/noos-source" },
+        "suggestions": { "required": ["values", "can_create"] }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

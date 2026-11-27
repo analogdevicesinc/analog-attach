@@ -1,0 +1,15 @@
+/dts-v1/;
+/plugin/;
+/ {
+	fragment@0 {
+		target = <&i2c_arm>;
+		__overlay__ {
+			adxl345: accel@53 {
+				compatible = "adi,adxl345";
+				reg = <0x53>;
+				interrupt-parent = <&gpio>;
+				interrupts = <17 4>;
+			};
+		};
+	};
+};

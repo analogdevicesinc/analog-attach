@@ -1,0 +1,7 @@
+$type: struct
+$symbol: test_i2c_config
+$description: "An I2C bus config, as a board declares one. Only here so i2c is a board
+  peripheral kind (bsp_kinds), which is what makes test_i2c_device a bus device."
+identifier:
+  type: uint32_t
+  description: "Which I2C peripheral"

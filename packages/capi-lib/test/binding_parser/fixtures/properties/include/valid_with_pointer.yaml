@@ -1,0 +1,3 @@
+include: "path/to/struct.yaml"
+pointer: true
+description: "Pointer to external struct"

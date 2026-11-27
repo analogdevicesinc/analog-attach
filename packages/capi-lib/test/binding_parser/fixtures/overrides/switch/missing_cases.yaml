@@ -1,0 +1,9 @@
+$type: struct
+$symbol: test_struct
+mode:
+  type: enum
+  values: [A, B]
+
+$override:
+  - $switch:
+      $on: mode

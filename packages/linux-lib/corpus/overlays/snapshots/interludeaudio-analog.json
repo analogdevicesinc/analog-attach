@@ -1,0 +1,24 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node2",
+          "cs4271@10"
+        ],
+        "message": "cs4271@10 (cirrus,cs4271): Unevaluated properties are not allowed ('reset-gpio' was unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/sound/cirrus,cs4271.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

@@ -1,0 +1,56 @@
+<%
+/*
+ * main.c for an IIO app: the capi set main.c, then the IIO app serving every IIO device in
+ * the workfile over the console UART, stepped forever. The app is a fact of this target,
+ * not a node: the only choice is which devices are IIO ones (see codegen_helpers.ts).
+ *
+ * The bring-up is the capi set one (_bringup.eta, borrowed from the base set).
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments, so this file uses only
+ * block comments and apostrophe-free prose.
+ */
+const project = it.h.capi_project(it.workfile);
+const iio_devices = it.h.iio_devices(it.workfile);
+if (iio_devices.length === 0) {
+	throw new Error("The capi-iio template set serves IIO devices, and the workfile has none. Add a part with: analog-attach add <driver>");
+}
+if (!project.console) {
+	throw new Error("The IIO app is served over the console UART, and the board declares no single UART for it");
+}
+-%>
+#include "common_data.h"
+
+int main(void)
+{
+	int ret;
+
+<%~ include("./_bringup", { h: it.h, workfile: it.workfile }) -%>
+
+	struct capi_iio_device_init iio_devices[] = {
+<% for (const d of iio_devices) { -%>
+		{
+			.name = "<%= d.name %>",
+			.dev = <%= d.name %>,
+			.dev_descriptor = <%= d.name %>-><%= d.table %>,
+		},
+<% } -%>
+	};
+	struct capi_iio_app_init_param app_init_param = {
+		.iio_init_param = {
+			.phy_type = CAPI_IIO_USE_UART,
+			.uart_handle = console_uart,
+			.devs = iio_devices,
+			.nb_devs = CAPI_ARRAY_SIZE(iio_devices),
+		},
+	};
+	struct capi_iio_app_desc *app;
+
+	ret = capi_iio_app_init(&app, app_init_param);
+	if (ret)
+		return ret;
+
+	while (1)
+		capi_iio_app_step(app);
+
+	return 0;
+}

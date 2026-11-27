@@ -1,0 +1,15 @@
+$type: struct
+$symbol: test_struct
+enabled:
+  type: bool
+
+value:
+  type: uint8_t
+
+$override:
+  - $if:
+      enabled:
+        value: true
+    $then:
+      value:
+        required: true

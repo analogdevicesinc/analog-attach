@@ -1,0 +1,6 @@
+$type: struct
+$symbol: child
+$override:
+  $parent:
+    - device_id:
+        maximum: 4

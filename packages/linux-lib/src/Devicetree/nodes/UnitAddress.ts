@@ -1,0 +1,305 @@
+import { type DTNode, type DTProperty, is_dt_flag } from "../syntax/AST.js";
+import { PropertyBuilder } from "../build/PropertyBuilder.js";
+import type { CellValue } from "../build/Cells.js";
+import { cell_number, is_enabled } from "./Access.js";
+
+/**
+ * Unit addresses are hex by convention (and dtc requires it on SPI, I2C and
+ * simple-bus children), but some bindings name child nodes in decimal, e.g.
+ * `^channel@([0-9]|1[0-5])$`.
+ */
+export type UnitRadix = 10 | 16;
+
+/** A unit address and the radix it is written in. */
+export type UnitAddr = { value: bigint; repr: "hex" | "dec" };
+
+export function parse_unit_address(unit: string, radix: UnitRadix = 16): bigint | undefined {
+	if (unit === "") { return undefined; }
+	const cleaned = unit.toLowerCase();
+	if (radix === 10) { return /^\d+$/.test(cleaned) ? BigInt(cleaned) : undefined; }
+	if (!/^[\da-f][\da-f,]*$/.test(cleaned)) { return undefined; }
+	if (cleaned.includes(",")) { return undefined; }
+	return BigInt(`0x${cleaned}`);
+}
+
+export function format_unit_address(value: bigint, radix: UnitRadix = 16): string {
+	return value.toString(radix);
+}
+
+const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+const HEX_LETTERS = ["a", "b", "c", "d", "e", "f"];
+
+function accepts_any(regex: RegExp, name: string, units: string[]): boolean {
+	return units.some(unit => regex.test(`${name}@${unit}`));
+}
+
+/**
+ * The radix of `name@<unit>` children under a binding with these node
+ * patterns, found by probing: a pattern that accepts digits but no hex letter
+ * (`^channel@([0-9]|1[0-5])$`) means decimal, one that also accepts letters
+ * means hex. Decimal wins when both kinds match, since a decimal name satisfies
+ * both. Undefined when no pattern accepts the name.
+ */
+export function unit_radix(patterns: string[], name: string): UnitRadix | undefined {
+	let hex = false;
+	for (const pattern of patterns) {
+		let regex: RegExp;
+		try { regex = new RegExp(pattern); } catch { continue; }
+		if (!accepts_any(regex, name, DIGITS)) { continue; }
+		if (!accepts_any(regex, name, HEX_LETTERS)) { return 10; }
+		hex = true;
+	}
+	return hex ? 16 : undefined;
+}
+
+/**
+ * The `reg` of a unit address: `address_cells` cells of `value` (most significant first), written in the unit
+ * address's radix (`<0x1d>` for `adc@1d`, `<10>` for a decimal `channel@10`), then `size_cells` cells of 0.
+ */
+export function encode_reg_address(value: bigint, address_cells: number, size_cells: number, radix: UnitRadix = 16): DTProperty {
+	const repr = radix === 16 ? "hex" : "dec";
+	const cells: CellValue[] = [];
+	for (let index = address_cells - 1; index >= 0; index--) {
+		cells.push(PropertyBuilder.number((value >> BigInt(index * 32)) & 0xFF_FF_FF_FFn, repr));
+	}
+	for (let index = 0; index < size_cells; index++) {
+		cells.push(PropertyBuilder.number(0n));
+	}
+	return PropertyBuilder.build_cell_array()
+		.with_cells(...cells)
+		.with_name("reg")
+		.build();
+}
+
+export function decode_reg_address(reg: DTProperty, address_cells: number): bigint | undefined {
+	if (is_dt_flag(reg.value)) { return undefined; }
+	const first = reg.value[0];
+	if (first?.kind !== "array") { return undefined; }
+
+	let result = 0n;
+	for (let index = 0; index < address_cells; index++) {
+		const element = first.elements[index];
+		const value = element === undefined ? undefined : cell_number(element);
+		if (value === undefined) { return undefined; }
+		result = (result << 32n) | (value & 0xFF_FF_FF_FFn);
+	}
+	return result;
+}
+
+/**
+ * The address a child occupies on its parent's bus: the first address of its
+ * `reg`, read with the parent's `#address-cells`, or with no `reg`, its
+ * hexadecimal unit address. A cell written as an expression counts once it
+ * evaluates (`(4<<8|0x03)`, a macro after cpp). Undefined when its `reg` doesn't
+ * decode (it then occupies nothing, whatever its unit address) or it has neither.
+ */
+export function occupied_address(child: DTNode, address_cells: number): bigint | undefined {
+	const reg = child.properties.find(p => p.name === "reg");
+	if (reg !== undefined) { return decode_reg_address(reg, address_cells); }
+	return child.unit_addr === undefined ? undefined : parse_unit_address(child.unit_addr);
+}
+
+/** The addresses a binding's `reg` allows: its enum's options, or the bounds of its number (no maximum: unbounded). */
+export type AllowedAddresses = bigint[] | { minimum: bigint; maximum?: bigint };
+
+/** Whether `address` is one `allowed` gives; any, for an empty enum. */
+export function is_allowed_address(allowed: AllowedAddresses, address: bigint): boolean {
+	if (Array.isArray(allowed)) { return allowed.length === 0 || allowed.includes(address); }
+	return address >= allowed.minimum && (allowed.maximum === undefined || address <= allowed.maximum);
+}
+
+/** The lowest address `allowed` gives: an enum's lowest option, a range's minimum, 0 for an empty enum. */
+export function lowest_allowed_address(allowed: AllowedAddresses): bigint {
+	if (!Array.isArray(allowed)) { return allowed.minimum; }
+	let lowest = allowed[0] ?? 0n;
+	for (const option of allowed) { if (option < lowest) { lowest = option; } }
+	return lowest;
+}
+
+/**
+ * The lowest address no enabled child occupies of those `allowed` gives (a binding's `reg` enum or range; by
+ * default, every one from 0). When every one is taken, the lowest of them, `taken`. `occupants` are every enabled
+ * child's address.
+ */
+export function next_free_unit_address(
+	effective_children: Map<string, DTNode>,
+	address_cells: number,
+	allowed: AllowedAddresses = [],
+): { address: bigint; occupants: { name: string; address: bigint }[]; taken: boolean } {
+	const occupied = new Map<bigint, string>();
+	const all_occupants: { name: string; address: bigint }[] = [];
+
+	for (const [name, child] of effective_children) {
+		if (!is_enabled(child)) { continue; }
+		const address = occupied_address(child, address_cells);
+		if (address !== undefined) {
+			occupied.set(address, name);
+			all_occupants.push({ name, address });
+		}
+	}
+
+	const lowest = lowest_allowed_address(allowed);
+	const candidates: Iterable<bigint> = Array.isArray(allowed) && allowed.length > 0
+	// eslint-disable-next-line unicorn/prefer-simple-sort-comparator -- bigints: `a - b` is a bigint, which sort rejects
+		? [...allowed].sort((a, b) => (a < b ? -1 : 1))
+		: addresses_from(lowest, Array.isArray(allowed) ? undefined : allowed.maximum);
+	for (const candidate of candidates) {
+		if (!occupied.has(candidate)) { return { address: candidate, occupants: all_occupants, taken: false }; }
+	}
+	return { address: lowest, occupants: all_occupants, taken: true };
+}
+
+/** `from`, `from + 1`, … up to `to` (unbounded without one). */
+function* addresses_from(from: bigint, to: bigint | undefined): Generator<bigint> {
+	for (let address = from; to === undefined || address <= to; address++) { yield address; }
+}
+
+export type SyncResult = "unchanged" | "renamed" | "conflict" | "not-numeric";
+
+export function sync_unit_address_from_reg(
+	node: DTNode,
+	address_cells: number,
+	effective_siblings: Map<string, DTNode>,
+	radix: UnitRadix = 16,
+): SyncResult {
+	const reg = node.properties.find(p => p.name === "reg");
+	if (reg === undefined) { return "unchanged"; }
+
+	const new_address = decode_reg_address(reg, address_cells);
+	if (new_address === undefined) { return "not-numeric"; }
+
+	const current_unit = node.unit_addr;
+	const current_address = current_unit === undefined ? undefined : parse_unit_address(current_unit, radix);
+
+	if (current_address !== undefined && current_address === new_address) { return "unchanged"; }
+
+	const new_unit = format_unit_address(new_address, radix);
+	const new_full_name = `${node.name}@${new_unit}`;
+
+	if (effective_siblings.has(new_full_name)) { return "conflict"; }
+
+	node.unit_addr = new_unit;
+	return "renamed";
+}
+
+if (import.meta.vitest) {
+	const { test, expect } = import.meta.vitest;
+
+	test("parse_unit_address", () => {
+		expect(parse_unit_address("0")).toBe(0n);
+		expect(parse_unit_address("a")).toBe(0xAn);
+		expect(parse_unit_address("10")).toBe(0x10n);
+		expect(parse_unit_address("7e204000")).toBe(0x7E_20_40_00n);
+		expect(parse_unit_address("bar")).toBeUndefined();
+		expect(parse_unit_address("")).toBeUndefined();
+		expect(parse_unit_address("0x10")).toBeUndefined();
+	});
+
+	test("parse_unit_address / format_unit_address — decimal", () => {
+		expect(parse_unit_address("10", 10)).toBe(10n);
+		expect(parse_unit_address("a", 10)).toBeUndefined();
+		expect(format_unit_address(10n, 10)).toBe("10");
+	});
+
+	test("unit_radix", () => {
+		expect(unit_radix(["^channel@([0-9]|1[0-5])$"], "channel")).toBe(10);
+		expect(unit_radix(["^channel@[0-9a-f]+$"], "channel")).toBe(16);
+		expect(unit_radix(["^.*@[0-9a-f]+$"], "adc")).toBe(16);
+		expect(unit_radix(["^.*@[0-9a-f]+$", "^channel@[0-9]+$"], "channel")).toBe(10);
+		expect(unit_radix(["^led@[1-9]$"], "led")).toBe(10);
+		expect(unit_radix(["^channel@[0-9]+$"], "port")).toBeUndefined();
+		expect(unit_radix(["^(?invalid"], "x")).toBeUndefined();
+	});
+
+	test("sync_unit_address_from_reg — decimal radix", () => {
+		const node: DTNode = {
+			name: "channel", unit_addr: "1", labels: [], children: [],
+			properties: [encode_reg_address(12n, 1, 0)],
+		};
+		expect(sync_unit_address_from_reg(node, 1, new Map(), 10)).toBe("renamed");
+		expect(node.unit_addr).toBe("12");
+		expect(sync_unit_address_from_reg(node, 1, new Map(), 10)).toBe("unchanged");
+	});
+
+	test("format_unit_address", () => {
+		expect(format_unit_address(0n)).toBe("0");
+		expect(format_unit_address(0xAn)).toBe("a");
+		expect(format_unit_address(0x10n)).toBe("10");
+	});
+
+	test("encode_reg_address — single address cell, no size", () => {
+		const reg = encode_reg_address(5n, 1, 0);
+		expect(reg.name).toBe("reg");
+		expect(is_dt_flag(reg.value)).toBe(false);
+	});
+
+	test("encode_reg_address — the address cells in the unit address's radix, the size cells 0", () => {
+		expect(PropertyBuilder.to_string(encode_reg_address(0x1Dn, 1, 0))).toBe("reg = <0x1d>;\n");
+		expect(PropertyBuilder.to_string(encode_reg_address(0x3F_20_00_00n, 2, 1))).toBe("reg = <0x0 0x3f200000 0>;\n");
+		expect(PropertyBuilder.to_string(encode_reg_address(10n, 1, 0, 10))).toBe("reg = <10>;\n");
+	});
+
+	test("decode_reg_address — round trip", () => {
+		const reg = encode_reg_address(0xAn, 1, 0);
+		expect(decode_reg_address(reg, 1)).toBe(0xAn);
+	});
+
+	test("decode_reg_address — two address cells", () => {
+		const reg = encode_reg_address(0x1_00_00_00_00n, 2, 1);
+		expect(decode_reg_address(reg, 2)).toBe(0x1_00_00_00_00n);
+	});
+
+	/** The one child of the root in `source`. */
+	const parsed_node = async (source: string): Promise<DTNode> => {
+		const { DeviceTree } = await import("../DeviceTree.js");
+		const tree = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n${source}\n};`);
+		if (typeof tree === "string") { throw new TypeError(tree); }
+		const child = tree.node_at("/")?.children[0];
+		if (child === undefined) { throw new TypeError("no child"); }
+		return child;
+	};
+
+	test("occupied_address — a reg written as an expression is its value", async () => {
+		// sc7280-idp's `reg = <PMR735A_ADC7_DIE_TEMP>` after cpp
+		expect(occupied_address(await parsed_node("channel@403 { reg = <(4 << 8 | 0x03)>; };"), 1)).toBe(0x04_03n);
+		// the value is the reg's, not the unit address's
+		expect(occupied_address(await parsed_node("channel@0 { reg = <(4 << 8 | 0x03)>; };"), 1)).toBe(0x04_03n);
+		// a macro the workfile doesn't expand occupies nothing
+		expect(occupied_address(await parsed_node("channel@5 { reg = <(MY_ADDR)>; };"), 1)).toBeUndefined();
+	});
+
+	test("next_free_unit_address — a reg written as an expression occupies its address", async () => {
+		const children = new Map<string, DTNode>([
+			["channel@0", await parsed_node("channel@0 { reg = <(0 << 8 | 0x00)>; };")],
+			["channel@1", await parsed_node("channel@1 { reg = <1>; };")],
+		]);
+		expect(next_free_unit_address(children, 1).address).toBe(2n);
+	});
+
+	test("next_free_unit_address — base spidev@0/1 → 2", () => {
+		const children = new Map<string, DTNode>();
+		children.set("spidev@0", {
+			name: "spidev", unit_addr: "0", labels: [], children: [],
+			properties: [encode_reg_address(0n, 1, 0)],
+		});
+		children.set("spidev@1", {
+			name: "spidev", unit_addr: "1", labels: [], children: [],
+			properties: [encode_reg_address(1n, 1, 0)],
+		});
+		const result = next_free_unit_address(children, 1);
+		expect(result.address).toBe(2n);
+	});
+
+	test("next_free_unit_address — disabled child does not occupy the address", () => {
+		const children = new Map<string, DTNode>();
+		children.set("spidev@0", {
+			name: "spidev", unit_addr: "0", labels: [], children: [],
+			properties: [
+				encode_reg_address(0n, 1, 0),
+				PropertyBuilder.build_string().with_value("disabled").with_name("status").build(),
+			],
+		});
+		const result = next_free_unit_address(children, 1);
+		expect(result.address).toBe(0n);
+	});
+}

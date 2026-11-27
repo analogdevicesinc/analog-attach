@@ -1,0 +1,7 @@
+$type: enum
+$symbol: detailed_enum
+values:
+  OPTION_ONE:
+    description: "First option with detailed description"
+  OPTION_TWO:
+    description: "Second option with detailed description"

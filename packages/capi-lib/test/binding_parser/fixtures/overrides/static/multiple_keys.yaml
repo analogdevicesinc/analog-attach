@@ -1,0 +1,13 @@
+$type: struct
+$symbol: test_struct
+prop_a:
+  type: uint8_t
+
+prop_b:
+  type: uint8_t
+
+$override:
+  - prop_a:
+      default: 10
+    prop_b:
+      default: 20

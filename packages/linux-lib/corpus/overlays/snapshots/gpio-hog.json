@@ -1,0 +1,26 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "hog@1a",
+          "$nodename",
+          "0"
+        ],
+        "message": "hog@1a: $nodename:0: 'hog@1a' does not match '-hog(-[0-9]+)?$'\n\tfrom schema $id: http://devicetree.org/schemas/gpio/gpio-hog.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

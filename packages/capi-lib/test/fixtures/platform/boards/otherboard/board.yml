@@ -1,0 +1,22 @@
+schema_version: "1.0"
+# Declares the SAME symbol name as testboard, on purpose: board BSP names are shared so
+# app code is portable, which is exactly why board externs cannot be pooled globally.
+peripherals:
+  spi:
+    bsp_test_spi_cfg:
+      interface: spi
+      identifier: 0
+      # One chip-select line, GPIO-driven (no native_cs): the board's convention, which is
+      # what lets a jumper-wired part resolve with nothing stated.
+      pins:
+        sck:  {connector: H1, pin: 1}
+        mosi: {connector: H1, pin: 2}
+        miso: {connector: H1, pin: 3}
+        cs:
+          - {connector: H1, pin: 4}
+    # A second bus that declares no pins, so it can never be joined to anything.
+    bsp_test_spi2_cfg:
+      interface: spi
+      identifier: 1
+  gpio_port:
+    bsp_other_gpio1_cfg: {interface: gpio, num_pins: 32, extra: {port: OTHER_GPIO1}}

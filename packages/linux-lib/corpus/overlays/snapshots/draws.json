@@ -1,0 +1,162 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node1",
+          "regulators"
+        ],
+        "message": "regulators (simple-bus): 'ranges' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/simple-bus.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "regulators",
+          "#size-cells"
+        ],
+        "message": "regulators (simple-bus): #size-cells: 0 is not one of [1, 2]\n\tfrom schema $id: http://devicetree.org/schemas/simple-bus.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "regulators",
+          "$nodename",
+          "0"
+        ],
+        "message": "regulators (simple-bus): $nodename:0: 'regulators' does not match '^([a-z][a-z0-9\\\\-]+-bus|bus|localbus|soc|axi|ahb|apb)(@.+)?$'\n\tfrom schema $id: http://devicetree.org/schemas/simple-bus.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "regulators",
+          "sc16is752_draws_clk"
+        ],
+        "message": "regulators (simple-bus): sc16is752_draws_clk: 'ranges' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/simple-bus.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "regulators",
+          "udrc0_ldoin"
+        ],
+        "message": "regulators (simple-bus): udrc0_ldoin: 'ranges' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/simple-bus.yaml"
+      },
+      {
+        "path": [
+          "node2",
+          "sc16is752@50",
+          "$nodename",
+          "0"
+        ],
+        "message": "sc16is752@50 (nxp,sc16is752): $nodename:0: 'sc16is752@50' does not match '^serial(@.*)?$'\n\tfrom schema $id: http://devicetree.org/schemas/serial/nxp,sc16is7xx.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "aic3204_gpio",
+          "brcm,pins"
+        ],
+        "message": "aic3204_gpio: brcm,pins: b'\\x00\\x00\\x00\\x1a' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "aic3204_reset",
+          "brcm,function"
+        ],
+        "message": "aic3204_reset: brcm,function: b'\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "aic3204_reset",
+          "brcm,pins"
+        ],
+        "message": "aic3204_reset: brcm,pins: b'\\x00\\x00\\x00\\r' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "aic3204_reset",
+          "brcm,pull"
+        ],
+        "message": "aic3204_reset: brcm,pull: b'\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "gpclk0_pin",
+          "brcm,function"
+        ],
+        "message": "gpclk0_pin: brcm,function: b'\\x00\\x00\\x00\\x04' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "gpclk0_pin",
+          "brcm,pins"
+        ],
+        "message": "gpclk0_pin: brcm,pins: b'\\x00\\x00\\x00\\x04' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "pps_pins",
+          "brcm,function"
+        ],
+        "message": "pps_pins: brcm,function: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "pps_pins",
+          "brcm,pins"
+        ],
+        "message": "pps_pins: brcm,pins: b'\\x00\\x00\\x00\\x07' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "pps_pins",
+          "brcm,pull"
+        ],
+        "message": "pps_pins: brcm,pull: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sc16is752_irq",
+          "brcm,function"
+        ],
+        "message": "sc16is752_irq: brcm,function: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sc16is752_irq",
+          "brcm,pins"
+        ],
+        "message": "sc16is752_irq: brcm,pins: b'\\x00\\x00\\x00\\x11' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sc16is752_irq",
+          "brcm,pull"
+        ],
+        "message": "sc16is752_irq: brcm,pull: b'\\x00\\x00\\x00\\x02' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

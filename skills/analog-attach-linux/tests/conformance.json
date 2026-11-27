@@ -1,0 +1,30 @@
+{
+	"version": 2,
+	"cases": [
+		{
+			"id": "add-adc-rpi",
+			"prompt": "I have an AD7124-8 wired to SPI0 on my Raspberry Pi 4, can you write the devicetree overlay for it?",
+			"expect": "trigger"
+		},
+		{
+			"id": "add-accel-build",
+			"prompt": "Add an ADXL345 accelerometer on I2C1 to my overlay, then build the dtbo",
+			"expect": "trigger"
+		},
+		{
+			"id": "fix-validation",
+			"prompt": "My overlay fails validation on the interrupts of the adxl355 node, can you fix it and deploy it to the board?",
+			"expect": "trigger"
+		},
+		{
+			"id": "zephyr-no-trigger",
+			"prompt": "Write a Zephyr devicetree overlay that adds an ADXL362 on SPI to my nRF52 app",
+			"expect": "no-trigger"
+		},
+		{
+			"id": "firmware-no-trigger",
+			"prompt": "Generate bare-metal firmware for an ADXL355 on my MAX32690 board",
+			"expect": "no-trigger"
+		}
+	]
+}

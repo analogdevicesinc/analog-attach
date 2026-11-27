@@ -1,0 +1,5 @@
+$type: extern
+$symbol: test_regs
+$provides: "test/reg"
+$array: true
+$header: "drivers/test/test_regs.h"

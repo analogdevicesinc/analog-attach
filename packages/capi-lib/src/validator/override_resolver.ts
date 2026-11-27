@@ -1,0 +1,266 @@
+import type {
+	Effect,
+	OverridePredicate,
+	OverrideReference,
+	Property,
+} from "../ruleset_parser/types";
+import type { Workfile } from "../workfile_handler/types";
+import type { CollectedRule, ValidationError } from "./types";
+
+export interface OverrideResult {
+	effective: Property;
+	errors: ValidationError[];
+	/**
+	 * Why this property is required, when a rule made it so with a reason (`$any_of`'s
+	 * "needs one of ..."). Lets the required check say what would satisfy it instead of
+	 * only that a value is missing.
+	 */
+	required_reason?: string;
+	/**
+	 * The union member a rule pins, when one fired (`comm_init: {value: spi_dev}`). The
+	 * effect itself only checks the stored binding; this is what lets bootstrap follow it.
+	 */
+	selected_member?: string;
+}
+
+// Map a rule-relative ref node to the concrete symbol name it was resolved to at
+// collection time. This is THE single place scope is decided — both predicate
+// reads and effect targeting go through it, so a "self" target can never again be
+// silently dropped by a branch that assumed "parent".
+function resolve_node(reference: OverrideReference, collected: CollectedRule): string | undefined {
+	switch (reference.node) {
+		case "self": {
+			return collected.self_symbol;
+		}
+		case "parent": {
+			return collected.parent_symbol;
+		}
+		case "include": {
+			// Resolved when the rule was collected, by walking the declaring node's own
+			// property values. Absent when the path leads nowhere yet - the union member is
+			// unset, so there is no node to constrain and the effect simply does not apply.
+			return collected.include_symbols?.[reference.via.join(".")];
+		}
+	}
+}
+
+// Read the current (explicit) value of a referenced property from the workfile.
+// P3: only a user-set `value` counts — a `default` is a UI hint and is never read
+// here, so equals/hasValue see undefined until the user actually sets the field.
+function read_reference(reference: OverrideReference, collected: CollectedRule, workfile: Workfile): unknown {
+	const symbol_name = resolve_node(reference, collected);
+	if (!symbol_name) {
+		return undefined;
+	}
+	const symbol = workfile.symbols[symbol_name];
+	if (symbol?._t !== "RulesetStruct") {
+		return undefined;
+	}
+	return symbol.properties.find(p => p.name === reference.property)?.value;
+}
+
+function evaluate_predicate(predicate: OverridePredicate, collected: CollectedRule, workfile: Workfile): boolean {
+	switch (predicate._t) {
+		case "PredicateAlways": {
+			return true;
+		}
+		case "PredicateEquals": {
+			return read_reference(predicate.reference, collected, workfile) === predicate.value;
+		}
+		case "PredicateNoneOf": {
+			// An unset property matches no case, so the default must not fire either.
+			const value = read_reference(predicate.reference, collected, workfile);
+			return value !== undefined && !predicate.values.includes(value);
+		}
+		case "PredicateHasValue": {
+			return read_reference(predicate.reference, collected, workfile) !== undefined;
+		}
+		case "PredicateAnd": {
+			return predicate.predicates.every(p => evaluate_predicate(p, collected, workfile));
+		}
+		case "PredicateNot": {
+			return !evaluate_predicate(predicate.predicate, collected, workfile);
+		}
+	}
+}
+
+// Fold one effect onto the effective property. Merge effects write a field;
+// selectMember is the sole validate effect (decision #5: never overwrite the
+// user's binding, only error if the fired selector contradicts it).
+// `effective` is the caller's structuredClone working copy — mutating it in place
+// is this function's contract, so no-param-reassign is disabled for the fold.
+/* eslint-disable no-param-reassign */
+function apply_effect(
+	effective: Property,
+	effect: Effect,
+	symbol_name: string,
+	errors: ValidationError[],
+	source: string,
+): string | undefined {
+	switch (effect.op) {
+		case "setDefault": {
+			(effective as { default?: unknown }).default = effect.value;
+			break;
+		}
+		case "setMin": {
+			(effective as { minimum?: number }).minimum = effect.value;
+			break;
+		}
+		case "setMax": {
+			(effective as { maximum?: number }).maximum = effect.value;
+			break;
+		}
+		case "setValue": {
+			// The parser refuses `value:` on an enum, but only when it can see the target
+			// type - a $parent or include reference names a property in another ruleset, so
+			// the check lands here instead. Without it the override would quietly replace a
+			// value the user chose, and the contradiction would never be reported.
+			if (effective._t === "EnumProperty") {
+				errors.push({
+					path: `${symbol_name}.${effective.name}`,
+					message: `Cannot force a value on enum '${effective.name}' from another node. Use 'values:' to restrict the selectable set.`,
+					severity: "error",
+					type: "definition-error",
+				});
+				break;
+			}
+			effective.value = effect.value;
+			break;
+		}
+		case "setRequired": {
+			effective.required = effect.value;
+			break;
+		}
+		case "setDescription": {
+			// Added under what the field already says, never in place of it: the schema says
+			// what the field is, the override what it means for one part. Labelled with the
+			// ruleset that declared the override, so a person knows where each part came from.
+			const note = `${source}: ${effect.value}`;
+			effective.description = effective.description ? `${effective.description}\n\n${note}` : note;
+			break;
+		}
+		case "setPointer": {
+			(effective as { pointer?: boolean }).pointer = effect.value;
+			break;
+		}
+		case "setDisabled": {
+			effective.disabled = effect.value;
+			// Return the reason so the caller's disabled-but-set check can explain WHY —
+			// this is what makes a lowered $mutex produce a good error. The reason is
+			// transient (it only lives across this fold), so it never touches the property.
+			return effect.value ? effect.reason : undefined;
+		}
+		case "restrictValues": {
+			// Narrows the selectable set. Lands on `.values` regardless of the target's
+			// static _t (an include-to-enum pin is still IncludeProperty here); whether
+			// validate_include honors it is a decision-#3 reconciliation item.
+			(effective as { values?: unknown[] }).values = effect.values;
+			break;
+		}
+		case "restrictAllowed": {
+			(effective as { allowed?: string[] }).allowed = effect.ids;
+			break;
+		}
+		case "selectMember": {
+			// Union: validate, don't mutate. The stored value is {member: binding};
+			// if the user bound a different member than the rule selects, that is an error.
+			const value = effective.value as Record<string, unknown> | undefined;
+			if (value && typeof value === "object") {
+				const chosen = Object.keys(value)[0];
+				if (chosen !== undefined && chosen !== effect.member) {
+					errors.push({
+						path: `${symbol_name}.${effect.reference.property}`,
+						message: `Union member '${chosen}' contradicts the required member '${effect.member}'`,
+						severity: "error",
+						type: "rule-violation",
+					});
+				}
+			}
+			break;
+		}
+	}
+}
+/* eslint-enable no-param-reassign */
+
+// Compute the effective property for `property` (which belongs to `symbol_name`)
+// by folding every collected rule whose condition holds. Refs are already resolved
+// to concrete symbols (collection time); here we only read/write through them.
+export function apply_overrides(
+	property: Property,
+	collected_rules: CollectedRule[],
+	symbol_name: string,
+	workfile: Workfile,
+): OverrideResult {
+	const effective = structuredClone(property);
+	const errors: ValidationError[] = [];
+
+	// Why this property ended up disabled, if it did (e.g. "mutually exclusive with
+	// spi_init"). Transient to this fold — used only for the disabled-but-set error.
+	let disable_reason: string | undefined;
+	// Same idea for a required effect that carries a reason.
+	let required_reason: string | undefined;
+	let selected_member: string | undefined;
+
+	for (const collected of collected_rules) {
+		const when = collected.rule.when;
+
+		// The parser only type-checks case names in $this scope; a $parent target isn't
+		// known until refs are resolved. An unmatchable case leaves the rule silently
+		// inert, so report it here, where the enum it reads is finally in hand. The
+		// sibling values on a PredicateNoneOf are the same set, so this covers `_` too.
+		if (
+			property._t === "EnumProperty"
+			&& when._t === "PredicateEquals"
+			&& when.reference.property === property.name
+			&& resolve_node(when.reference, collected) === symbol_name
+			&& !property.values.includes(when.value as string | number)
+		) {
+			errors.push({
+				path: `${symbol_name}.${property.name}`,
+				message: `Case '${String(when.value)}' never matches '${property.name}'. Valid values: ${property.values.join(", ")}`,
+				severity: "warning",
+				type: "rule-violation",
+			});
+		}
+
+		if (!evaluate_predicate(when, collected, workfile)) {
+			continue;
+		}
+
+		// The ruleset that declared the rule, by its $symbol: stable, unlike the workfile
+		// node's name, and the file to open to change what the rule says.
+		const source = workfile.symbols[collected.self_symbol]?.$symbol ?? collected.self_symbol;
+
+		for (const effect of collected.rule.effects) {
+			const target_symbol = resolve_node(effect.reference, collected);
+			if (target_symbol !== symbol_name || effect.reference.property !== property.name) {
+				continue;
+			}
+			const reason = apply_effect(effective, effect, symbol_name, errors, source);
+			if (effect.op === "setDisabled") {
+				disable_reason = reason;
+			}
+			if (effect.op === "setRequired" && effect.value && effect.reason !== undefined) {
+				required_reason = effect.reason;
+			}
+			if (effect.op === "selectMember") {
+				selected_member = effect.member;
+			}
+		}
+	}
+
+	// General disabled-but-set check (subsumes the old mutex special case): a
+	// disabled property that still carries an explicit value is an error, explained
+	// by whichever disable effect fired. A disabled-and-unset property is fine — it
+	// just skips its required check downstream.
+	if (effective.disabled && effective.value !== undefined) {
+		errors.push({
+			path: `${symbol_name}.${property.name}`,
+			message: disable_reason ?? `Property '${property.name}' is disabled but has a value`,
+			severity: "error",
+			type: "rule-violation",
+		});
+	}
+
+	return { effective, errors, required_reason, selected_member };
+}

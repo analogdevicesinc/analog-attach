@@ -1,0 +1,10 @@
+name: sensor
+type: driver_category
+version: "1.0.0"
+description: "Sensor drivers"
+
+drivers:
+  - testpart
+
+provides:
+  interfaces: [test_sensor]

@@ -1,0 +1,3 @@
+# The test specification's version (report.py): raise it when the specification is handed out.
+# The workbooks add the last commit that changed a spec source and a fingerprint of its content.
+0.1

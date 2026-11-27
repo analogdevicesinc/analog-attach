@@ -1,0 +1,18 @@
+name: testpart
+type: driver
+category: sensor
+version: "1.0.0"
+description: "A part on a SPI bus"
+
+build:
+  kconfig: TESTPART
+  sources: [testpart.c]
+  includes: [.]
+
+depends:
+  interfaces: [spi]
+
+provides:
+  interfaces: [test_sensor]
+
+rulesets_file: analog-attach/module.yml

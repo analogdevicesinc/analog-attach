@@ -1,0 +1,15 @@
+schema_version: "1.0"
+
+rulesets:
+  enums:
+    - enums/testpart_comm_type.yaml
+  structs:
+    - testpart_init_param.yaml
+  externs:
+    - testpart_ops.yaml
+  iio:
+    - iio/testpart_iio_init_param.yaml
+
+# Only a loop: the part needs no setup.
+example:
+  loop: examples/loop.eta

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "build.schema.json",
+  "title": "build response",
+  "description": "Standard output of build in JSON mode (BUILD-031 to BUILD-033; noos BUILD-520, BUILD-521). $defs/base is BuildResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": {
+      "description": "BuildResponse: path is the artifact, when there is one.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
+      "properties": { "path": { "type": "string" } }
+    },
+    "linux": {
+      "oneOf": [
+        {
+          "description": "AA_BUILD succeeded and left the output file (BUILD-032): path is the .dtbo, or where output is devicetree the .dtb, with source the full devicetree build wrote first (BUILD-015).",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "required": ["path"],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^Built /.+ with AA_BUILD$" },
+            "severity": { "const": "info" },
+            "path": { "type": "string", "pattern": "^/", "description": "The output file, absolute: $AA_DTBO, or $AA_DTB where output is devicetree." },
+            "source": { "type": "string", "pattern": "^/", "description": "Where output is devicetree: the full devicetree file, absolute." }
+          },
+          "unevaluatedProperties": false
+        },
+        {
+          "description": "AA_BUILD succeeded but left no output file where it goes (BUILD-033).",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^AA_BUILD succeeded, but /.+ is not there$" },
+            "severity": { "const": "warn" },
+            "error_type": { "const": "output-missing" },
+            "source": { "type": "string", "pattern": "^/" }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal", "description": "AA_BUILD failed: 'Build failed: AA_BUILD exited with status <n>' (or 'did not run: <why>'), then a newline and its standard error when it wrote any (BUILD-031); where output is devicetree, 'Build failed: ' and why the full devicetree couldn't be written or preprocessed (BUILD-013, BUILD-014)." },
+        { "$ref": "common.schema.json#/$defs/config-refusal", "description": "A problem of the workspace, among them aa_build.sh missing or not executable while AA_BUILD is its default (COM-150)." }
+      ]
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the project was built (BUILD-520). path is the ELF, when the build left one; severity is warn when it didn't (BUILD-521).",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^Built .+" },
+            "severity": { "enum": ["info", "warn"] },
+            "path": { "type": "string", "pattern": "^/" }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

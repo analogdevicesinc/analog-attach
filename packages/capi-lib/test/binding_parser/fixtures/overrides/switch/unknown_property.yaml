@@ -1,0 +1,13 @@
+$type: struct
+$symbol: test_struct
+mode:
+  type: enum
+  values: [A, B]
+
+$override:
+  - $switch:
+      $on: unknown_prop
+      $cases:
+        A:
+          mode:
+            default: A

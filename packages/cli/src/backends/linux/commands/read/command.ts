@@ -1,0 +1,602 @@
+import path from "node:path";
+
+import { DeviceTreeOverlay, creatable_providers, get_full_node_name, is_dt_flag, print_property, type DTProperty } from "linux-lib";
+
+import { answer, command, read_header, refuse, type Outcome, type Session } from "../../../../interface/backend-interface";
+import { load_workspace, optional_bindings, type Bindings } from "../../config/workspace";
+import type { ConfigResult } from "../../config/settings";
+import { bigIntReplacer, resolve_node_identifier, not_found_message, parse_target } from "../../utilities";
+import { convert_property, written_value } from "../../protocol/dt-to-protocol";
+import { UNTYPED } from "../../protocol/binding-to-description";
+import type { Property, PropertyConstraints, ReadNode, ReadProperty, ReadResponse, Suggestion, Types, ValueSource } from "../../protocol/types";
+import { format_type, resolve_target_binding, type PropertyInfo } from "../list/suggest";
+import { node_missing_required, property_details } from "../../node-state";
+
+export interface ReadOptions {
+	/** Only the value (or "true" for a flag), as before the binding details were added. */
+	quiet: boolean;
+}
+
+/**
+ * Find a node and optionally a property on it, as the outcome to end with.
+ * The node is read as the base and the overlay together have it, each value
+ * marked with where it is set. Unless quiet, a property comes with what its
+ * binding says about it, the values on offer and the providers that can be
+ * added for it, and a node (in text mode) with the required properties it
+ * still lacks. Shared with `update <path> <prop>` without a value.
+ */
+export async function read_target(
+	session: Pick<Session, "mode" | "program">,
+	overlay: DeviceTreeOverlay,
+	bindings: ConfigResult<Bindings>,
+	path_string: string,
+	property_name: string | undefined,
+	options: ReadOptions,
+): Promise<Outcome<ReadResponse>> {
+	const base = overlay.get_base_dts() ?? undefined;
+	const reference = resolve_node_identifier(path_string, overlay);
+	const node_path = overlay.find_node(reference)?.node_path ?? base?.locate(reference)?.path;
+	const node = node_path === undefined ? undefined : overlay.effective_node(node_path);
+
+	if (node_path === undefined || node === undefined) {
+		return refuse(not_found_message(path_string, overlay, base), { type: "not-found" });
+	}
+
+	const property = property_name === undefined ? undefined : node.properties.find(p => p.name === property_name);
+	if (property_name !== undefined && property === undefined) {
+		return refuse(`Not found: ${property_name} on ${path_string}`, { type: "not-found" });
+	}
+
+	// A node's binding only gives the missing required properties, which JSON mode doesn't report.
+	const json = session.mode === "json";
+	const needs_binding = !options.quiet && (property !== undefined || !json);
+	const target = !needs_binding || base === undefined ? undefined : await resolve_target_binding(path_string, overlay, base, bindings);
+	const binding = target === undefined || "error" in target.binding ? undefined : target.binding;
+
+	if (property === undefined) {
+		const read = read_node(overlay, node_path);
+		const missing = json || binding === undefined ? [] : node_missing_required(binding, overlay, node_path);
+		return answer<ReadResponse>(() => ({ ...read_header(`Read ${path_string}`), ...protocol_node(read) }), () => [...node_lines(read), ...format_missing(missing)].join("\n"));
+	}
+
+	const details = target === undefined || base === undefined
+		? { info: undefined, suggestions: [], others: [] }
+		: property_details(target, overlay, base, path_string, property.name);
+	const { info } = details;
+	const suggestions = [...details.suggestions, ...details.others];
+	const creatable = options.quiet ? [] : creatable_providers(property.name);
+
+	const source = property_source(overlay, node_path, property.name);
+	const response = (): ReadResponse => ({
+		...read_header(`Read ${property.name} of ${path_string}`),
+		...with_binding_type(read_property(property, source), info),
+		...(info?.description === undefined ? {} : { description: info.description }),
+		...(info === undefined ? {} : { required: info.required, ...binding_constraints(info), definition: path.basename(info.binding_path) }),
+		// A binding was looked up: the property's type in dt-schema's words, untyped when none defines it
+		...(target === undefined ? {} : { dt_type: info?.dt_type ?? UNTYPED }),
+		...(suggestions.length === 0 && creatable.length === 0 ? {} : {
+			suggestions: {
+				values: suggestions,
+				...(creatable.length === 0 ? {} : { can_create: creatable.map(compatible => ({ value: compatible, display_string: `add ${compatible}` })) }),
+			},
+		}),
+	});
+	if (options.quiet) {
+		return answer(response, is_dt_flag(property.value) ? "true" : print_property(property, "", 0).trim());
+	}
+	const lines = [`${property_line(property)}${source === "base" ? BASE_MARK : ""}`, ...format_details(info, suggestions)];
+	if (creatable.length > 0) { lines.push(`  Or add your own: ${creatable.map(compatible => `${session.program} add ${compatible}`).join(", ")}`); }
+	return answer(response, lines.join("\n"));
+}
+
+/**
+ * The property with the binding's type, when the binding defines it (READ-050). The value stays
+ * as written, except that a single value under an array type becomes a one-item array. The cells
+ * of a specifier list (`interrupts`) stay flat, as the type's bounds count them and `update`
+ * takes them.
+ */
+export function with_binding_type<P extends Property & { written?: Property["value"] }>(property: P, info?: Pick<PropertyInfo, "type">): P {
+	if (info === undefined) { return property; }
+	const { type } = info;
+	const listed = (value: Property["value"]): Property["value"] => type.kind === "array" && !Array.isArray(value) && value !== null ? [value] : value;
+	const { written } = property;
+	return { ...property, type, value: listed(property.value), ...(written === undefined ? {} : { written: listed(written) }) };
+}
+
+/** A property as `read` gives it: its value, where it is set, and its numbers as written when it has any (READ-054). */
+function read_property(property: DTProperty, source: ValueSource): ReadProperty {
+	const written = written_value(property);
+	return { ...convert_property(property), source, ...(written === undefined ? {} : { written }) };
+}
+
+function property_line(property: DTProperty): string {
+	return is_dt_flag(property.value) ? `${property.name};` : print_property(property, "", 0).trim();
+}
+
+/** The binding's default, minimum and maximum as `constraints`, left out when it gives none. */
+function binding_constraints(info: PropertyInfo): { constraints?: PropertyConstraints } {
+	const { default: fallback, minimum, maximum } = info.constraints;
+	const constraints: PropertyConstraints = {
+		...(fallback === undefined ? {} : { default: fallback }),
+		...(minimum === undefined ? {} : { minimum }),
+		...(maximum === undefined ? {} : { maximum }),
+	};
+	return Object.keys(constraints).length === 0 ? {} : { constraints };
+}
+
+const BASE_MARK = "   // base";
+
+function property_source(overlay: DeviceTreeOverlay, node_path: string, name: string): ValueSource {
+	return overlay.property_node(node_path, name) === undefined ? "base" : "overlay";
+}
+
+/** A node as `read` shows it (see `ReadNode`), with its properties still parsed for printing. */
+interface NodeRead {
+	key: string;
+	labels: string[];
+	origin: ReadNode["origin"];
+	collapsed: boolean;
+	properties: { property: DTProperty; source: ValueSource }[];
+	children: NodeRead[];
+	/** Its `status` property, kept for a collapsed child too: whether it is enabled shows without reading it. */
+	status?: DTProperty;
+	/** A collapsed child's: whether it has children, which `read` on its path shows. */
+	has_children?: boolean;
+}
+
+/**
+ * The node at `node_path` as the base and the overlay together have it. The
+ * children the overlay reaches (it changes them or something below them) are
+ * read the same way; the others are collapsed to their name and labels, so a
+ * base subtree isn't printed whole.
+ */
+function read_node(overlay: DeviceTreeOverlay, node_path: string): NodeRead {
+	const roots = overlay.get_fragments().flatMap(fragment => overlay.get_fragment_root_path(fragment) ?? []);
+	const touches = (path: string): boolean => overlay.overlay_nodes_at(path).length > 0;
+	const reaches = (path: string): boolean => touches(path) || roots.some(root => root.startsWith(path === "/" ? "/" : `${path}/`));
+	// Internal: the overlay adds the node or changes it. External: the base has it, untouched.
+	const origin = (path: string): ReadNode["origin"] => (
+		overlay.get_base_dts()?.node_exists(path) === true && !touches(path) ? "external" : "internal"
+	);
+
+	const read = (path: string): NodeRead => {
+		const node = overlay.effective_node(path);
+		const children = [...overlay.effective_children(path)].map(([name, child]): NodeRead => {
+			const child_path = path === "/" ? `/${name}` : `${path}/${name}`;
+			if (reaches(child_path)) { return read(child_path); }
+			const status = child.properties.find(property => property.name === "status");
+			const has_children = overlay.effective_children(child_path).size > 0;
+			return { key: name, labels: child.labels, origin: "external", collapsed: true, properties: [], children: [], has_children, ...(status === undefined ? {} : { status }) };
+		});
+		const status = node?.properties.find(property => property.name === "status");
+		return {
+			key: node === undefined ? path : get_full_node_name(node),
+			labels: node?.labels ?? [],
+			origin: origin(path),
+			collapsed: false,
+			...(status === undefined ? {} : { status }),
+			properties: (node?.properties ?? []).map(property => ({ property, source: property_source(overlay, path, property.name) })),
+			children,
+		};
+	};
+	return read(node_path);
+}
+
+function protocol_node(node: NodeRead): ReadNode {
+	return {
+		kind: "node",
+		key: node.key,
+		properties: node.properties.map(({ property, source }) => read_property(property, source)),
+		children: node.children.map(child => protocol_node(child)),
+		alias: node.labels,
+		origin: node.origin,
+		...(node.status === undefined ? {} : { status: String(convert_property(node.status).value) }),
+		...(node.has_children === undefined ? {} : { has_children: node.has_children }),
+	};
+}
+
+/** A read node as DTS, with `// base` after what the base sets and after collapsed children. */
+function node_lines(node: NodeRead, indent = ""): string[] {
+	const labels = node.labels.map(label => `${label}: `).join("");
+	if (node.collapsed) { return [`${indent}${labels}${node.key} { … };${BASE_MARK}`]; }
+	const lines = [`${indent}${labels}${node.key} {`];
+	for (const { property, source } of node.properties) {
+		lines.push(`${indent}    ${property_line(property)}${source === "base" ? BASE_MARK : ""}`);
+	}
+	for (const child of node.children) { lines.push(...node_lines(child, `${indent}    `)); }
+	lines.push(`${indent}};`);
+	return lines;
+}
+
+/**
+ * The lines under a property's value: its description and binding file, what's
+ * allowed, and the suggestions. `with_type` adds the type when nothing narrower
+ * is allowed, for a question that has no value to show yet. Without
+ * `with_allowed`, what is allowed is left out too (a question that lists the
+ * options itself).
+ */
+export function format_details(info: PropertyInfo | undefined, all_suggestions: Suggestion[], { with_type = false, with_allowed = true } = {}): string[] {
+	const lines: string[] = [];
+	let suggestions = all_suggestions;
+	if (info !== undefined) {
+		const description = (info.description ?? "").trim().split("\n").map(line => line.trim()).filter(Boolean);
+		const file = `(${path.basename(info.binding_path)})`;
+		const last = description.pop();
+		lines.push(...description.map(line => `  ${line}`), last === undefined ? `  ${file}` : `  ${last}   ${file}`);
+		// A phandle's options are every node it could name, so they are left to the suggestions.
+		const allowed = info.phandle_options === undefined && with_allowed ? allowed_text(info) : undefined;
+		if (allowed !== undefined) { lines.push(`  Allowed: ${allowed}`); } else if (with_type) { lines.push(`  Type: ${info.phandle_options === undefined ? format_type(info.type) : "phandle"}`); }
+		if (info.constraints.default !== undefined) { lines.push(`  Default: ${JSON.stringify(info.constraints.default, bigIntReplacer)}`); }
+		// The binding suggests each option of an enum, which the Allowed line already lists: those that say no more go.
+		const options = allowed === undefined ? undefined : enum_options(info.type);
+		if (options !== undefined) {
+			suggestions = suggestions.filter(s => !options.includes(s.value) || (s.display_string ?? s.value) !== s.value);
+		}
+	}
+	if (suggestions.length > 0) {
+		const plain = suggestions.every(s => (s.display_string ?? s.value) === s.value);
+		if (plain) {
+			lines.push(`  Suggestions: ${suggestions.map(s => s.value).join(", ")}`);
+		} else {
+			lines.push("  Suggestions:");
+			for (const { value, display_string: display = value } of suggestions) {
+				lines.push(display.startsWith(value) ? `    ${display}` : `    ${value}  ${display}`);
+			}
+		}
+	}
+	return lines;
+}
+
+function allowed_text({ type, constraints }: PropertyInfo): string | undefined {
+	if (constraints.const !== undefined) { return JSON.stringify(constraints.const, bigIntReplacer); }
+	const options = enum_options(type);
+	if (options !== undefined) { return options.join(" | "); }
+	const { minimum, maximum } = constraints;
+	if (minimum !== undefined && maximum !== undefined) {
+		return is_cell_width(minimum, maximum) ? undefined : `${minimum}..${maximum}`;
+	}
+	if (minimum !== undefined) { return `>= ${minimum}`; }
+	if (maximum !== undefined) { return `<= ${maximum}`; }
+	return undefined;
+}
+
+function enum_options(type: Types): string[] | undefined {
+	if (type.kind === "enum") { return type.options.map(o => String(o.display_string ?? o.value)); }
+	if (type.kind === "array") { return enum_options(type.items); }
+	return undefined;
+}
+
+/** Whether a range is just what a uint8/16/32/64 or int8/16/32/64 cell can hold, which says nothing. */
+function is_cell_width(minimum: number | bigint, maximum: number | bigint): boolean {
+	const low = BigInt(minimum);
+	const high = BigInt(maximum);
+	return [8n, 16n, 32n, 64n].some(bits => (low === 0n && high === (1n << bits) - 1n)
+		|| (low === -(1n << (bits - 1n)) && high === (1n << (bits - 1n)) - 1n));
+}
+
+export function format_missing(missing: string[]): string[] {
+	return missing.length === 0 ? [] : [`Missing required: ${missing.join(", ")}`];
+}
+
+/**
+ * `read` without a path (READ-011): what the overlay puts in the merged tree. `read /` without the
+ * collapsed children and the base's properties, so each node of the overlay stays where it goes,
+ * under the nodes on the way to it, and what the overlay sets on a base node stays on that node.
+ */
+function overlay_root(overlay: DeviceTreeOverlay): ReadNode {
+	const overlay_part = (node: NodeRead): NodeRead => ({
+		...node,
+		properties: node.properties.filter(({ source }) => source === "overlay"),
+		children: node.children.filter(child => !child.collapsed).map(child => overlay_part(child)),
+	});
+	return protocol_node(overlay_part(read_node(overlay, "/")));
+}
+
+export const read = command<{ path?: string; property?: string; quiet: boolean }, ReadResponse>({
+	docs: {
+		brief: "Read nodes or properties from the overlay",
+		full: `Paths:
+  Label:        spi0                       (a label in the base tree)
+  Label-first:  spi0/adi,ad7124-8@0       (label then child segments)
+  Absolute:     /soc/spi@7e204000          (full device tree path)
+
+A property is shown with its binding description, the allowed values and
+suggestions; a node with the required properties it still lacks.`,
+		examples: [
+			"read                                   Print the entire overlay",
+			"read spi0                              Print a node by label",
+			"read spi0/adi,ad7124-8@0               Print a node subtree",
+			"read spi0/adi,ad7124-8@0 reg           Read a single property",
+			"read --quiet spi0/adi,ad7124-8@0 reg   Only the value",
+		],
+	},
+	async run(arguments_, _flags, session) {
+		const loaded = load_workspace(session, ["base", "overlay"]);
+		if (!loaded.ok) { return loaded.outcome; }
+		const { workspace } = loaded;
+		const { tree: overlay } = workspace.overlay;
+		if (arguments_.path === undefined) {
+			return answer<ReadResponse>(() => ({ ...read_header("Read the workfile"), ...overlay_root(overlay) }), () => workspace.overlay.print());
+		}
+
+		const target = parse_target(arguments_.path, arguments_.property, { path: "required", property: "optional" });
+		if (!target.ok) { return target.outcome; }
+
+		// Bindings are optional: without them read prints the plain value.
+		return read_target(session, overlay, optional_bindings(workspace), target.path ?? arguments_.path, target.property, { quiet: arguments_.quiet });
+	},
+});
+
+if (import.meta.vitest) {
+	const { test, expect } = import.meta.vitest;
+	const { DeviceTree: DT, DeviceTreeOverlay: DTO } = await import("linux-lib");
+	const { outcome_json, outcome_text } = await import("../../testing/outcome");
+	const text_session = { mode: "text", program: "aa" } as const;
+	const json_session = { mode: "json", program: "aa" } as const;
+
+	const info: PropertyInfo = {
+		type: { kind: "number", subtype: "int" },
+		description: "Maximum SPI clocking speed of the device in Hz.",
+		required: false,
+		binding_path: "/linux/Documentation/devicetree/bindings/iio/adc/adi,ad7124.yaml",
+		constraints: { maximum: 5_000_000n },
+		dt_type: "uint32 · 0 to 5000000",
+	};
+
+	test("format_details — description with the binding file, range and suggestions", () => {
+		expect(format_details(info, [{ value: "5000000", display_string: "5000000" }])).toEqual([
+			"  Maximum SPI clocking speed of the device in Hz.   (adi,ad7124.yaml)",
+			"  Allowed: <= 5000000",
+			"  Suggestions: 5000000",
+		]);
+	});
+
+	test("format_details — a range that is just the cell width says nothing", () => {
+		expect(format_details({ ...info, constraints: { minimum: 0, maximum: 4_294_967_295 } }, [])).toEqual([
+			"  Maximum SPI clocking speed of the device in Hz.   (adi,ad7124.yaml)",
+		]);
+	});
+
+	const lines = (constraints: PropertyInfo["constraints"]): string[] => format_details({ ...info, description: undefined, constraints }, []);
+
+	test("format_details — ranges, const and default", () => {
+		expect(lines({ minimum: 1, maximum: 8 })).toEqual(["  (adi,ad7124.yaml)", "  Allowed: 1..8"]);
+		expect(lines({ minimum: 2 })).toEqual(["  (adi,ad7124.yaml)", "  Allowed: >= 2"]);
+		expect(lines({ const: "adi,ad7124-8", default: 3 })).toEqual(["  (adi,ad7124.yaml)", "  Allowed: \"adi,ad7124-8\"", "  Default: 3"]);
+	});
+
+	test("format_details — enum options, and suggestions with notes one per line", () => {
+		const enum_info: PropertyInfo = {
+			...info,
+			description: "Interrupt parent",
+			type: { kind: "enum", options: [{ value: "gpio" }, { value: "gicv2" }] },
+			constraints: {},
+		};
+		expect(format_details(enum_info, [
+			{ value: "gicv2", display_string: "gicv2 — interrupt controller; inherited from /" },
+			{ value: "gpio", display_string: "gpio — interrupt controller" },
+		])).toEqual([
+			"  Interrupt parent   (adi,ad7124.yaml)",
+			"  Allowed: gpio | gicv2",
+			"  Suggestions:",
+			"    gicv2 — interrupt controller; inherited from /",
+			"    gpio — interrupt controller",
+		]);
+	});
+
+	test("format_details — an option the Allowed line lists is no suggestion of its own; without with_allowed, neither is shown", () => {
+		const reference: PropertyInfo = { ...info, description: undefined, type: { kind: "enum", options: [{ value: 0 }, { value: 1 }, { value: 3 }] }, constraints: { default: 3 } };
+		const suggestions = [{ value: "3", display_string: "3 — the binding's default" }, { value: "0", display_string: "0" }, { value: "1" }];
+		expect(format_details(reference, suggestions)).toEqual([
+			"  (adi,ad7124.yaml)",
+			"  Allowed: 0 | 1 | 3",
+			"  Default: 3",
+			"  Suggestions:",
+			"    3 — the binding's default",
+		]);
+		expect(format_details(reference, [], { with_allowed: false })).toEqual(["  (adi,ad7124.yaml)", "  Default: 3"]);
+	});
+
+	test("format_details — a phandle lists no Allowed line, and its type is phandle", () => {
+		const phandle_info: PropertyInfo = {
+			...info,
+			description: "Interrupt parent",
+			type: { kind: "enum", options: [{ value: "gpio" }, { value: "gicv2" }, { value: "aon_intr" }] },
+			constraints: {},
+			phandle_options: ["gpio", "gicv2", "aon_intr"],
+		};
+		expect(format_details(phandle_info, [
+			{ value: "gicv2", display_string: "gicv2 — interrupt controller; inherited from /" },
+			{ value: "aon_intr", display_string: "aon_intr (disabled)" },
+		])).toEqual([
+			"  Interrupt parent   (adi,ad7124.yaml)",
+			"  Suggestions:",
+			"    gicv2 — interrupt controller; inherited from /",
+			"    aon_intr (disabled)",
+		]);
+		expect(format_details(phandle_info, [], { with_type: true })).toEqual(["  Interrupt parent   (adi,ad7124.yaml)", "  Type: phandle"]);
+	});
+
+	test("format_details — a display that doesn't start with the value shows both", () => {
+		expect(format_details({ ...info, constraints: {} }, [{ value: "19 IRQ_TYPE_EDGE_FALLING", display_string: "GPIO 19, falling edge" }]).at(-2))
+			.toBe("  Suggestions:");
+		expect(format_details({ ...info, constraints: {} }, [{ value: "19 IRQ_TYPE_EDGE_FALLING", display_string: "GPIO 19, falling edge" }]).at(-1))
+			.toBe("    19 IRQ_TYPE_EDGE_FALLING  GPIO 19, falling edge");
+	});
+
+	test("format_details — a multi-line description puts the file after the last line", () => {
+		expect(format_details({ ...info, description: "First line.\nSecond line.\n", constraints: {} }, [])).toEqual([
+			"  First line.",
+			"  Second line.   (adi,ad7124.yaml)",
+		]);
+	});
+
+	test("format_details — with_type shows the type when nothing narrower is allowed", () => {
+		expect(format_details({ ...info, constraints: {} }, [], { with_type: true })).toEqual([
+			"  Maximum SPI clocking speed of the device in Hz.   (adi,ad7124.yaml)",
+			"  Type: number",
+		]);
+		expect(format_details(info, [], { with_type: true }).at(-1)).toBe("  Allowed: <= 5000000");
+	});
+
+	test("format_details — no binding: suggestions only", () => {
+		expect(format_details(undefined, [])).toEqual([]);
+		expect(format_details(undefined, [{ value: "1", display_string: "1" }])).toEqual(["  Suggestions: 1"]);
+	});
+
+	test("format_missing — the missing required properties of a node", () => {
+		expect(format_missing(["interrupt-parent", "interrupts"])).toEqual(["Missing required: interrupt-parent, interrupts"]);
+		expect(format_missing([])).toEqual([]);
+	});
+
+	test("read_target — without bindings a property prints just its value and a node no missing list", async () => {
+		const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tcompatible = "adi,ad7124-8";\n\t\tspi-max-frequency = <1000000>;\n\t};\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "tool-missing", message: "no dt-schema" }] };
+
+		const logs = [
+			outcome_text(await read_target(text_session, overlay, no_bindings, "spi0/adc@0", "spi-max-frequency", { quiet: false })),
+			outcome_text(await read_target(text_session, overlay, no_bindings, "spi0/adc@0", undefined, { quiet: false })),
+		].join("\n").split("\n");
+
+		expect(logs).toEqual([
+			"spi-max-frequency = <1000000>;",
+			"adc@0 {",
+			"    compatible = \"adi,ad7124-8\";",
+			"    spi-max-frequency = <1000000>;",
+			"};",
+		]);
+	});
+
+	test("read_target — the base and the overlay together, base values marked, base children collapsed", async () => {
+		const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\ti2c_arm: i2c1: i2c@7e804000 {\n\t\t\tcompatible = "brcm,bcm2835-i2c";\n\t\t\tstatus = "disabled";\n\t\t\trtc@51 {\n\t\t\t\treg = <0x51>;\n\t\t\t};\n\t\t};\n\t\tspi0: spi@7e204000 {\n\t\t\tcompatible = "brcm,bcm2835-spi";\n\t\t\tspidev@0 {\n\t\t\t};\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&i2c_arm {\n\tstatus = "okay";\n\thwmon@2e {\n\t\treg = <0x2e>;\n\t};\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "tool-missing", message: "no dt-schema" }] };
+		const human = async (path: string, property?: string): Promise<string[]> =>
+			outcome_text(await read_target(text_session, overlay, no_bindings, path, property, { quiet: false })).split("\n");
+
+		expect(await human("i2c1", "compatible")).toEqual([`compatible = "brcm,bcm2835-i2c";   // base`]);
+		expect(await human("i2c1", "status")).toEqual([`status = "okay";`]);
+		expect(await human("i2c1")).toEqual([
+			"i2c_arm: i2c1: i2c@7e804000 {",
+			`    compatible = "brcm,bcm2835-i2c";   // base`,
+			`    status = "okay";`,
+			"    rtc@51 { … };   // base",
+			"    hwmon@2e {",
+			"        reg = <0x2e>;",
+			"    };",
+			"};",
+		]);
+		// A base node the overlay doesn't touch reads too.
+		expect(await human("spi0")).toEqual(["spi0: spi@7e204000 {", `    compatible = "brcm,bcm2835-spi";   // base`, "    spidev@0 { … };   // base", "};"]);
+		// The overlay reaches /soc through i2c1, so it is read; spi0 isn't, so it is collapsed.
+		const soc = await human("/soc");
+		expect(soc.filter(line => line.startsWith("    ") && !line.startsWith("        "))).toEqual([
+			"    i2c_arm: i2c1: i2c@7e804000 {",
+			"    };",
+			"    spi0: spi@7e204000 { … };   // base",
+		]);
+
+		const responses = [
+			await outcome_json(await read_target(json_session, overlay, no_bindings, "i2c1", "compatible", { quiet: false })),
+			await outcome_json(await read_target(json_session, overlay, no_bindings, "i2c1", undefined, { quiet: false })),
+		];
+		expect(responses[0]).toMatchObject({ key: "compatible", source: "base" });
+		expect(responses[1]).toMatchObject({
+			key: "i2c@7e804000",
+			origin: "internal",
+			properties: [{ key: "compatible", source: "base" }, { key: "status", source: "overlay" }],
+			children: [{ key: "rtc@51", origin: "external", properties: [], children: [] }, { key: "hwmon@2e", origin: "internal" }],
+		});
+		expect(responses[1]).not.toHaveProperty("children.0.collapsed");
+		// A collapsed child says whether it has children; a read one gives them.
+		expect(responses[1]).toHaveProperty("children.0.has_children", false);
+		expect(responses[1]).not.toHaveProperty("children.1.has_children");
+		const soc_json = await outcome_json(await read_target(json_session, overlay, no_bindings, "/soc", undefined, { quiet: false }));
+		expect(soc_json).toMatchObject({ children: [{ key: "i2c@7e804000" }, { key: "spi@7e204000", children: [], has_children: true }] });
+		expect(soc_json).not.toHaveProperty("children.0.has_children");
+		expect(responses[1]).not.toHaveProperty("missing_required");
+		expect(await outcome_json(await read_target(json_session, overlay, no_bindings, "spi0", undefined, { quiet: false }))).toMatchObject({ origin: "external" });
+	});
+
+	test("overlay_root — read / without the collapsed children and the base's properties", () => {
+		const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tmodel = "board";\n\tsoc {\n\t\tcompatible = "simple-bus";\n\t\ti2c_arm: i2c1: i2c@7e804000 {\n\t\t\tcompatible = "brcm,bcm2835-i2c";\n\t\t\tstatus = "disabled";\n\t\t\trtc@51 {\n\t\t\t\treg = <0x51>;\n\t\t\t};\n\t\t};\n\t\tspi0: spi@7e204000 {\n\t\t\tcompatible = "brcm,bcm2835-spi";\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&i2c_arm {\n\tstatus = "okay";\n\thwmon@2e {\n\t\treg = <0x2e>;\n\t};\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const keys = (node: ReadNode): unknown => ({ key: node.key, properties: node.properties.map(property => `${property.key} ${property.source}`), children: node.children.map(child => keys(child)) });
+
+		const root = overlay_root(overlay);
+		// The added node under the bus it goes on; the bus with the status the overlay sets; the
+		// way to it without the base's properties; spi0 and rtc@51, which it doesn't reach, left out.
+		expect(keys(root)).toEqual({ key: "/", properties: [], children: [{ key: "soc", properties: [], children: [{
+			key: "i2c@7e804000", properties: ["status overlay"], children: [{ key: "hwmon@2e", properties: ["reg overlay"], children: [] }],
+		}] }] });
+		const [soc] = root.children;
+		const [i2c] = soc?.children ?? [];
+		expect(soc).toMatchObject({ origin: "external", alias: [] });
+		expect(i2c).toMatchObject({ origin: "internal", alias: ["i2c_arm", "i2c1"], status: "okay" });
+	});
+
+	test("read_target — every node gives its status, as the overlay leaves it; a collapsed one too", async () => {
+		const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\ti2c1: i2c@7e804000 {\n\t\t\tstatus = "disabled";\n\t\t};\n\t\tspi0: spi@7e204000 {\n\t\t\tstatus = "disabled";\n\t\t};\n\t\tgpio: gpio@7e200000 {\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&i2c1 {\n\tstatus = "okay";\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "tool-missing", message: "no dt-schema" }] };
+		const soc = await outcome_json(await read_target(json_session, overlay, no_bindings, "/soc", undefined, { quiet: false }));
+		// i2c1 is turned on by the overlay; spi0 is collapsed and still off; gpio has no status.
+		expect(soc).toMatchObject({ children: [{ key: "i2c@7e804000", status: "okay" }, { key: "spi@7e204000", status: "disabled" }, { key: "gpio@7e200000" }] });
+		expect(soc).not.toHaveProperty("children.2.status");
+	});
+
+	test("with_binding_type — the binding's type; the value as written, a single value made an array", () => {
+		const int: Types = { kind: "number", subtype: "int" };
+		const property = (value: Property["value"]): Property => ({ kind: "property", key: "p", type: int, value });
+		const enumeration: Types = { kind: "enum", options: [{ value: 0 }, { value: 1 }, { value: 3 }] };
+		expect(with_binding_type(property(0))).toEqual(property(0));
+		expect(with_binding_type(property(3), { type: enumeration })).toEqual({ kind: "property", key: "p", type: enumeration, value: 3 });
+		const array: Types = { kind: "array", items: int };
+		expect(with_binding_type(property(0), { type: array }).value).toEqual([0]);
+		expect(with_binding_type(property([0, 1]), { type: array }).value).toEqual([0, 1]);
+		// A specifier list's cells stay flat: its bounds count cells.
+		const rows: Types = { kind: "array", items: { kind: "tuple", items: [int, int] }, min_items: 2, max_items: 2 };
+		expect(with_binding_type(property([25, 2]), { type: rows }).value).toEqual([25, 2]);
+		const tuple: Types = { kind: "tuple", items: [{ kind: "string" }, int, int] };
+		expect(with_binding_type(property(["&gpio", 25, 1]), { type: tuple }).value).toEqual(["&gpio", 25, 1]);
+	});
+
+	test("read_target — a clock or a supply can be added instead of the values on offer, unless quiet", async () => {
+		const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tvref-supply = <&spi0>;\n\t\tspi-max-frequency = <1000000>;\n\t};\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", error_type: "tool-missing", message: "no dt-schema" }] };
+		const run = async (json: boolean, property: string, quiet = false) =>
+			read_target(json ? json_session : text_session, overlay, no_bindings, "spi0/adc@0", property, { quiet });
+
+		expect(await outcome_json(await run(true, "vref-supply"))).toMatchObject({
+			suggestions: { values: [], can_create: [{ value: "regulator-fixed", display_string: "add regulator-fixed" }] },
+		});
+		expect(outcome_text(await run(false, "vref-supply")).split("\n")).toEqual(["vref-supply = <&spi0>;", "  Or add your own: aa add regulator-fixed"]);
+		expect(await outcome_json(await run(true, "vref-supply", true))).not.toHaveProperty("suggestions");
+		expect(outcome_text(await run(false, "vref-supply", true))).toBe("vref-supply = <&spi0>;");
+		expect(await outcome_json(await run(true, "spi-max-frequency"))).not.toHaveProperty("suggestions");
+	});
+
+	test("read_target — a missing node or property is a refusal", async () => {
+		const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [] };
+		const missing = await read_target(json_session, overlay, no_bindings, "spi9", undefined, { quiet: false });
+		expect(missing.kind).toBe("refused");
+		expect(await outcome_json(missing)).toEqual({ ok: false, message: "Not found: spi9. Did you mean spi0?", severity: "error", error_type: "not-found" });
+		expect(outcome_text(await read_target(text_session, overlay, no_bindings, "spi0", "reg", { quiet: false }))).toBe("Not found: reg on spi0");
+	});
+}

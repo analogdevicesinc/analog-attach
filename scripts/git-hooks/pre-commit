@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# pre-commit: ESLint on the TypeScript files the commit adds or changes under a package's src/
+# (cli, linux-lib, capi-lib: the folders their `lint` covers), each with its package's config,
+# which has the formatting rules of eslint.stylistic.mjs. An error stops the commit, a warning
+# doesn't (as `yarn lint`). On with `yarn hooks:install`;
+# `git commit --no-verify` skips it.
+#
+# ESLint reads the files on disk: a file with changes that aren't staged is linted as it is in the
+# working tree, not as it is committed.
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+status=0
+for package in cli linux-lib capi-lib; do
+	files=()
+	while IFS= read -r -d '' file; do
+		files+=("${file#"packages/$package/"}")
+	done < <(git diff --cached --name-only --diff-filter=ACMR -z -- "packages/$package/src/*.ts")
+	[ ${#files[@]} -eq 0 ] && continue
+	echo "pre-commit: linting ${#files[@]} file(s) of packages/$package" >&2
+	(cd "packages/$package" && yarn eslint --no-warn-ignored -- "${files[@]}") >&2 || status=1
+done
+
+if [ "$status" -ne 0 ]; then
+	echo "pre-commit: lint errors: fix them and commit again (git commit --no-verify skips this)." >&2
+fi
+exit "$status"

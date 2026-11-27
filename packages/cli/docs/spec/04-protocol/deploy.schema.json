@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deploy.schema.json",
+  "title": "deploy response",
+  "description": "Standard output of deploy in JSON mode (DEPLOY-031, DEPLOY-032; noos DEPLOY-520). $defs/base is DeployResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": { "description": "DeployResponse: a CommonResponse.", "$ref": "common.schema.json#/$defs/common" },
+    "linux": {
+      "oneOf": [
+        {
+          "description": "AA_DEPLOY succeeded (DEPLOY-032).",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^Deployed /.+ with AA_DEPLOY$" },
+            "severity": { "const": "info" }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal", "description": "AA_DEPLOY failed: 'Deploy failed: AA_DEPLOY exited with status <n>' (or 'did not run: <why>'), then a newline and its standard error when it wrote any (DEPLOY-031)." },
+        { "$ref": "common.schema.json#/$defs/config-refusal", "description": "A problem of the workspace: aa_deploy.sh missing or not executable while AA_DEPLOY is its default (COM-150), a secret not in the environment of a run that can't ask (DEPLOY-042)." }
+      ]
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the project was flashed (DEPLOY-520).",
+          "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],
+          "properties": {
+            "message": { "type": "string", "pattern": "^(Deployed .+ with '.*'|Flashed .+ to .+ via (openocd|jlink))$" },
+            "severity": { "const": "info" }
+          }
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

@@ -1,7 +1,10 @@
-import { defineProject } from 'vitest/config';
+import { defineProject } from "vitest/config";
 
 export default defineProject({
-    test: {
-        projects: ['packages/attach-lib/vitest.config.ts']
-    },
+	test: {
+		projects: [
+			"packages/linux-lib/vitest.config.ts",
+			"packages/cli/vitest.config.ts",
+		]
+	},
 });

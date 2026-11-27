@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "validate.schema.json",
+  "title": "validate response",
+  "description": "Standard output of validate in JSON mode (VALIDATE-021): ok true, the count of findings as message, a severity taken from them, and the findings. A workspace that doesn't load (COM-071), or a tool that fails (VALIDATE-013), is a refusal instead, told apart by its ok. $defs/base is ValidationResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": {
+      "description": "ValidationResponse: severity is error when there are errors, else warn when there are warnings, else info.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
+      "required": ["errors", "warnings"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^[0-9]+ error\\(s\\), [0-9]+ warning\\(s\\)$" },
+        "errors": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/validation-finding" } },
+        "warnings": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/validation-finding" } }
+      }
+    },
+    "linux": {
+      "oneOf": [{ "$ref": "#/$defs/linux-report" }, { "$ref": "common.schema.json#/$defs/refusal" }, { "$ref": "common.schema.json#/$defs/config-refusal" }]
+    },
+    "linux-report": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "errors": {
+          "description": "Diagnostics of any level other than warning, in the order of VALIDATE-020 (with --full, VALIDATE-046).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/linux-diagnostic" }
+        },
+        "warnings": {
+          "description": "Diagnostics of level warning: dt-validate's, then the address warnings (7.4).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/linux-diagnostic" }
+        },
+        "base_findings": {
+          "description": "With --full only, when the full tree was checked (not when a fragment's target names no node, VALIDATE-041): how many of the merged tree's findings are on nodes the overlay doesn't touch, and are left out (VALIDATE-045).",
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "linux-diagnostic": {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/validation-finding" }],
+      "properties": {
+        "path": {
+          "description": "The segments of the validation-tree path of the node the diagnostic is about: its absolute path, or node<N>, ... for a fragment whose target resolves to no node (VALIDATE-006, VALIDATE-022), followed by the property path. A diagnostic without a node has only its property path (VALIDATE-022).",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the workfile's problems (VALIDATE-500). Each path is [<node>, <property>] (and the union member, when the problem is in it), or [<node>]; a warning is a required raw value left empty, or a capability mismatch an override allows (VALIDATE-501).",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node3",
+          "sc16is750@48"
+        ],
+        "message": "sc16is750@48 (nxp,sc16is750): Unevaluated properties are not allowed ('i2c-max-frequency' was unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/serial/nxp,sc16is7xx.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "sc16is750@48",
+          "$nodename",
+          "0"
+        ],
+        "message": "sc16is750@48 (nxp,sc16is750): $nodename:0: 'sc16is750@48' does not match '^serial(@.*)?$'\n\tfrom schema $id: http://devicetree.org/schemas/serial/nxp,sc16is7xx.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "sc16is750@48",
+          "i2c-max-frequency"
+        ],
+        "message": "sc16is750@48 (nxp,sc16is750): i2c-max-frequency: b'\\x00\\x06\\x1a\\x80' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node5",
+          "int_pins@18",
+          "brcm,function"
+        ],
+        "message": "int_pins@18: brcm,function: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node5",
+          "int_pins@18",
+          "brcm,pins"
+        ],
+        "message": "int_pins@18: brcm,pins: b'\\x00\\x00\\x00\\x18' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node5",
+          "int_pins@18",
+          "brcm,pull"
+        ],
+        "message": "int_pins@18: brcm,pull: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

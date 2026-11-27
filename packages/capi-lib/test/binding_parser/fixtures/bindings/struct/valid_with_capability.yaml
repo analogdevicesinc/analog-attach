@@ -1,0 +1,6 @@
+$type: struct
+$symbol: spi_init_param
+$capability: spi
+device_id:
+  type: uint32_t
+  description: "Device ID"

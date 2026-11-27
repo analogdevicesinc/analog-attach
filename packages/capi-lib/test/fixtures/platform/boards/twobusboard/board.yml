@@ -1,0 +1,25 @@
+schema_version: "1.0"
+# Two SPI buses, each declaring its pins and its own chip-select line. A jumper-wired part
+# could go on either, so which bus it is on is the user's choice, not bootstrap's.
+peripherals:
+  spi:
+    bsp_test_spi_cfg:
+      interface: spi
+      identifier: 0
+      pins:
+        sck:  {connector: H1, pin: 1}
+        mosi: {connector: H1, pin: 2}
+        miso: {connector: H1, pin: 3}
+        cs:
+          - {connector: H1, pin: 4}
+    bsp_test_spi2_cfg:
+      interface: spi
+      identifier: 1
+      pins:
+        sck:  {connector: H1, pin: 5}
+        mosi: {connector: H1, pin: 6}
+        miso: {connector: H1, pin: 7}
+        cs:
+          - {connector: H1, pin: 8}
+  gpio_port:
+    bsp_other_gpio1_cfg: {interface: gpio, num_pins: 32, extra: {port: OTHER_GPIO1}}

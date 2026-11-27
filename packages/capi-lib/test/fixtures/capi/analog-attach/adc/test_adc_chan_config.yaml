@@ -1,0 +1,13 @@
+$type: struct
+$symbol: test_adc_chan_config
+$description: "Generic ADC channel configuration: the channel level, it names its ADC"
+adc_handle:
+  include: test_adc
+  pointer: true
+  required: true
+  description: "The ADC this channel belongs to"
+extra:
+  type: driver_init_param
+  interface: test_adc
+  required: true
+  description: "The selected driver's own channel configuration"

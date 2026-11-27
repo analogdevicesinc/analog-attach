@@ -1,0 +1,7 @@
+$type: enum
+$symbol: test_spi_mode
+$description: "SPI clock polarity and phase"
+values:
+  TEST_SPI_MODE_0: "CPOL 0, CPHA 0"
+  TEST_SPI_MODE_3: "CPOL 1, CPHA 1"
+default: TEST_SPI_MODE_0

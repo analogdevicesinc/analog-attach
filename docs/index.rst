@@ -1,46 +1,74 @@
+Analog Attach
+=============
 
-Analog Attach is a VS Code extension for creating and editing Device Tree
-files (DTS) and Device Tree Overlay (DTSO) files with schema validation,
-binding support, and remote deployment capabilities.
+Analog Attach is a command line tool, with a GUI that runs locally in your
+browser, for attaching devices to Linux boards through devicetree overlays. It
+works with any device that has a Linux driver and a devicetree binding. It
+writes the overlay for you, validates it against the bindings of your Linux
+kernel tree, builds it and deploys it to the board. For boards without overlay
+support it builds a full devicetree instead. An AI agent can drive it too:
+it ships a skill for AI coding agents, and the GUI has an Assistant.
 
-Get it from the `VS Code Marketplace <https://marketplace.visualstudio.com/items?itemName=AnalogDevices.analog-attach&ssr=false#review-details>`__,
-the extension source code is available at :git-analog-attach:`/`.
-
-Contents
--------------------------------------------------------------------------------
-
-.. toctree::
-   :caption: How to install
-   :maxdepth: 2
-
-   install-steps/index
+Analog Attach is distributed as an npm package attached to each release on
+`GitHub <https://github.com/analogdevicesinc/analog-attach/releases#release-v0.2.0>`__.
+The source code is available at :git-analog-attach:`/`.
 
 .. toctree::
-   :caption: Getting Started
+   :caption: Introduction
    :maxdepth: 2
 
-   my-first-dts/index
+   introduction/index
 
 .. toctree::
-   :caption: Plug and Play View
+   :caption: Installation
    :maxdepth: 2
 
-   plug-and-play/index
+   install/index
 
 .. toctree::
-   :caption: Tree Config View
+   :caption: Quick Start
    :maxdepth: 2
 
-   tree-config/index
+   quick-start/index
 
 .. toctree::
-   :caption: Common
+   :caption: Concepts
    :maxdepth: 2
 
-   common/index
+   concepts/index
 
 .. toctree::
-   :caption: Debugging and Common Issues
+   :caption: GUI Guide
    :maxdepth: 2
 
-   debugging/index
+   ui-guide/index
+
+.. toctree::
+   :caption: CLI Guide
+   :maxdepth: 2
+
+   cli-guide/index
+
+.. toctree::
+   :caption: Working with AI Agents
+   :maxdepth: 2
+
+   ai-agents/index
+
+.. toctree::
+   :caption: Use Cases
+   :maxdepth: 2
+
+   use-cases/index
+
+.. toctree::
+   :caption: Reference
+   :maxdepth: 2
+
+   reference/index
+
+.. toctree::
+   :caption: Troubleshooting
+   :maxdepth: 2
+
+   troubleshooting/index

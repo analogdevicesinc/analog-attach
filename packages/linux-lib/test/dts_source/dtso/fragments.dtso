@@ -1,0 +1,32 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	fragment@0 {
+		target-path = "/soc/gpio@7e200000/gpclk0_gpio49/pin-gpclk";
+		__overlay__ {
+			compatible = "adi,imu";
+			reg = <1>;
+		};
+	};
+
+	fragment@1 {
+		target = <&label_reference>;
+		__overlay__ {
+			compatible = "adi,imu";
+			reg = <1>;
+		};
+	};
+};
+
+/ {
+	fragment@2 {
+		target = <&another_label_reference>;
+		__overlay__ {
+			imu@1 {
+				compatible = "adi,imu";
+				reg = <1>;
+			};
+		};
+	};
+};

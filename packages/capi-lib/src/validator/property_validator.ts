@@ -1,0 +1,717 @@
+import type {
+	ArrayProperty,
+	BooleanProperty,
+	DriverInitParameterProperty,
+	DriverOpsProperty,
+	EnumProperty,
+	IncludeMatch,
+	NumberProperty,
+	PlatformExtraProperty,
+	PlatformOpsProperty,
+	Property,
+	RulesetDescriptor,
+	RulesetStruct,
+	StringProperty,
+	UnionProperty
+} from "../ruleset_parser/types";
+import { is_integer_symbol, ruleset_type_token, RulesetType } from "../ruleset_parser/types";
+import type { ParseContext } from "../ruleset_parser/validators";
+import { at } from "../ruleset_parser/validators";
+import type { Workfile } from "../workfile_handler/types";
+import { resolve_reference, suggest_platform_extra } from "../workfile_handler/workfile_handler";
+import { load_resolved_ruleset } from "../resolver/resolver";
+import { driver_init_parameter_candidates, provides_interface } from "../registry/drivers";
+import { resolve_entry } from "../registry/registry";
+import { capability_fits } from "../workfile_handler/workfile_handler";
+import { format_number_in } from "../ruleset_parser/number_format";
+import { apply_overrides } from "./override_resolver";
+import type { CollectedRule, ValidationError } from "./types";
+
+export function validate_property(
+	property: Property,
+	child_overrides: CollectedRule[],
+	parent_symbol: RulesetStruct | RulesetDescriptor,
+	symbol_name: string,
+	workfile: Workfile,
+	context: ParseContext
+): ValidationError[] {
+	const property_context = at(context, property.name);
+
+	// symbol_name is the workfile INSTANCE key (e.g. "my_spi"), not parent_symbol.$symbol
+	// (the schema symbol, e.g. "capi_spi_device"). Refs were resolved to instance
+	// keys at collection time, so the engine must match against the instance key too.
+	const { effective, errors: override_errors, required_reason } = apply_overrides(
+		property, child_overrides, symbol_name, workfile
+	);
+
+	// Errors surfaced by the override engine itself (e.g. a union member that
+	// contradicts a selectMember rule, or a disabled-but-set property). These stand
+	// regardless of the checks below.
+	if (override_errors.length > 0) {
+		return override_errors;
+	}
+
+	// Check disabled AFTER applying overrides: a property may be disabled statically
+	// (disabled: true in the ruleset) or dynamically (e.g. the unchosen member of a
+	// mutex). Either way a disabled property is skipped, including its required check.
+	if (effective.disabled) {
+		return []; // NOTE: Disabled will not be taken into account
+	}
+
+	// A readonly field has nothing to validate: generated code fills it in, so it is
+	// empty in every valid workfile, and `set_value` refuses to give it a value.
+	if (effective.readonly === true) {
+		return [];
+	}
+
+	if (effective.value === undefined) {
+		if (!effective.required) {
+			return [];
+		}
+
+		// This might be an odd check, but if there is no "extra" struct for this platform, assume
+		// it is okay and do not return error even if the "extra" property is required.
+		// platform_extra only exists on struct rulesets, never on a descriptor.
+		if (effective._t === "PlatformExtraProperty" && parent_symbol._t === "RulesetStruct") {
+			const suggestions = suggest_platform_extra(workfile, effective, parent_symbol);
+			if (!suggestions.ok || !suggestions.value.types || suggestions.value.types.length === 0) {
+				return []; // no possible extra for this, assume there is none
+			}
+		}
+
+		// A raw value is opaque: we can't offer any assistance and can't blame the
+		// user for leaving it empty (they may fill it in before/after codegen). A
+		// declared default satisfies the requirement; otherwise warn only.
+		if (effective._t === "RawProperty") {
+			if (effective.default !== undefined) {
+				return [];
+			}
+			return [{
+				path: property_context.path,
+				message: "Required property has no value; the driver may need it",
+				severity: "warning",
+				type: "missing-required"
+			}];
+		}
+
+		return [{
+			path: property_context.path,
+			// A rule that made this required may say what would satisfy it.
+			message: required_reason ?? "Required property has no value",
+			severity: "error",
+			type: "missing-required"
+		}];
+	}
+
+	switch (effective._t) {
+		case "NumberProperty": {
+			return validate_number(effective, property_context);
+		}
+		case "BooleanProperty": {
+			return validate_boolean(effective, property_context);
+		}
+		case "StringProperty": {
+			return validate_string(effective, property_context);
+		}
+		case "IncludeProperty": {
+			return validate_include(effective.value as string, effective, workfile, property_context);
+		}
+		case "EnumProperty": {
+			return validate_enum(effective, property_context);
+		}
+		case "UnionProperty": {
+			return validate_union(effective, workfile, property_context);
+		}
+		case "ArrayProperty": {
+			return validate_array(effective, workfile, property_context);
+		}
+		case "PlatformOpsProperty": {
+			// platform_ops only exists on struct rulesets, never on a descriptor.
+			if (parent_symbol._t !== "RulesetStruct") {
+				return [];
+			}
+			return validate_platform_ops(effective, workfile, parent_symbol, property_context);
+		}
+		case "PlatformExtraProperty": {
+			// platform_extra only exists on struct rulesets, never on a descriptor.
+			if (parent_symbol._t !== "RulesetStruct") {
+				return [];
+			}
+			return validate_platform_extra(effective, workfile, parent_symbol, property_context);
+		}
+		case "DriverOpsProperty": {
+			return validate_driver_backed(effective, workfile, "ops table", RulesetType.RT_EXTERN, property_context);
+		}
+		case "DriverInitParameterProperty": {
+			return validate_driver_backed(effective, workfile, "init_param", RulesetType.RT_STRUCT, property_context);
+		}
+		case "RawProperty": {
+			return []; // NOTE: Opaque value, emitted verbatim — nothing to validate
+		}
+		default: {
+			// NOTE: No validation error as this case should have
+			// been caught by the ruleset_parser validator
+			return [];
+		}
+	}
+}
+
+/** Whether an include names an enum, so its value is one of the enum's options, not a node. */
+function includes_enum(match: IncludeMatch): boolean {
+	if (match.include === undefined) {
+		return false;
+	}
+	const resolved = load_resolved_ruleset(match.include);
+	return resolved.ok && resolved.value._t === "RulesetEnum";
+}
+
+/**
+ * The problems of a property's value alone, as its definition and the rules on it leave it:
+ * a number's type and bounds, a boolean, a string, an enum's options (an include of an enum
+ * too), an array's size and the options of its enum elements, a union's member. What `update`
+ * refuses before writing (UPDATE-02). A reference to another node, a rule about other
+ * properties and a required value left empty are the whole workfile's to report: `validate`.
+ */
+export function validate_value(
+	property: Property,
+	child_overrides: CollectedRule[],
+	symbol_name: string,
+	workfile: Workfile,
+	context: ParseContext
+): ValidationError[] {
+	const property_context = at(context, property.name);
+	const { effective } = apply_overrides(property, child_overrides, symbol_name, workfile);
+	if (effective.value === undefined || effective.value === null || effective.disabled === true || effective.readonly === true) {
+		return [];
+	}
+	switch (effective._t) {
+		case "NumberProperty": {
+			return validate_number(effective, property_context);
+		}
+		case "BooleanProperty": {
+			return validate_boolean(effective, property_context);
+		}
+		case "StringProperty": {
+			return validate_string(effective, property_context);
+		}
+		case "EnumProperty": {
+			return validate_enum(effective, property_context);
+		}
+		case "IncludeProperty": {
+			return includes_enum(effective) ? validate_include(effective.value as string, effective, workfile, property_context) : [];
+		}
+		case "ArrayProperty": {
+			const value = effective.value as unknown;
+			if (!Array.isArray(value)) {
+				return [];
+			}
+			if (value.length > effective.size) {
+				return [{
+					path: property_context.path,
+					message: `Array exceeds maximum size of ${effective.size.toString()}, got ${value.length.toString()}`,
+					severity: "error",
+					type: "out-of-range"
+				}];
+			}
+			const element = effective.element;
+			if (element._t !== "IncludeProperty" || !includes_enum(element)) {
+				return [];
+			}
+			return (value as string[]).flatMap((entry, index) => validate_include(entry, element, workfile, at(property_context, index)));
+		}
+		case "UnionProperty": {
+			const [member] = Object.keys(effective.value);
+			if (member === undefined || effective.members.some(candidate => candidate.name === member)) {
+				return [];
+			}
+			return [{ path: at(property_context, member).path, message: `Unknown union member '${member}'`, severity: "error", type: "out-of-range" }];
+		}
+		default: {
+			return [];
+		}
+	}
+}
+
+/**
+ * Check a driver-backed value: the symbol exists, is the right kind of node, and comes from
+ * a module that declares the interface the property asked for.
+ *
+ * The interface check is what makes this more than a type check. Nothing stops a workfile
+ * naming some other driver's init_param here — it is a struct like any other — and the
+ * mistake would otherwise surface as a compile error in generated C.
+ */
+function validate_driver_backed(
+	property: DriverOpsProperty | DriverInitParameterProperty,
+	workfile: Workfile,
+	label: string,
+	expected: RulesetType,
+	context: ParseContext
+): ValidationError[] {
+	const symbol_name = property.value as string;
+
+	const target = workfile.symbols[symbol_name];
+	if (!target) {
+		return [{
+			path: context.path,
+			message: `Driver ${label} '${symbol_name}' is not a symbol in this workfile`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	if (target.$type !== expected) {
+		return [{
+			path: context.path,
+			message: `Driver ${label} '${symbol_name}' must be a ${ruleset_type_token(expected)}, got ${ruleset_type_token(target.$type)}`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	const provides = provides_interface(target.$symbol, property.interface);
+	if (!provides.ok) {
+		return [{ path: context.path, message: provides.error.message, severity: "error", type: provides.error.type }];
+	}
+	if (!provides.value) {
+		return [{
+			path: context.path,
+			message: `'${symbol_name}' does not come from a driver implementing '${property.interface}'`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	// A struct another of the driver's structs includes is a part of that one, not what the
+	// handle takes: the driver would read it as the wrong type.
+	if (expected === RulesetType.RT_STRUCT) {
+		const candidates = driver_init_parameter_candidates(property.interface);
+		if (candidates.ok && !candidates.value.some(candidate => candidate.$symbol === target.$symbol)) {
+			const entry = resolve_entry(target.$symbol);
+			const module_path = entry.ok ? entry.value.module.path : undefined;
+			const offered = candidates.value.filter(candidate => candidate.module.path === module_path);
+			return [{
+				path: context.path,
+				message: `'${symbol_name}' (${target.$symbol}) is not a ${property.interface} init_param: its driver takes ${offered.map(candidate => candidate.$symbol).join(" or ") || "another struct"}`,
+				severity: "error",
+				type: "bad-reference"
+			}];
+		}
+	}
+
+	if (property.allowed && !property.allowed.includes(target.$symbol)) {
+		return [{
+			path: context.path,
+			message: `Driver ${label} '${symbol_name}' ($symbol: ${target.$symbol}) is not in the allowed list: ${property.allowed.join(", ")}`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	return [];
+}
+
+function validate_platform_ops(
+	property: PlatformOpsProperty,
+	workfile: Workfile,
+	parent_struct: RulesetStruct,
+	context: ParseContext
+): ValidationError[] {
+	const symbol_name = property.value as string;
+
+	const ops = workfile.platform_ops[symbol_name];
+	if (!ops) {
+		return [{
+			path: context.path,
+			message: `Platform ops '${symbol_name}' not found`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	if (property.allowed) {
+		if (!property.allowed.includes(ops.$symbol)) {
+			return [{
+				path: context.path,
+				message: `Platform ops '${symbol_name}' ($symbol: ${ops.$symbol}) is not in the allowed list: ${property.allowed.join(", ")}`,
+				severity: "error",
+				type: "bad-reference"
+			}];
+		}
+
+		if (!capability_fits(property, ops)) {
+			return [{
+				path: context.path,
+				message: `Capability mismatch: ops is '${ops.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}' (allowed by override)`,
+				severity: "warning",
+				type: "bad-reference"
+			}];
+		}
+
+		return [];
+	}
+
+	if (!capability_fits(property, ops)) {
+		return [{
+			path: context.path,
+			message: `Capability mismatch: ops is '${ops.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}'`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	return [];
+}
+
+function validate_platform_extra(
+	property: PlatformExtraProperty,
+	workfile: Workfile,
+	parent_struct: RulesetStruct,
+	context: ParseContext
+): ValidationError[] {
+	const symbol_name = property.value as string;
+
+	const extra = workfile.symbols[symbol_name];
+	if (!extra) {
+		return [{
+			path: context.path,
+			message: `Platform extra '${symbol_name}' not found`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	if (extra._t !== "RulesetStruct") {
+		return [{
+			path: context.path,
+			message: `Expected type struct or device, got ${extra._t}`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	if (property.allowed) {
+		if (!property.allowed.includes(extra.$symbol)) {
+			return [{
+				path: context.path,
+				message: `Platform extra '${symbol_name}' ($symbol: ${extra.$symbol}) is not in the allowed list: ${property.allowed.join(", ")}`,
+				severity: "error",
+				type: "bad-reference"
+			}];
+		}
+
+		if (!capability_fits(property, extra)) {
+			return [{
+				path: context.path,
+				message: `Capability mismatch: extra is '${extra.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}' (allowed by override)`,
+				severity: "warning",
+				type: "bad-reference"
+			}];
+		}
+
+		return [];
+	}
+
+	if (!capability_fits(property, extra)) {
+		return [{
+			path: context.path,
+			message: `Capability mismatch: extra is '${extra.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}'`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	return [];
+}
+
+function validate_number(property: NumberProperty, context: ParseContext): ValidationError[] {
+	const errors: ValidationError[] = [];
+	const value = property.value;
+	// Every number in these messages reads the way the field does, so a hex field is never
+	// reported in decimal the reader then has to convert back.
+	const shown = (shown_value: number) => format_number_in(shown_value, property.format);
+
+	if (typeof value !== "number") {
+		errors.push({
+			path: context.path,
+			message: `Expected number, got ${typeof value}`,
+			severity: "error",
+			type: "out-of-range"
+		});
+		return errors; // No reason to continue
+	}
+
+	// NaN/Infinity have no C literal we could emit for any numeric type.
+	if (!Number.isFinite(value)) {
+		errors.push({
+			path: context.path,
+			message: `Value ${value.toString()} is not a finite number`,
+			severity: "error",
+			type: "out-of-range"
+		});
+		return errors; // Range checks below are meaningless for a non-finite value
+	}
+
+	// A fractional value in an integer field would be truncated by the C compiler
+	// without warning, so reject it rather than silently changing the value.
+	if (is_integer_symbol(property.type) && !Number.isInteger(value)) {
+		errors.push({
+			path: context.path,
+			message: `Value ${value.toString()} is not an integer, but '${property.type}' is an integer type`,
+			severity: "error",
+			type: "out-of-range"
+		});
+	}
+
+	if (property.minimum !== undefined && value < property.minimum) {
+		errors.push({
+			path: context.path,
+			message: `Value ${shown(value)} is below the minimum ${shown(property.minimum)}`,
+			severity: "error",
+			type: "out-of-range"
+		});
+	}
+
+	if (property.maximum !== undefined && value > property.maximum) {
+		errors.push({
+			path: context.path,
+			message: `Value ${shown(value)} is above the maximum ${shown(property.maximum)}`,
+			severity: "error",
+			type: "out-of-range"
+		});
+	}
+
+	// An override can narrow a numeric field to a set rather than a range; honoring it here
+	// is what makes `values:` mean the same thing on a number as it does on an enum.
+	if (property.values !== undefined && property.values.length > 0 && !property.values.includes(value)) {
+		errors.push({
+			path: context.path,
+			message: `Value ${shown(value)} is not one of: ${property.values.map(allowed => shown(allowed)).join(", ")}`,
+			severity: "error",
+			type: "out-of-range"
+		});
+	}
+
+	return errors;
+}
+
+function validate_boolean(property: BooleanProperty, context: ParseContext): ValidationError[] {
+	if (typeof property.value !== "boolean") {
+		return [{
+			path: context.path,
+			message: `Expected boolean, got ${typeof property.value}`,
+			severity: "error",
+			type: "out-of-range"
+		}];
+	}
+
+	return [];
+}
+
+function validate_string(property: StringProperty, context: ParseContext): ValidationError[] {
+	if (typeof property.value !== "string") {
+		return [{
+			path: context.path,
+			message: `Expected string, got ${typeof property.value}`,
+			severity: "error",
+			type: "out-of-range"
+		}];
+	}
+
+	return [];
+}
+
+function validate_enum(property: EnumProperty, context: ParseContext): ValidationError[] {
+	const value = property.value;
+	if (typeof value !== "number" && typeof value !== "string") {
+		return [{
+			path: context.path,
+			message: `Invalid value type '${typeof value}. Expected number or string'`,
+			severity: "error",
+			type: "out-of-range"
+		}];
+	}
+
+	if (!property.values.includes(value)) {
+		return [{
+			path: context.path,
+			message: `Invalid value '${value.toString()}'. Expected one of: ${property.values.join(", ")}`,
+			severity: "error",
+			type: "out-of-range"
+		}];
+	}
+	return [];
+}
+
+function validate_include(
+	value: string,
+	match: IncludeMatch,
+	workfile: Workfile,
+	context: ParseContext
+): ValidationError[] {
+	if (match.include === undefined) {
+		return validate_include_type(value, match.include_type, workfile, context);
+	}
+
+	const include_path = match.include;
+	const resolved = load_resolved_ruleset(include_path);
+
+	if (resolved.ok && resolved.value._t === "RulesetEnum") {
+		const valid_values = resolved.value.values.map(v => v.name);
+		if (!valid_values.includes(value)) {
+			return [{
+				path: context.path,
+				message: `Invalid value '${value}'. Expected one of: ${valid_values.join(", ")}`,
+				severity: "error",
+				type: "out-of-range"
+			}];
+		}
+		return [];
+	}
+
+	// `value` names a whole node or one readonly member of one; both resolve to the $id
+	// that has to match here.
+	const target = resolve_reference(workfile, value);
+	if (!target) {
+		return [{
+			path: context.path,
+			message: value.includes(".")
+				? `Reference '${value}' does not name a readonly member of an existing node`
+				: `Target symbol '${value}' not found`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	if (target.$id !== include_path) {
+		return [{
+			path: context.path,
+			message: `Type mismatch: '${value}' is '${target.$id}', expected '${include_path}'`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	return [];
+}
+
+// `include_type` checks the target's kind, not its identity: any node of that type is
+// accepted. That is as tight as C's `void *` lets us be.
+function validate_include_type(
+	value: string,
+	include_type: RulesetType,
+	workfile: Workfile,
+	context: ParseContext
+): ValidationError[] {
+	const target = workfile.symbols[value];
+	if (!target) {
+		return [{
+			path: context.path,
+			message: `Target symbol '${value}' not found`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	if (target.$type !== include_type) {
+		return [{
+			path: context.path,
+			message: `Type mismatch: '${value}' is a ${ruleset_type_token(target.$type)}, expected any ${ruleset_type_token(include_type)}`,
+			severity: "error",
+			type: "bad-reference"
+		}];
+	}
+
+	return [];
+}
+
+function validate_union(
+	property: UnionProperty,
+	workfile: Workfile,
+	context: ParseContext
+): ValidationError[] {
+	const value = property.value as Record<string, string>;
+
+	const keys = Object.keys(value);
+	const selected_member_name = keys[0];
+	if (keys.length !== 1 || selected_member_name === undefined) {
+		return [{
+			path: context.path,
+			message: `Union value must have exactly one key`,
+			severity: "error",
+			type: "out-of-range"
+		}];
+	}
+
+	const target_symbol_name = value[selected_member_name];
+	if (target_symbol_name === undefined) {
+		return [{
+			path: at(context, selected_member_name).path,
+			message: `Union member '${selected_member_name}' has no bound target`,
+			severity: "error",
+			type: "missing-required"
+		}];
+	}
+
+	const member = property.members.find(m => m.name === selected_member_name);
+	if (!member) {
+		return [{
+			path: at(context, selected_member_name).path,
+			message: `Unknown union member '${selected_member_name}'`,
+			severity: "error",
+			type: "out-of-range"
+		}];
+	}
+
+	// A member is an include like any other, so reuse the same check rather than
+	// repeating the $id comparison here.
+	return validate_include(target_symbol_name, member, workfile, at(context, selected_member_name));
+}
+
+function validate_array(
+	property: ArrayProperty,
+	workfile: Workfile,
+	context: ParseContext
+): ValidationError[] {
+	const errors: ValidationError[] = [];
+	const value = property.value as string[] | undefined;
+
+	if (!value) {
+		return [];
+	}
+
+	if (!Array.isArray(value)) {
+		return [{
+			path: context.path,
+			message: `Expected array, got ${typeof value}`,
+			severity: "error",
+			type: "out-of-range"
+		}];
+	}
+
+	if (value.length === 0) {
+		return [];
+	}
+
+	if (value.length > property.size) {
+		return [{
+			path: context.path,
+			message: `Array exceeds maximum size of ${property.size.toString()}, got ${value.length.toString()}`,
+			severity: "error",
+			type: "out-of-range"
+		}];
+	}
+
+	if (property.element._t === "IncludeProperty") {
+		for (const [index, element_value] of value.entries()) {
+			const element_errors = validate_include(
+				element_value,
+				property.element,
+				workfile,
+				at(context, index)
+			);
+			errors.push(...element_errors);
+		}
+	}
+
+	return errors;
+}

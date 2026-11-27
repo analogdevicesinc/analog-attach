@@ -1,0 +1,1412 @@
+import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import path from "node:path";
+import fs from "node:fs";
+import { validate_property_value, validate_workfile } from "../../src/validator/validator";
+import { parse_ruleset } from "../../src/ruleset_parser/ruleset_parser";
+import { expectOk, setup_test_config, teardown_test_config } from "../test_utilities";
+import {
+	RulesetStruct,
+	RulesetType,
+	RulesetPlatformOps,
+	IncludeProperty,
+	UnionProperty,
+	ArrayProperty,
+	NumberProperty,
+	BooleanProperty,
+	EnumProperty,
+	StringProperty,
+	PlatformOpsProperty,
+	PlatformExtraProperty
+} from "../../src/ruleset_parser/types";
+import { Workfile } from "../../src/workfile_handler/types";
+
+// A struct is identified by its $symbol: that is what an `include:` has to name and what
+// the registry keys on. Build facts are not here at all - they belong to the module.yml of
+// whichever module ships the symbol.
+function make_struct(
+	name: string,
+	properties: RulesetStruct["properties"] = []
+): RulesetStruct {
+	return {
+		_t: "RulesetStruct",
+		$type: RulesetType.RT_STRUCT,
+		$symbol: name,
+		$description: "Test struct",
+		properties,
+	};
+}
+
+// Parse a child ruleset from a fixture so its $override block is lowered to real
+// rules[] by the actual parser — override tests exercise lowering + engine
+// end-to-end rather than hand-building internal Rule/Effect literals. The
+// resulting struct's property VALUES are then set from `values` (parsing does
+// not carry user values), so it behaves like a workfile instance.
+function parse_override_fixture(name: string, values: Record<string, unknown> = {}): RulesetStruct {
+	const yaml = fs.readFileSync(path.resolve(__dirname, "fixtures/overrides", name), "utf8");
+	const result = parse_ruleset(yaml);
+	expectOk(result);
+	const struct = result.value as RulesetStruct;
+	for (const [property_name, value] of Object.entries(values)) {
+		const property = struct.properties.find(p => p.name === property_name);
+		if (property) {
+			property.value = value;
+		}
+	}
+	return struct;
+}
+
+function make_number(name: string, options: Partial<NumberProperty> = {}): NumberProperty {
+	return {
+		_t: "NumberProperty",
+		name,
+		description: "",
+		type: "uint32_t",
+		...options,
+	};
+}
+
+function make_boolean(name: string, options: Partial<BooleanProperty> = {}): BooleanProperty {
+	return {
+		_t: "BooleanProperty",
+		name,
+		description: "",
+		type: "bool",
+		default: false,
+		...options,
+	};
+}
+
+function make_string(name: string, options: Partial<StringProperty> = {}): StringProperty {
+	return {
+		_t: "StringProperty",
+		name,
+		description: "",
+		type: "string",
+		...options,
+	};
+}
+
+function make_enum(name: string, values: (string | number)[], options: Partial<EnumProperty> = {}): EnumProperty {
+	return {
+		_t: "EnumProperty",
+		name,
+		description: "",
+		values,
+		...options,
+	};
+}
+
+function make_include(name: string, include: string, options: Partial<IncludeProperty> = {}): IncludeProperty {
+	return {
+		_t: "IncludeProperty",
+		name,
+		description: "",
+		include,
+		...options,
+	};
+}
+
+function make_union(name: string, members: IncludeProperty[], options: Partial<UnionProperty> = {}): UnionProperty {
+	return {
+		_t: "UnionProperty",
+		name,
+		description: "",
+		members,
+		...options,
+	};
+}
+
+function make_array(name: string, size: number, element: ArrayProperty["element"], options: Partial<ArrayProperty> = {}): ArrayProperty {
+	return {
+		_t: "ArrayProperty",
+		name,
+		description: "",
+		size,
+		element,
+		...options,
+	};
+}
+
+function make_workfile(symbols: Record<string, RulesetStruct>, platform_ops: Record<string, RulesetPlatformOps> = {}): Workfile {
+	return { platform_ops, symbols };
+}
+
+function make_platform_ops(name: string, capability?: string): RulesetPlatformOps {
+	return {
+		_t: "RulesetPlatformOps",
+		$type: RulesetType.RT_PLATFORM_OPS,
+		$symbol: name,
+		$description: "Test ops",
+		$capability: capability,
+	};
+}
+
+function make_platform_ops_property(name: string, options: Partial<PlatformOpsProperty> = {}): PlatformOpsProperty {
+	return {
+		_t: "PlatformOpsProperty",
+		name,
+		description: "",
+		type: "platform_ops",
+		...options,
+	};
+}
+
+function make_platform_extra_property(name: string, options: Partial<PlatformExtraProperty> = {}): PlatformExtraProperty {
+	return {
+		_t: "PlatformExtraProperty",
+		name,
+		description: "",
+		type: "platform_extra",
+		...options,
+	};
+}
+
+function make_struct_with_capability(
+	name: string,
+	capability: string,
+	properties: RulesetStruct["properties"] = []
+): RulesetStruct {
+	return {
+		_t: "RulesetStruct",
+		$type: RulesetType.RT_STRUCT,
+		$symbol: name,
+		$description: "Test struct",
+		$capability: capability,
+		properties,
+	};
+}
+
+describe("validate_workfile", () => {
+	beforeEach(() => { setup_test_config(); });
+	afterEach(() => { teardown_test_config(); });
+
+	describe("number property validation", () => {
+		test("valid number passes", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("count", { value: 42, minimum: 0, maximum: 100 })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+			expect(result.errors).toHaveLength(0);
+		});
+
+		test("number below minimum fails", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("count", { value: -5, minimum: 0 })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors).toHaveLength(1);
+			expect(result.errors[0].path).toBe("my_struct.count");
+			expect(result.errors[0].message).toContain("below");
+		});
+
+		test("number above maximum fails", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("count", { value: 150, maximum: 100 })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors).toHaveLength(1);
+			expect(result.errors[0].path).toBe("my_struct.count");
+			expect(result.errors[0].message).toContain("above");
+		});
+
+		test("wrong type fails", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("count", { value: "not a number" as any })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Expected number");
+		});
+
+		test("fractional value on an integer type fails", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("count", { type: "uint32_t", value: 1.5 })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors).toHaveLength(1);
+			expect(result.errors[0].path).toBe("my_struct.count");
+			expect(result.errors[0].message).toContain("is not an integer");
+		});
+
+		test("fractional value on a float passes", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("gain", { type: "float", value: 1.5, minimum: 0, maximum: 2 })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+			expect(result.errors).toHaveLength(0);
+		});
+
+		test("fractional value on a double passes", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("vref", { type: "double", value: 3.3 })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+			expect(result.errors).toHaveLength(0);
+		});
+
+		test("float below minimum fails", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("gain", { type: "float", value: 0.05, minimum: 0.1 })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors).toHaveLength(1);
+			expect(result.errors[0].message).toContain("below");
+		});
+
+		test("non-finite value fails", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("gain", { type: "float", value: Number.POSITIVE_INFINITY })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors).toHaveLength(1);
+			expect(result.errors[0].message).toContain("not a finite number");
+		});
+	});
+
+	describe("boolean property validation", () => {
+		test("valid boolean passes", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_boolean("flag", { value: true })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("wrong type fails", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_boolean("flag", { value: "true" as any })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Expected boolean");
+		});
+	});
+
+	describe("string property validation", () => {
+		test("valid string passes", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_string("name", { value: "hello" })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("wrong type fails", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_string("name", { value: 123 as any })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Expected string");
+		});
+	});
+
+	describe("enum property validation", () => {
+		test("valid enum value passes", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_enum("mode", ["fast", "slow"], { value: "fast" })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("invalid enum value fails", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_enum("mode", ["fast", "slow"], { value: "medium" })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Invalid value");
+			expect(result.errors[0].message).toContain("fast, slow");
+		});
+	});
+
+	describe("required property validation", () => {
+		test("required property without value fails", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("count", { required: true })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Required");
+		});
+
+		test("optional property without value passes", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("count", { required: false })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+	});
+
+	describe("disabled property validation", () => {
+		test("disabled property is skipped", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("count", { disabled: true, required: true })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+	});
+
+	// A readonly field is empty in every valid workfile, because `set_value` refuses to
+	// give it one, so there is nothing to validate — not even its required-ness.
+	describe("readonly property validation", () => {
+		test("readonly property is skipped", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("nb_devices", { readonly: true, required: true })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("a readonly include is not required to point anywhere", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_include("devices", "no_such_symbol", { readonly: true, pointer: true, required: true })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+	});
+
+	describe("include property validation", () => {
+		test("valid include passes", () => {
+			const workfile = make_workfile({
+				my_spi: make_struct("spi_init_param", []),
+				my_device: make_struct("device", [
+					make_include("spi", "spi_init_param", { value: "my_spi" })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("include with missing target fails", () => {
+			const workfile = make_workfile({
+				my_device: make_struct("device", [
+					make_include("spi", "spi_init_param", { value: "nonexistent" })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("not found");
+		});
+
+		test("include with type mismatch fails", () => {
+			const workfile = make_workfile({
+				my_i2c: make_struct("i2c_init_param", []),
+				my_device: make_struct("device", [
+					make_include("spi", "spi_init_param", { value: "my_i2c" })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Type mismatch");
+		});
+	});
+
+	describe("union property validation", () => {
+		test("valid union passes", () => {
+			const workfile = make_workfile({
+				my_spi: make_struct("spi", []),
+				my_device: make_struct("device", [
+					make_union("comm", [
+						make_include("spi", "spi"),
+						make_include("i2c", "i2c_init_param"),
+					], { value: { spi: "my_spi" } })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("union with unknown member fails", () => {
+			const workfile = make_workfile({
+				my_spi: make_struct("spi", []),
+				my_device: make_struct("device", [
+					make_union("comm", [
+						make_include("spi", "spi"),
+					], { value: { uart: "my_spi" } })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Unknown union member");
+		});
+
+		test("union with multiple keys fails", () => {
+			const workfile = make_workfile({
+				my_spi: make_struct("spi", []),
+				my_i2c: make_struct("i2c", []),
+				my_device: make_struct("device", [
+					make_union("comm", [
+						make_include("spi", "spi"),
+						make_include("i2c", "i2c"),
+					], { value: { spi: "my_spi", i2c: "my_i2c" } })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("exactly one key");
+		});
+	});
+
+	describe("array property validation", () => {
+		test("valid array passes", () => {
+			const workfile = make_workfile({
+				gpio1: make_struct("gpio", []),
+				gpio2: make_struct("gpio", []),
+				my_device: make_struct("device", [
+					make_array("gpios", 2, make_include("element", "gpio"), { value: ["gpio1", "gpio2"] })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("array exceeding max size fails", () => {
+			const workfile = make_workfile({
+				gpio1: make_struct("gpio", []),
+				gpio2: make_struct("gpio", []),
+				gpio3: make_struct("gpio", []),
+				my_device: make_struct("device", [
+					make_array("gpios", 2, make_include("element", "gpio"), { value: ["gpio1", "gpio2", "gpio3"] })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("exceeds maximum size");
+		});
+
+		test("array with fewer elements than max passes", () => {
+			const workfile = make_workfile({
+				gpio1: make_struct("gpio", []),
+				my_device: make_struct("device", [
+					make_array("gpios", 2, make_include("element", "gpio"), { value: ["gpio1"] })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("array with missing element fails", () => {
+			const workfile = make_workfile({
+				gpio1: make_struct("gpio", []),
+				my_device: make_struct("device", [
+					make_array("gpios", 2, make_include("element", "gpio"), { value: ["gpio1", "nonexistent"] })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("not found");
+			expect(result.errors[0].path).toContain("[1]");
+		});
+
+		test("array with valid enum values passes", () => {
+			const workfile = make_workfile({
+				my_device: make_struct("device", [
+					make_array("modes", 3, make_include("element", "test_spi_mode"), {
+						value: ["TEST_SPI_MODE_0", "TEST_SPI_MODE_3", "TEST_SPI_MODE_0"]
+					})
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("array with invalid enum value fails", () => {
+			const workfile = make_workfile({
+				my_device: make_struct("device", [
+					make_array("modes", 3, make_include("element", "test_spi_mode"), {
+						value: ["TEST_SPI_MODE_0", "INVALID_MODE", "TEST_SPI_MODE_3"]
+					})
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Invalid value");
+			expect(result.errors[0].message).toContain("INVALID_MODE");
+		});
+
+		test("array with non-array value fails", () => {
+			const workfile = make_workfile({
+				my_device: make_struct("device", [
+					make_array("modes", 3, make_include("element", "test_spi_mode"), {
+						value: "not an array" as unknown as string[]
+					})
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Expected array");
+		});
+	});
+
+	// Override tests author the child ruleset as YAML and run it through the real
+	// parser, so the $override block is lowered end-to-end. The parent is built with
+	// the make_* helpers (it only needs property values) and links the child via an
+	// include. Refs in a child override resolve to: self = the child (my_child),
+	// parent = whatever includes it (my_parent).
+	describe("static override validation", () => {
+		test("$parent static override modifies constraints", () => {
+			const child = parse_override_fixture("static_parent.yaml");
+			const parent = make_struct("parent", [
+				make_number("device_id", { value: 5, maximum: 10 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].path).toBe("my_parent.device_id");
+			expect(result.errors[0].message).toContain("above");
+			expect(result.errors[0].message).toContain("4");
+		});
+
+		test("$this static override does not affect parent", () => {
+			// Child has its OWN device_id constrained to max 4 via a $this override.
+			// The parent's same-named device_id (value 5) must stay unconstrained —
+			// if scope leaked, 5 > 4 would fail. Child's own device_id (0) satisfies 4.
+			const child = parse_override_fixture("static_this.yaml", { device_id: 0 });
+			const parent = make_struct("parent", [
+				make_number("device_id", { value: 5, maximum: 10 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+	});
+
+	describe("conditional override validation", () => {
+		test("$if override applies when condition matches", () => {
+			const child = parse_override_fixture("if_parent.yaml");
+			const parent = make_struct("parent", [
+				make_enum("mode", ["fast", "slow"], { value: "fast" }),
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].path).toBe("my_parent.speed");
+			expect(result.errors[0].message).toContain("below");
+		});
+
+		test("$if override does not apply when condition does not match", () => {
+			const child = parse_override_fixture("if_parent.yaml");
+			const parent = make_struct("parent", [
+				make_enum("mode", ["fast", "slow"], { value: "slow" }),
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+	});
+
+	describe("mutex validation", () => {
+		test("mutex with one value passes", () => {
+			const child = parse_override_fixture("mutex_parent.yaml");
+			const parent = make_struct("parent", [
+				make_number("opt_a", { value: 1 }),
+				make_number("opt_b"),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("mutex with multiple values fails", () => {
+			// Both opt_a and opt_b set: each disables the other, so both are
+			// disabled-but-set. The engine reports each with its mutex reason.
+			const child = parse_override_fixture("mutex_parent.yaml");
+			const parent = make_struct("parent", [
+				make_number("opt_a", { value: 1 }),
+				make_number("opt_b", { value: 2 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			const messages = result.errors.map(error => error.message).join(" | ");
+			expect(messages).toContain("mutually exclusive");
+			expect(messages).toContain("opt_a");
+			expect(messages).toContain("opt_b");
+		});
+
+		test("$this mutex does not affect parent", () => {
+			// Child declares its own opt_a/opt_b and a $this mutex over them; both
+			// are left unset so the mutex is satisfied. The parent's same-named
+			// both-set properties are unaffected (no mutex on the parent).
+			const child = parse_override_fixture("mutex_this.yaml");
+			const parent = make_struct("parent", [
+				make_number("opt_a", { value: 1 }),
+				make_number("opt_b", { value: 2 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+	});
+
+	describe("switch override validation", () => {
+		test("$switch override applies matching case", () => {
+			const child = parse_override_fixture("switch_parent.yaml");
+			const parent = make_struct("parent", [
+				make_enum("mode", ["fast", "slow"], { value: "fast" }),
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].path).toBe("my_parent.speed");
+			expect(result.errors[0].message).toContain("below");
+		});
+
+		test("$switch override does not apply non-matching case", () => {
+			const child = parse_override_fixture("switch_parent_single.yaml");
+			const parent = make_struct("parent", [
+				make_enum("mode", ["fast", "slow"], { value: "slow" }),
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("$switch with $this scope checks child property", () => {
+			const child = parse_override_fixture("switch_this.yaml", { child_mode: "a" });
+			const parent = make_struct("parent", [
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("below");
+		});
+
+		// Regression: the numeric case names arrive from YAML as strings while the
+		// workfile stores device_id as a number, so a strict === made every case in a
+		// numeric switch dead. Both real users of this (the MAX32690/MAX32650 SPI
+		// chip_select tables) were fully inert.
+		test("$switch matches a numeric case against a numeric value", () => {
+			const child = parse_override_fixture("switch_numeric_parent.yaml");
+			const parent = make_struct("parent", [
+				make_number("device_id", { value: 0 }),
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].path).toBe("my_parent.speed");
+			expect(result.errors[0].message).toContain("below");
+		});
+
+		test("$switch numeric case does not fire for a different value", () => {
+			// device_id 1 selects the maximum: 10 case, which speed 50 violates —
+			// proving the OTHER numeric case was selected, not merely that one fired.
+			const child = parse_override_fixture("switch_numeric_parent.yaml");
+			const parent = make_struct("parent", [
+				make_number("device_id", { value: 1 }),
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].path).toBe("my_parent.speed");
+			expect(result.errors[0].message).toContain("above the maximum 10");
+		});
+
+		test("$switch `_` case fires when no other case matches", () => {
+			const child = parse_override_fixture("switch_default_parent.yaml");
+			const parent = make_struct("parent", [
+				make_number("device_id", { value: 7 }),
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].path).toBe("my_parent.speed");
+			expect(result.errors[0].message).toContain("above the maximum 10");
+		});
+
+		test("$switch `_` case yields to a matching case", () => {
+			// device_id 0 hits the explicit case, so only its minimum applies and the
+			// default's maximum: 10 must not also fire.
+			const child = parse_override_fixture("switch_default_parent.yaml");
+			const parent = make_struct("parent", [
+				make_number("device_id", { value: 0 }),
+				make_number("speed", { value: 100 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("$switch `_` case does not fire when $on is unset", () => {
+			const child = parse_override_fixture("switch_default_parent.yaml");
+			const parent = make_struct("parent", [
+				make_number("device_id"),
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("$switch reports a case that can never match a $parent enum", () => {
+			const child = parse_override_fixture("switch_parent_bad_case.yaml");
+			const parent = make_struct("parent", [
+				make_enum("mode", ["fast", "slow"], { value: "fast" }),
+				make_number("speed", { value: 150 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			// A warning, not an error: the ruleset still generates, the case is just dead.
+			const result = validate_workfile(workfile);
+			const warning = result.errors.find(e => e.message.includes("never matches"));
+			expect(warning?.severity).toBe("warning");
+			expect(warning?.message).toContain("Case 'FAAAST' never matches");
+		});
+
+		test("$switch skips when $on property not found", () => {
+			const child = parse_override_fixture("switch_missing_on.yaml");
+			const parent = make_struct("parent", [
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+	});
+
+	describe("conditional override edge cases", () => {
+		test("$if skips when condition target not found", () => {
+			const child = parse_override_fixture("if_missing_target.yaml");
+			const parent = make_struct("parent", [
+				make_number("speed", { value: 50 }),
+				make_include("extra", "child", { value: "my_child" })
+			]);
+
+			const workfile = make_workfile({
+				my_child: child,
+				my_parent: parent
+			});
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+	});
+
+	describe("multiple errors", () => {
+		test("returns all errors, not just first", () => {
+			const workfile = make_workfile({
+				my_struct: make_struct("test", [
+					make_number("a", { value: -1, minimum: 0 }),
+					make_number("b", { value: 200, maximum: 100 }),
+					make_number("c", { required: true })
+				])
+			});
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors.length).toBe(3);
+		});
+	});
+
+	describe("platform_ops validation", () => {
+		test("valid platform_ops passes", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_ops_property("platform_ops", { capability: ["spi"], value: "spi_ops" })
+					])
+				},
+				{
+					spi_ops: make_platform_ops("spi_ops", "spi")
+				}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("missing platform_ops symbol fails", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_ops_property("platform_ops", { capability: ["spi"], value: "nonexistent_ops" })
+					])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("not found");
+		});
+
+		test("capability mismatch fails", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_ops_property("platform_ops", { capability: ["spi"], value: "gpio_ops" })
+					])
+				},
+				{
+					gpio_ops: make_platform_ops("gpio_ops", "gpio")
+				}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Capability mismatch");
+			expect(result.errors[0].message).toContain("gpio");
+			expect(result.errors[0].message).toContain("spi");
+		});
+
+		test("a field that names no capability takes any ops", () => {
+			const workfile = make_workfile(
+				{
+					my_struct: make_struct("test", [
+						make_platform_ops_property("platform_ops", { value: "spi_ops" })
+					])
+				},
+				{
+					spi_ops: make_platform_ops("spi_ops", "spi")
+				}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("no value skips validation (not required)", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_ops_property("platform_ops", { capability: ["spi"] })
+					])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("required platform_ops without value fails", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_ops_property("platform_ops", { capability: ["spi"], required: true })
+					])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Required");
+		});
+	});
+
+	describe("platform_extra validation", () => {
+		test("valid platform_extra passes", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_extra_property("extra", { capability: ["spi"], value: "my_spi_extra" })
+					]),
+					my_spi_extra: make_struct_with_capability("max_spi", "spi", [])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("missing platform_extra symbol fails", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_extra_property("extra", { capability: ["spi"], value: "nonexistent" })
+					])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("not found");
+		});
+
+		test("capability mismatch fails", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_extra_property("extra", { capability: ["spi"], value: "my_gpio_extra" })
+					]),
+					my_gpio_extra: make_struct_with_capability("max_gpio", "gpio", [])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Capability mismatch");
+			expect(result.errors[0].message).toContain("gpio");
+			expect(result.errors[0].message).toContain("spi");
+		});
+
+		test("a field that names no capability takes any ops", () => {
+			const workfile = make_workfile(
+				{
+					my_struct: make_struct("test", [
+						make_platform_extra_property("extra", { value: "my_extra" })
+					]),
+					my_extra: make_struct_with_capability("extra", "spi", [])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("no value skips validation (not required)", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_extra_property("extra", { capability: ["spi"] })
+					])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("required platform_extra without value fails when platform types exist", () => {
+			// A required `extra` is only an error when the platform actually offers one to
+			// put there, so this needs a platform module that ships a matching struct --
+			// test_spi_extra carries $capability: spi in the fixture platform.
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("test_spi_config", [
+						make_platform_extra_property("extra", { capability: ["spi"], required: true })
+					])
+				},
+				{}
+			);
+
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("Required");
+		});
+
+		test("required platform_extra without value passes if no valid extras exist", () => {
+			// A required `extra` with nothing that could fill it is not the user's mistake,
+			// so it is skipped rather than reported. The capability here is one no
+			// configured module provides; the i2c struct is present to show that an extra
+			// with a different capability does not count as a candidate.
+			const workfile = make_workfile(
+				{
+					my_uart: make_struct("uart_init", [
+						make_platform_extra_property("extra", { capability: ["uart"], required: true })
+					]),
+					unrelated_extra: make_struct_with_capability("i2c_extra", "i2c", [])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+	});
+
+	describe("platform_ops allowed restriction", () => {
+		test("ops in allowed list passes", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_ops_property("platform_ops", { capability: ["spi"],
+							value: "spi_ops_a",
+							allowed: ["spi_ops_a", "spi_ops_b"]
+						})
+					])
+				},
+				{
+					spi_ops_a: make_platform_ops("spi_ops_a", "spi"),
+					spi_ops_b: make_platform_ops("spi_ops_b", "spi")
+				}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("ops not in allowed list fails", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_ops_property("platform_ops", { capability: ["spi"],
+							value: "spi_ops_c",
+							allowed: ["spi_ops_a", "spi_ops_b"]
+						})
+					])
+				},
+				{
+					spi_ops_a: make_platform_ops("spi_ops_a", "spi"),
+					spi_ops_b: make_platform_ops("spi_ops_b", "spi"),
+					spi_ops_c: make_platform_ops("spi_ops_c", "spi")
+				}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("not in the allowed list");
+		});
+
+		test("allowed overrides capability check - mismatch is warning not error", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_ops_property("platform_ops", { capability: ["spi"],
+							value: "gpio_ops",
+							allowed: ["gpio_ops"]  // override allows gpio ops for spi
+						})
+					])
+				},
+				{
+					gpio_ops: make_platform_ops("gpio_ops", "gpio")
+				}
+			);
+			const result = validate_workfile(workfile);
+			// Should be valid (allowed takes precedence) but with warning
+			expect(result.valid).toBe(true);
+			expect(result.errors.some(_error => _error.severity === "warning" && _error.message.includes("Capability mismatch"))).toBe(true);
+		});
+	});
+
+	describe("platform_extra allowed restriction", () => {
+		test("extra in allowed list passes", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_extra_property("extra", { capability: ["spi"],
+							value: "my_extra",
+							allowed: ["extra_a", "extra_b"]
+						})
+					]),
+					my_extra: make_struct_with_capability("extra_a", "spi", [])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(true);
+		});
+
+		test("extra not in allowed list fails", () => {
+			const workfile = make_workfile(
+				{
+					my_spi: make_struct("spi_init", [
+						make_platform_extra_property("extra", { capability: ["spi"],
+							value: "my_extra",
+							allowed: ["extra_a", "extra_b"]
+						})
+					]),
+					my_extra: make_struct_with_capability("extra_c", "spi", [])
+				},
+				{}
+			);
+			const result = validate_workfile(workfile);
+			expect(result.valid).toBe(false);
+			expect(result.errors[0].message).toContain("not in the allowed list");
+		});
+	});
+
+	// A struct embedded BY VALUE must be defined before the struct embedding it, so a loop
+	// of value references has no valid C layout. Pointer references (i3c bus <-> device)
+	// only store an address and stay legal — covered in test/codegen/i3c_pointer_cycle.
+	describe("dependency cycle validation", () => {
+		function cycle_errors(result: ReturnType<typeof validate_workfile>) {
+			return result.errors.filter(error => error.message.includes("dependency cycle"));
+		}
+
+		test("a two-symbol value cycle is an error on both symbols", () => {
+			const workfile = make_workfile({
+				bus: make_struct("bus_t", [
+					make_include("dev", "dev.yaml", { value: "dev" })
+				]),
+				dev: make_struct("dev_t", [
+					make_include("bus", "bus_t", { value: "bus" })
+				])
+			});
+
+			const result = validate_workfile(workfile);
+
+			expect(result.valid).toBe(false);
+			expect(cycle_errors(result).map(error => error.path).sort()).toEqual(["bus", "dev"]);
+		});
+
+		// The message must spell out the loop, so it can be followed edge by edge instead
+		// of just naming a set of suspects.
+		test("the error names the chain that closes the loop", () => {
+			const workfile = make_workfile({
+				a: make_struct("a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
+				b: make_struct("b_t", [make_include("to_c", "c.yaml", { value: "c" })]),
+				c: make_struct("c_t", [make_include("to_a", "a.yaml", { value: "a" })])
+			});
+
+			const result = validate_workfile(workfile);
+
+			for (const error of cycle_errors(result)) {
+				// Whichever member the trace enters from, the chain returns to it.
+				expect(error.message).toMatch(/\((\w+) -> \w+ -> \w+ -> \1\)/);
+			}
+		});
+
+		// Kahn's algorithm also strands everything DEPENDING on a cycle, so reading its
+		// leftovers would blame `observer`, which sits on no loop. This is why the cycle is
+		// traced rather than taken from the leftover set.
+		test("a symbol that only depends on a cycle is not blamed for it", () => {
+			const workfile = make_workfile({
+				a: make_struct("a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
+				b: make_struct("b_t", [make_include("to_a", "a.yaml", { value: "a" })]),
+				observer: make_struct("obs_t", [
+					make_include("watches", "a_t", { value: "a" })
+				])
+			});
+
+			const result = validate_workfile(workfile);
+
+			expect(cycle_errors(result).map(error => error.path).sort()).toEqual(["a", "b"]);
+		});
+
+		// Two unrelated loops are two findings; retiring one walk must not hide the other.
+		test("independent cycles are reported separately", () => {
+			const workfile = make_workfile({
+				a: make_struct("a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
+				b: make_struct("b_t", [make_include("to_a", "a.yaml", { value: "a" })]),
+				x: make_struct("x_t", [make_include("to_y", "y.yaml", { value: "y" })]),
+				y: make_struct("y_t", [make_include("to_x", "x.yaml", { value: "x" })])
+			});
+
+			const result = validate_workfile(workfile);
+
+			expect(cycle_errors(result).map(error => error.path).sort()).toEqual(["a", "b", "x", "y"]);
+		});
+
+		// A self-reference is the same defect with one member. It has its own message and
+		// must not ALSO be reported as a cycle, so one defect stays one error.
+		test("a value self-reference is reported once, as a self-reference", () => {
+			const workfile = make_workfile({
+				loop: make_struct("loop_t", [
+					make_include("me", "loop_t", { value: "loop" })
+				])
+			});
+
+			const result = validate_workfile(workfile);
+
+			expect(result.valid).toBe(false);
+			expect(result.errors).toHaveLength(1);
+			expect(result.errors[0].message).toContain("references itself");
+		});
+
+		// `.bus = &itself` compiles, so the cycle check (value edges only) cannot see it —
+		// the separate self-reference rule looks at ALL edges and still rejects it.
+		test("a pointer self-reference is still rejected", () => {
+			const workfile = make_workfile({
+				loop: make_struct("loop_t", [
+					make_include("me", "loop_t", { value: "loop", pointer: true })
+				])
+			});
+
+			const result = validate_workfile(workfile);
+
+			expect(result.valid).toBe(false);
+			expect(result.errors.some(error => error.message.includes("references itself"))).toBe(true);
+		});
+
+		// An array of embedded structs is a value edge too, so a loop through one counts.
+		test("a cycle through an array of embedded includes is caught", () => {
+			const workfile = make_workfile({
+				parent: make_struct("parent_t", [
+					make_array("kids", 2, make_include("kid", "child"), { value: ["child"] })
+				]),
+				child: make_struct("child_t", [
+					make_include("owner", "parent_t", { value: "parent" })
+				])
+			});
+
+			const result = validate_workfile(workfile);
+
+			expect(cycle_errors(result).map(error => error.path).sort()).toEqual(["child", "parent"]);
+		});
+	});
+});
+
+// What `update` refuses before writing: the value alone, not the rest of the workfile.
+describe("validate_property_value", () => {
+	beforeEach(() => { setup_test_config(); });
+	afterEach(() => { teardown_test_config(); });
+
+	test("a number outside its bounds, or an enum value not among the options", () => {
+		const workfile = make_workfile({
+			my_struct: make_struct("test", [
+				make_number("count", { value: 150, maximum: 100 }),
+				make_enum("mode", ["A", "B"], { value: "C" }),
+			])
+		});
+		expect(validate_property_value(workfile, "my_struct", "count").map(error => error.message)).toEqual([expect.stringContaining("above")]);
+		expect(validate_property_value(workfile, "my_struct", "mode")).toHaveLength(1);
+	});
+
+	test("a value the definition allows, a reference to a missing node, and an empty required value are none of its business", () => {
+		const workfile = make_workfile({
+			my_struct: make_struct("test", [
+				make_number("count", { value: 50, maximum: 100 }),
+				make_include("bus", "test_spi_device", { value: "no_such_node" }),
+				make_number("needed", { required: true }),
+			])
+		});
+		expect(validate_property_value(workfile, "my_struct", "count")).toEqual([]);
+		expect(validate_property_value(workfile, "my_struct", "bus")).toEqual([]);
+		expect(validate_property_value(workfile, "my_struct", "needed")).toEqual([]);
+		expect(validate_workfile(workfile).valid).toBe(false);
+	});
+});

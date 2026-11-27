@@ -1,0 +1,44 @@
+{
+  "name": "capi-lib",
+  "version": "0.0.1",
+  "description": "CAPI workfile, bootstrap and code generation library for Analog Attach",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
+    "typecheck": "tsc --noEmit -p .",
+    "lint": "eslint src",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:build": "AA_BUILD_TESTS=1 vitest run test/integration/capi_build.test.ts",
+    "coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@microsoft/api-extractor": "^7.60.1",
+    "@stylistic/eslint-plugin": "^6.0.1",
+    "@types/node": "22.x",
+    "@vitest/coverage-v8": "^5.1.0",
+    "eslint": "^10.14.0",
+    "eslint-plugin-unicorn": "^79.0.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.7",
+    "vite-plugin-dts": "^5.1.2",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "eta": "^4.6.0"
+  }
+}

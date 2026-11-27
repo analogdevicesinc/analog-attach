@@ -1,0 +1,71 @@
+{
+  "platform": "max32655",
+  "board": "max32655fthr",
+  "symbols": {
+    "adxl355_cfg": {
+      "$compatible": "capi_accel_sensor_init_config",
+      "$auto": [
+        "extra",
+        "ops"
+      ],
+      "extra": "adxl355_ip",
+      "ops": "adxl355_capi_accel_ops"
+    },
+    "adxl355_ip": {
+      "$compatible": "adxl355_init_param",
+      "$auto": [
+        "comm_type",
+        "dev_type",
+        "comm_init"
+      ],
+      "comm_type": "ADXL355_SPI_COMM",
+      "dev_type": "ID_ADXL355",
+      "comm_init": {
+        "spi_dev": "adxl355_spi_dev"
+      }
+    },
+    "eval_adxl355_pmdz": {
+      "$compatible": "eval-adxl355-pmdz",
+      "$auto": [
+        "part"
+      ],
+      "part": "accel"
+    },
+    "adxl355_spi_dev": {
+      "$compatible": "capi_spi_device",
+      "$auto": [
+        "controller",
+        "mode",
+        "cs_gpio",
+        "cs_gpio_num",
+        "non_continuous_mode",
+        "lsb_first"
+      ],
+      "controller": "bsp_spi1_cfg_handle",
+      "max_speed_hz": 4000000,
+      "mode": "CAPI_SPI_MODE_0",
+      "cs_gpio": "adxl355_cs_gpio",
+      "cs_gpio_num": 1,
+      "non_continuous_mode": false,
+      "lsb_first": false
+    },
+    "adxl355_cs_gpio": {
+      "$compatible": "capi_gpio_pin",
+      "$auto": [
+        "port_handle",
+        "number",
+        "flags"
+      ],
+      "port_handle": "bsp_gpio2_cfg_handle",
+      "number": 0,
+      "flags": 0
+    },
+    "accel": {
+      "$compatible": "capi_accel_sensor",
+      "$auto": [
+        "$init_param"
+      ],
+      "$init_param": "adxl355_cfg"
+    }
+  }
+}

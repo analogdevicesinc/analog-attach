@@ -1,0 +1,69 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node2",
+          "hyperpixel4_spi_pins",
+          "brcm,function"
+        ],
+        "message": "hyperpixel4_spi_pins: brcm,function: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node2",
+          "hyperpixel4_spi_pins",
+          "brcm,pins"
+        ],
+        "message": "hyperpixel4_spi_pins: brcm,pins: b'\\x00\\x00\\x00\\x1b\\x00\\x00\\x00\\x12\\x00\\x00\\x00\\x1a' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node2",
+          "hyperpixel4_spi_pins",
+          "brcm,pull"
+        ],
+        "message": "hyperpixel4_spi_pins: brcm,pull: b'\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "i2c@0"
+        ],
+        "message": "i2c@0 (i2c-gpio): 'scl-gpios' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/i2c/i2c-gpio.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "i2c@0"
+        ],
+        "message": "i2c@0 (i2c-gpio): 'sda-gpios' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/i2c/i2c-gpio.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "ft6236@14"
+        ],
+        "message": "ft6236@14 (goodix,gt911): 'touchscreen-x-mm', 'touchscreen-y-mm' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/input/touchscreen/goodix.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "ft6236@5d"
+        ],
+        "message": "ft6236@5d (goodix,gt911): 'touchscreen-x-mm', 'touchscreen-y-mm' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/input/touchscreen/goodix.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

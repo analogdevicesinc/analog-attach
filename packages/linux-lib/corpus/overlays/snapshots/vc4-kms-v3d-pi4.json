@@ -1,0 +1,53 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [
+      {
+        "parent_path": "/soc",
+        "nodes": [
+          "interrupt-controller@7ef00100",
+          "hdmi@7ef00700"
+        ],
+        "address": "0x7ef00100",
+        "in_overlay": [
+          true,
+          true
+        ]
+      },
+      {
+        "parent_path": "/soc",
+        "nodes": [
+          "interrupt-controller@7ef00100",
+          "hdmi@7ef05700"
+        ],
+        "address": "0x7ef00100",
+        "in_overlay": [
+          true,
+          true
+        ]
+      },
+      {
+        "parent_path": "/soc",
+        "nodes": [
+          "hdmi@7ef00700",
+          "hdmi@7ef05700"
+        ],
+        "address": "0x7ef20000",
+        "in_overlay": [
+          true,
+          true
+        ]
+      }
+    ],
+    "chip_select_overflows": []
+  }
+}

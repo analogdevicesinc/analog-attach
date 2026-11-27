@@ -1,0 +1,319 @@
+// A tiny Linux workspace for the backend's tests through the front end's `main`: a fixture
+// Linux tree with two bindings, a base devicetree, an overlay, caches and stand-ins for the
+// tools on PATH (dtc, and a dt-schema installation) in temp directories, so nothing depends on
+// a real kernel checkout or on what the machine has installed.
+
+import * as fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+import { main } from "../../../front/main";
+import { capture_stream } from "../../../front/output";
+import type { Registry } from "../../../front/registry";
+import { PromptCancelled, type Prompter } from "../../../interface/backend-interface";
+
+export const LINUX_REGISTRY: Registry = { linux: () => import("../index").then(module => module.backend) };
+
+/**
+ * A stand-in for dtc, dt-mk-schema and dt-validate: prints a version, writes the file after `-o`
+ * or `--json-output` (`diagnostics.json` next to it, else `[]`), and fails when a file named
+ * `fail` is next to it.
+ */
+export const FAKE_TOOL = `#!/bin/sh
+here=$(dirname "$0")
+if [ "$1" = "--version" ]; then echo "fake 1.0"; exit 0; fi
+if [ -e "$here/fail" ]; then echo "fake failure: $(basename "$0")" >&2; exit 1; fi
+previous=""
+for word in "$@"; do
+    case "$previous" in
+        -o|--json-output)
+            diagnostics="$here/diagnostics.json"
+            case "$word" in *full-error.json) [ -e "$here/full-diagnostics.json" ] && diagnostics="$here/full-diagnostics.json" ;; esac
+            if [ -e "$diagnostics" ]; then cat "$diagnostics" > "$word"; else printf '[]' > "$word"; fi ;;
+    esac
+    previous="$word"
+done
+exit 0
+`;
+
+/** The dt-schema version the fake installation reports. */
+export const FAKE_DT_SCHEMA_VERSION = "2026.9";
+
+/**
+ * The Python of the fake dt-schema installation: answers the probe (`-c`) with the package
+ * directory under `root` and `version`, and runs a script it is the interpreter of with sh.
+ * dt-mk-schema names it on its first line, as pip writes it.
+ */
+const fake_python = (root: string, version: string): string => `#!/bin/sh
+if [ "$1" = "-c" ]; then printf '%s\n' '${JSON.stringify({ root, version })}'; exit 0; fi
+exec /bin/sh "$@"
+`;
+
+/**
+ * The fake tools in `bin`, each FAKE_TOOL: dtc, dt-validate, and a dt-schema installation of
+ * `version` (`python3`, a `dt-mk-schema` it runs, the package under `site_packages`).
+ * dt-mk-schema's interpreter is itself a script, which Linux runs.
+ */
+export function write_fake_tools(bin: string, site_packages: string, version = FAKE_DT_SCHEMA_VERSION): void {
+	fs.mkdirSync(bin, { recursive: true });
+	for (const directory of ["schemas", "meta-schemas"]) {
+		fs.mkdirSync(path.join(site_packages, "dtschema", directory), { recursive: true });
+	}
+	const python = path.join(bin, "python3");
+	fs.writeFileSync(python, fake_python(site_packages, version), { mode: 0o755 });
+	fs.writeFileSync(path.join(bin, "dt-mk-schema"), FAKE_TOOL.replace(/^#!.*\n/, () => `#!${python}\n`), { mode: 0o755 });
+	for (const name of ["dtc", "dt-validate"]) { fs.writeFileSync(path.join(bin, name), FAKE_TOOL, { mode: 0o755 }); }
+}
+
+export const BASE_DTS = `/dts-v1/;
+/ {
+\tsoc {
+\t\t#address-cells = <1>;
+\t\t#size-cells = <1>;
+\t\tspi0: spi@7e204000 {
+\t\t\tcompatible = "brcm,bcm2835-spi";
+\t\t\t#address-cells = <1>;
+\t\t\t#size-cells = <0>;
+\t\t\tstatus = "disabled";
+\t\t};
+\t};
+};
+`;
+
+export const OVERLAY = `/dts-v1/;
+/plugin/;
+
+&spi0 {
+\tstatus = "okay";
+\tadc: adc@0 {
+\t\tcompatible = "adi,ad7124-8";
+\t\treg = <0>;
+\t};
+};
+`;
+
+/** A binding of the fixture Linux tree: two compatibles, and channel child nodes with required properties. */
+export const AD7124_YAML = `%YAML 1.2
+---
+$id: http://devicetree.org/schemas/iio/adc/adi,ad7124.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Analog Devices AD7124 ADC
+
+properties:
+  compatible:
+    enum:
+      - adi,ad7124-4
+      - adi,ad7124-8
+  reg:
+    maxItems: 1
+  spi-max-frequency:
+    maximum: 5000000
+  interrupts:
+    maxItems: 1
+  '#address-cells':
+    const: 1
+  '#size-cells':
+    const: 0
+
+required:
+  - compatible
+  - reg
+
+patternProperties:
+  "^channel@([0-9]|1[0-5])$":
+    type: object
+    properties:
+      reg:
+        maxItems: 1
+      diff-channels:
+        maxItems: 2
+        minItems: 2
+      bipolar:
+        type: boolean
+    required:
+      - reg
+      - diff-channels
+
+additionalProperties: false
+`;
+
+/** A second binding of the fixture tree: an SPI device with required properties add leaves to the interview. */
+export const ADXL_YAML = `%YAML 1.2
+---
+$id: http://devicetree.org/schemas/iio/accel/adi,adxl000.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Analog Devices ADXL000 accelerometer
+
+properties:
+  compatible:
+    const: adi,adxl000
+  reg:
+    maxItems: 1
+  adi,mode:
+    enum:
+      - fast
+      - slow
+  spi-max-frequency:
+    maximum: 5000000
+
+required:
+  - compatible
+  - reg
+  - adi,mode
+  - spi-max-frequency
+
+additionalProperties: false
+`;
+
+/** An overlay file to import: one fragment on spi0, and a reference to a node nobody has. */
+export const IMPORTED = `/dts-v1/;
+/plugin/;
+/ {
+\tfragment@0 {
+\t\ttarget = <&spi0>;
+\t\t__overlay__ {
+\t\t\tstatus = "okay";
+\t\t\tdac@1 {
+\t\t\t\treg = <1>;
+\t\t\t\tvref-supply = <&vref>;
+\t\t\t};
+\t\t};
+\t};
+};
+`;
+
+/** A prompter without a terminal that answers from a script, in order, and records the questions; Ctrl-C once the script runs out. */
+export function scripted(answers: unknown[]): Prompter & { asked: string[] } {
+	const asked: string[] = [];
+	const next = <T>(message: string): Promise<T> => {
+		asked.push(message);
+		if (answers.length === 0) { return Promise.reject(new PromptCancelled()); }
+		return Promise.resolve(answers.shift() as T);
+	};
+	return {
+		asked,
+		select: question => next(question.message),
+		input: question => next(question.message),
+		confirm: question => next(question.message),
+		checkbox: question => next(question.message),
+		search: question => next(question.message),
+		password: question => next(question.message),
+	};
+}
+
+export interface RunOptions {
+	/** A run on a terminal, asking through this prompter. */
+	prompter?: Prompter;
+	registry?: Registry;
+	/** The environment the run has (`Session.environment`), over `PATH` with the fake tools first. */
+	environment?: Readonly<Record<string, string>>;
+}
+
+export interface RunResult { code: number; stdout: string; stderr: string }
+
+export interface LinuxFixture {
+	/** The temp directory everything is in. */
+	readonly base: string;
+	/** The cwd of a run, with `overlay.dtso`. */
+	readonly project: string;
+	readonly home: string;
+	/** A package root, with no assets. */
+	readonly package_root: string;
+	/** The fake tools (`write_fake_tools`), first on PATH during a run. */
+	readonly tools: string;
+	/** The fake dt-schema installation's package directory: `<site_packages>/dtschema`. */
+	readonly site_packages: string;
+	/** The fixture Linux tree. */
+	readonly linux: string;
+	/** The project's state directory, where the Linux backend keeps its caches. */
+	state_directory(): string;
+	/** `.analog-attach/config.json` with `backend: linux` and these values in its `linux` section. */
+	write_settings(values: Record<string, unknown>): void;
+	/** A binding YAML in the Linux tree, under `Documentation/devicetree/bindings/<relative>`, for `compatibles`; in the caches `write_caches` writes next. */
+	write_binding(relative: string, yaml: string, compatibles: readonly string[]): void;
+	/** Caches as `config linux` would leave them, current for the fixture tree. */
+	write_caches(): void;
+	/** A configured workspace with current caches. */
+	configure(): void;
+	/** One run of `main` in the project. */
+	run(argv: readonly string[], options?: RunOptions): Promise<RunResult>;
+	remove(): void;
+}
+
+/** A fresh fixture: the Linux tree with the ad7124 and adxl000 bindings, the base, the overlay; nothing configured yet. */
+export function create_linux_fixture(): LinuxFixture {
+	const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "aa-linux-")));
+	const project = path.join(base, "project");
+	const home = path.join(base, "home");
+	const package_root = path.join(base, "package");
+	const tools = path.join(base, "tools", "bin");
+	const site_packages = path.join(base, "tools", "site-packages");
+	const linux = path.join(base, "linux");
+	const bindings_directory = path.join(linux, "Documentation", "devicetree", "bindings");
+	const entries: Record<string, string> = {};
+
+	fs.mkdirSync(project);
+	fs.mkdirSync(home);
+	fs.mkdirSync(package_root);
+	write_fake_tools(tools, site_packages);
+	fs.mkdirSync(bindings_directory, { recursive: true });
+	fs.mkdirSync(path.join(linux, "include"), { recursive: true });
+	fs.writeFileSync(path.join(base, "base.dts"), BASE_DTS);
+	fs.writeFileSync(path.join(project, "overlay.dtso"), OVERLAY);
+
+	const state_directory = (): string => path.join(project, ".analog-attach", "linux");
+	const write_binding = (relative: string, yaml: string, compatibles: readonly string[]): void => {
+		const file = path.join(bindings_directory, relative);
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, yaml);
+		for (const compatible of compatibles) { entries[compatible] = file; }
+	};
+	write_binding(path.join("iio", "adc", "adi,ad7124.yaml"), AD7124_YAML, ["adi,ad7124-4", "adi,ad7124-8"]);
+	write_binding(path.join("iio", "accel", "adi,adxl000.yaml"), ADXL_YAML, ["adi,adxl000"]);
+
+	const fixture: LinuxFixture = {
+		base, project, home, package_root, tools, site_packages, linux,
+		state_directory,
+		write_settings(values) {
+			fs.mkdirSync(path.join(project, ".analog-attach"), { recursive: true });
+			fs.writeFileSync(path.join(project, ".analog-attach", "config.json"), JSON.stringify({ backend: "linux", linux: values }, undefined, 2));
+		},
+		write_binding,
+		write_caches() {
+			const stamp = { generated_at: Date.now() + 60_000, linux, dt_schema: site_packages, dt_schema_version: FAKE_DT_SCHEMA_VERSION };
+			fs.mkdirSync(path.join(state_directory(), "validation-cache"), { recursive: true });
+			fs.writeFileSync(path.join(state_directory(), "compat-index.json"), JSON.stringify({ ...stamp, entries }));
+			fs.writeFileSync(path.join(state_directory(), "validation-cache", "validation.json"), "{}");
+			fs.writeFileSync(path.join(state_directory(), "validation-cache", "validation.stamp.json"), JSON.stringify(stamp));
+		},
+		configure() {
+			fixture.write_settings({ linux, devicetree: path.join(base, "base.dts"), workfile: path.join(project, "overlay.dtso") });
+			fixture.write_caches();
+		},
+		async run(argv, options = {}) {
+			const tty = options.prompter !== undefined;
+			const stdout = capture_stream(false);
+			const stderr = capture_stream(false);
+			const search_path = process.env["PATH"];
+			process.env["PATH"] = `${tools}${path.delimiter}${search_path ?? ""}`;
+			const code = await main(argv, {
+				registry: options.registry ?? LINUX_REGISTRY,
+				streams: { stdout, stderr },
+				location: { cwd: project, home, xdg_config_home: path.join(home, ".config") },
+				tty: { stdin: tty, stdout: tty },
+				...(options.prompter === undefined ? {} : { prompter: () => options.prompter! }),
+				// What the scripts inherit: PATH, the fake tools first, and the run's own.
+				environment: { PATH: process.env["PATH"], ...options.environment },
+				agent_installed: () => false,
+				package_root,
+			}).finally(() => { process.env["PATH"] = search_path; });
+			return { code, stdout: stdout.text, stderr: stderr.text };
+		},
+		remove() {
+			fs.rmSync(base, { recursive: true, force: true });
+		},
+	};
+	return fixture;
+}

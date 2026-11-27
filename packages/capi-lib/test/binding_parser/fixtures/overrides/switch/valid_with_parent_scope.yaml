@@ -1,0 +1,20 @@
+$type: struct
+$symbol: test_struct
+mode:
+  type: enum
+  values: [MODE_A, MODE_B]
+
+value:
+  type: uint8_t
+
+$override:
+  $parent:
+    - $switch:
+        $on: mode
+        $cases:
+          MODE_A:
+            value:
+              default: 10
+          MODE_B:
+            value:
+              default: 20

@@ -1,0 +1,763 @@
+import {
+	DeviceTree,
+	DeviceTreeOverlay,
+	NodeBuilder,
+	PropertyBuilder,
+	is_dt_flag,
+	get_full_node_name,
+	address_cells_of,
+	encode_reg_address,
+	ensure_address_cells,
+	parse_unit_address,
+	sync_unit_address_from_reg,
+	unit_radix,
+	type DTNode,
+	type DTProperty,
+	type DTLabel,
+	type DTPath,
+	type FoundNodeResult,
+	type NodeTarget,
+	type ResolvedProperty,
+	effective_interrupt_parent,
+	base_lookup,
+} from "linux-lib";
+import * as fs from "node:fs";
+
+import { answer, command, input_error, PromptCancelled, refuse, warned, type FlagSpecs, type InteractiveSession, type UpdateArguments } from "../../../../interface/backend-interface";
+import type { ErrorType } from "../../../../interface/error-types";
+import { load_workspace, type Bindings, type Workfile } from "../../config/workspace";
+import { resolve_write_target, parse_node_path, not_found_message } from "../../utilities";
+import { child_unit_radix, find_property_definition, narrowed_binding, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
+import { suggest_values } from "../list/value";
+import { read_target } from "../read/command";
+import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
+import { describe_missing, missing_lines, missing_required_of, type NewNode } from "../../missing-required";
+import { ask_for_missing } from "../../missing-interview";
+import type { UpdateChildResponse, UpdateResponse } from "../../protocol/types";
+import { written_count_warning } from "../../item-count";
+import { value_warning } from "../../value-check";
+import { build_raw_property, cell_bits, quoted_strings, shape_hint, type ShapeHint } from "../../property-value";
+
+/** Where a warning goes: `session.warn`, stderr in every mode. */
+export type Warn = (message: string) => void;
+
+/**
+ * The binding's definition of a property of the target node, by name or by a
+ * property pattern. Without one the value is written unchecked, which `warn`
+ * says (`update` passes a no-op when it only reads or sets a flag).
+ */
+export async function resolve_property_definition(
+	binding_node: DTNode | undefined,
+	binding_parent: DTNode | undefined,
+	parent_name: string,
+	base_dt: DeviceTree,
+	bindings: Bindings,
+	property_name: string,
+	warn: Warn,
+): Promise<{ definition: ResolvedProperty | undefined; unchecked: boolean }> {
+	if (binding_node === undefined) { return { definition: undefined, unchecked: false }; }
+	const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, bindings);
+	if ("error" in binding) {
+		warn(`Property ${property_name} written without schema validation: ${binding.error}`);
+		return { definition: undefined, unchecked: true };
+	}
+	const result = binding.narrow_and_populate(binding_node);
+	if (result === undefined) {
+		warn(`Property ${property_name} written without schema validation: failed to narrow binding`);
+		return { definition: undefined, unchecked: true };
+	}
+	const definition = find_property_definition(binding, result.properties, property_name);
+	if (definition === undefined) {
+		const origin_desc = binding.origin.kind === "compatible"
+			? `${binding.origin.compatible} binding`
+			: `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
+		warn(`Property ${property_name} not defined by ${origin_desc}; written without schema validation`);
+	}
+	return { definition, unchecked: definition === undefined };
+}
+
+export type UpdateDecision = "set-flag" | "read" | "value" | { error: string };
+
+export function decide_update(hint: ShapeHint, value_tokens: readonly string[], existing_has_value: boolean): UpdateDecision {
+	if (value_tokens.length === 0) {
+		if (hint === "flag") { return "set-flag"; }
+		if (hint === undefined) {
+			return existing_has_value ? "read" : "set-flag";
+		}
+		return "read";
+	}
+	if (hint === "flag") {
+		return { error: `is a flag: \`update <path> ${""}\` sets it, \`delete <path> ${""}\` clears it` };
+	}
+	return "value";
+}
+
+const child_node_message = (identifier: string, name: string): string =>
+	`${name} is a child node; set its properties with \`update ${identifier}/${name} <prop> <value>\``;
+
+const UPDATE_FLAGS = {
+	suggest: { kind: "boolean", brief: "List what the property can be set to, instead of setting it" },
+} as const satisfies FlagSpecs;
+
+export const update = command<UpdateArguments, UpdateResponse, typeof UPDATE_FLAGS>({
+	flags: UPDATE_FLAGS,
+	docs: {
+		brief: "Update/insert a property",
+		full: `Paths:
+  Label:        spi0                       (a label in the base tree)
+  Label-first:  spi0/adi,ad7124-8@0       (label then child segments)
+  Absolute:     /soc/spi@7e204000          (full device tree path)
+
+Value syntax:
+  Numbers:     0, 1, 0x1F                  Cell values
+  Macros:      GPIO_ACTIVE_LOW, IRQ_TYPE_EDGE_FALLING, ...
+  Labels:      &spi0, spi0                 Phandle references
+  Strings:     words without & are strings when the binding expects them
+  Arrays:      multiple tokens in one call
+  Matrices:    rows separated by ","
+
+Special cases:
+  No value     Sets a flag property, or reads the current value (as 'read' does)
+  Child name   'update <path> <child-name>' creates a child node and lists
+               its missing required properties; an existing child is read
+               (as 'read <path>/<child-name>' does)
+  reg          'update <path> reg <n>' also renames the node's unit address
+  --suggest    Lists what the property can be set to, as 'list value' does,
+               and sets nothing`,
+		examples: [
+			"update spi0/adi,ad7124-8@0 spi-max-frequency 1000000",
+			"update spi0/adi,ad7124-8@0 reg 1",
+			"update spi0/adi,ad7124-8@0 interrupts 25 IRQ_TYPE_EDGE_FALLING",
+			"update spi0/adi,ad7124-8@0 channel@0",
+			"update --suggest spi0/adi,ad7124-8@0 interrupt-parent",
+		],
+	},
+	async run({ path: path_argument, property: property_argument, values, quiet }, flags, session) {
+		if (path_argument === undefined) { return input_error("Missing: path"); }
+		if (property_argument === undefined) { return input_error("Missing: property name"); }
+		const parsed_path = parse_node_path(path_argument);
+		if (!parsed_path.ok) { return input_error(parsed_path.error); }
+		const node_identifier = parsed_path.value;
+
+		if (flags.suggest === true) {
+			const [member] = values;
+			if (member !== undefined) { return input_error(`A member is not supported by the linux backend: ${member}`); }
+			return suggest_values(session, node_identifier, property_argument);
+		}
+
+		const loaded = load_workspace(session, ["bindings", "base", "overlay"]);
+		if (!loaded.ok) { return loaded.outcome; }
+		const { workspace } = loaded;
+		const base_dt = workspace.base.tree;
+		const { tree: overlay } = workspace.overlay;
+		const bindings = workspace.bindings;
+
+		const { target_reference, found, is_base_target, binding_node, binding_parent, parent_name }
+			= resolve_write_target(node_identifier, overlay, base_dt);
+		if (found === undefined && !is_base_target) {
+			return refuse(not_found_message(node_identifier, overlay, base_dt), { type: "not-found" });
+		}
+
+		const property_name = property_argument;
+
+		// R12: child nodes via update. A name is a child node when the node has a child of that name, else when its binding
+		// defines it as a node (`defines_child_node`); `@` in it decides nothing.
+		const node_path = found?.node_path ?? base_dt.locate(target_reference)?.path ?? node_identifier;
+		if (overlay.effective_children(node_path).has(property_name)) {
+			if (values.length > 0) { return refuse(child_node_message(node_identifier, property_name), { type: "invalid-value" }); }
+			const child_identifier = node_identifier === "/" ? `/${property_name}` : `${node_identifier}/${property_name}`;
+			return read_target(session, overlay, { ok: true, value: bindings }, child_identifier, undefined, { quiet });
+		}
+
+		let child_patterns: string[] = [];
+		let defines_child = false;
+		if (binding_node !== undefined) {
+			const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, overlay.merged_tree() ?? base_dt, bindings);
+			if (!("error" in binding)) {
+				child_patterns = binding.child_nodes.map(c => c.pattern);
+				defines_child = defines_child_node(binding, narrowed_binding(binding, binding_node).properties, property_name);
+			}
+		}
+		if (defines_child) {
+			if (values.length > 0) { return refuse(child_node_message(node_identifier, property_name), { type: "invalid-value" }); }
+
+			const child_path = create_child_node(overlay, node_path, property_name, child_patterns);
+			workspace.overlay.save();
+			const message = `Added ${property_name} to ${node_identifier}`;
+			const child: NewNode = {
+				workfile: workspace.overlay,
+				base: base_dt,
+				bindings,
+				identifier: `${node_identifier}/${property_name}`,
+				path: child_path,
+			};
+			const missing = await missing_required_of(child);
+			const response = async (): Promise<UpdateChildResponse> => ({
+				ok: true,
+				message,
+				severity: "info",
+				path: child_path.split("/").filter(Boolean),
+				missing_required: await describe_missing(child, missing),
+			});
+			// Asked only on a terminal, without --quiet, with the interview setting on.
+			if (quiet || session.prompter === undefined || !workspace.settings.interview) {
+				return answer<UpdateResponse>(response, () => [message, ...missing_lines(child.identifier, missing)].join("\n"));
+			}
+			// On a terminal: fill the pinned values, then ask for the rest (no example values for a child).
+			session.say(message);
+			try {
+				await ask_for_missing(child, missing, session as InteractiveSession);
+			} catch (error) {
+				if (!(error instanceof PromptCancelled)) { throw error; }
+				for (const line of missing_lines(child.identifier, await missing_required_of(child))) { session.say(line); }
+			}
+			return answer<UpdateResponse>(response, "");
+		}
+		// Fall through to property handling (creates a flag for unknown names)
+
+		const outcome = await apply_update(workspace.overlay, base_dt, bindings, node_identifier, property_name, values, message => { session.warn(message); });
+		switch (outcome.kind) {
+			case "read": {
+				return read_target(session, overlay, { ok: true, value: bindings }, node_identifier, property_name, { quiet });
+			}
+			case "error": {
+				return refuse(outcome.message, { type: outcome.type });
+			}
+			case "set": {
+				const message = outcome.detail === undefined ? outcome.message : `${outcome.message}; ${outcome.detail}`;
+				const text = outcome.detail === undefined ? outcome.message : `${outcome.message}\n${outcome.detail}`;
+				return answer<UpdateResponse>({ ok: true, message, ...warned(outcome.warning) }, text);
+			}
+		}
+	},
+});
+
+/**
+ * Whether the binding defines `name` as a child node: the property of that name (`properties`, narrowed) by its type,
+ * a `node`; else a child-node pattern that matches it (`^buck[0-2]$`, `^channel@([0-9]|1[0-5])$`). A name it defines
+ * otherwise, or not at all, is a property.
+ */
+export function defines_child_node(binding: Pick<NodeBinding, "child_nodes">, properties: ResolvedProperty[], name: string): boolean {
+	const named = properties.find(property => property.key === name);
+	if (named !== undefined) { return named.value._t === "node"; }
+	return binding.child_nodes.some(rule => new RegExp(rule.pattern).test(name));
+}
+
+/**
+ * Add the child `name` (`channel@0`, `buck0`) under `node_path`, with a reg in the radix the parent's patterns name it
+ * in when it has a unit address; its path.
+ */
+export function create_child_node(overlay: DeviceTreeOverlay, node_path: string, name: string, child_patterns: string[]): string {
+	const at = name.indexOf("@");
+	const child_name = at === -1 ? name : name.slice(0, at);
+	const child_unit = at === -1 ? undefined : name.slice(at + 1);
+	const child_properties: DTProperty[] = [];
+
+	const radix = unit_radix(child_patterns, child_name) ?? 16;
+	const parsed_addr = child_unit === undefined ? undefined : parse_unit_address(child_unit, radix);
+	if (parsed_addr !== undefined) {
+		const cells = address_cells_of(overlay, node_path);
+		child_properties.push(encode_reg_address(parsed_addr, cells.address, cells.size, radix));
+		// C3: write #address-cells/#size-cells on parent if missing
+		ensure_address_cells(overlay, node_path);
+	}
+
+	overlay.ensure_node(node_path)?.children.push(NodeBuilder.new()
+		.with_name(child_name)
+		.with_unit_address(child_unit)
+		.with_label([])
+		.with_properties(child_properties.length > 0 ? child_properties : undefined)
+		.build());
+	return `${node_path === "/" ? "" : node_path}/${name}`;
+}
+
+export type UpdateOutcome =
+	| { kind: "read" }
+	| { kind: "error"; message: string; type: ErrorType }
+	/** `detail` is a second line (the implicit interrupt-parent); `warning` the type of the first warning that went to stderr. */
+	| { kind: "set"; message: string; detail?: string; warning?: ErrorType };
+
+/**
+ * Set a property (or a flag) on a node and write the workfile, or say that
+ * the request is a read. Warnings go to `warn` as they come; the rest is
+ * returned. Shared by `update` and the interview after `add`.
+ */
+export async function apply_update(
+	workfile: Workfile,
+	base_dt: DeviceTree,
+	bindings: Bindings,
+	node_identifier: string,
+	property_name: string,
+	value_arguments: readonly string[],
+	warn: Warn,
+): Promise<UpdateOutcome> {
+	const { path: input, tree: overlay } = workfile;
+	const { target_reference, found, is_base_target, binding_node, binding_parent, parent_name }
+		= resolve_write_target(node_identifier, overlay, base_dt);
+	if (found === undefined && !is_base_target) {
+		return { kind: "error", message: not_found_message(node_identifier, overlay, base_dt), type: "not-found" };
+	}
+
+	// Reading or setting a flag says nothing about the schema. The binding is shaped by the base with the overlay
+	// applied, as `read` shows it: an interrupt-parent the overlay sets on the node's bus is the one it inherits.
+	const { definition: property_definition, unchecked } = await resolve_property_definition(
+		binding_node, binding_parent, parent_name, overlay.merged_tree() ?? base_dt, bindings,
+		property_name, value_arguments.length === 0 ? () => {} : warn,
+	);
+
+	const hint = shape_hint(property_definition);
+
+	// The node as the base and the overlay together have it, as `read` shows it.
+	const node_path = found?.node_path ?? base_dt.locate(target_reference)?.path;
+	const existing_property = (node_path === undefined ? undefined : overlay.effective_node(node_path))
+		?.properties.find(p => p.name === property_name);
+	const existing_has_value = existing_property !== undefined && !is_dt_flag(existing_property.value);
+
+	const decision = decide_update(hint, value_arguments, existing_has_value);
+
+	if (typeof decision === "object" && "error" in decision) {
+		return { kind: "error", message: `${property_name} ${decision.error}`, type: "invalid-value" };
+	}
+
+	if (decision === "read") { return { kind: "read" }; }
+
+	if (decision === "set-flag") {
+		const built = PropertyBuilder.build_flag().set_flag().with_name(property_name).build();
+		place_property(overlay, target_reference, found, is_base_target, built, property_name);
+		const printed = workfile.print();
+		const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
+		if (typeof test_parse === "string") {
+			return { kind: "error", message: `Update would produce an unreadable overlay: ${test_parse}`, type: "edit-refused" };
+		}
+		fs.writeFileSync(input, printed);
+		return { kind: "set", message: `Set flag ${property_name} on ${node_identifier}` };
+	}
+
+	// decision === "value"
+	const with_value = value_arguments.join(" ");
+	const is_label = (name: string): boolean => {
+		if (base_dt.node_exists(name)) { return true; }
+		return overlay.find_node(name) !== undefined;
+	};
+
+	// A string with spaces in it, as the shell quoted it, stays one string.
+	const strings = quoted_strings(value_arguments, hint);
+	const built = strings === undefined
+		? build_raw_property(with_value, property_name, hint, is_label, cell_bits(property_definition))
+		: PropertyBuilder.build_string().with_value(strings.length === 1 ? strings[0]! : strings).with_name(property_name).build();
+
+	if (built !== null && typeof built === "object" && "error" in built) {
+		return { kind: "error", message: built.error, type: "invalid-value" };
+	}
+
+	place_property(overlay, target_reference, found, is_base_target, built, property_name);
+
+	const ip_result = implicit_interrupt_parent(overlay, base_dt, target_reference, found, is_base_target, property_name, built);
+	if (ip_result.warning !== undefined) { warn(ip_result.warning); }
+
+	// R10: updating reg renames the node (overlay-added targets only)
+	let rename_message = "";
+	let reg_path = is_base_target ? base_dt.locate(target_reference)?.path : found?.node_path;
+	if (property_name === "reg" && found !== undefined && !is_base_target) {
+		const parent_path = found.node_path.split("/").slice(0, -1).join("/") || "/";
+		const cells = address_cells_of(overlay, parent_path);
+		const effective = overlay.effective_children(parent_path);
+		const radix = await child_unit_radix(overlay.effective_node(parent_path), found.node.name, bindings);
+		const sync = sync_unit_address_from_reg(found.node, cells.address, effective, radix);
+		switch (sync) {
+			case "conflict": {
+				return { kind: "error", message: "reg update would create a naming conflict; not written", type: "name-taken" };
+			}
+			case "renamed": {
+				rename_message = `; renamed to ${get_full_node_name(found.node)}`;
+				reg_path = parent_path === "/" ? `/${get_full_node_name(found.node)}` : `${parent_path}/${get_full_node_name(found.node)}`;
+				break;
+			}
+			case "not-numeric": {
+				warn("reg contains non-numeric cells; node not renamed");
+				break;
+			}
+		}
+	} else if (property_name === "reg" && is_base_target) {
+		warn("an overlay can't rename a base node; reg written but name unchanged");
+	}
+
+	const printed = workfile.print();
+	const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
+
+	if (typeof test_parse === "string") {
+		return { kind: "error", message: `Update would produce an unreadable overlay: ${test_parse}`, type: "edit-refused" };
+	}
+
+	fs.writeFileSync(input, printed);
+
+	const reg_warnings = property_name === "reg" && reg_path !== undefined ? node_reg_warnings(overlay, reg_path) : [];
+	for (const line of reg_warnings.flatMap(w => reg_warning_lines(w))) { warn(line); }
+	// The binding shapes the value but never refuses it: a count or a value it doesn't allow is written, with a warning.
+	const checks = property_definition === undefined || built === undefined
+		? []
+		: [
+			written_count_warning(property_name, property_definition.value, built, overlay.merged_tree() ?? base_dt),
+			value_warning(property_name, property_definition.value, built),
+		];
+	const out_of_bounds = checks.filter(warning => warning !== undefined);
+	for (const warning of out_of_bounds) { warn(warning); }
+
+	return {
+		kind: "set",
+		message: `Set ${property_name} on ${node_identifier}${rename_message}`,
+		...(ip_result.message === undefined ? {} : { detail: ip_result.message }),
+		...first_warning([
+			[unchecked, "unchecked"],
+			[ip_result.warning !== undefined, "out-of-range"],
+			[reg_warnings.length > 0, "resource-conflict"],
+			[out_of_bounds.length > 0, "out-of-range"],
+		]),
+	};
+}
+
+/** The type of the first warning that went out, in the order they did. */
+function first_warning(warnings: readonly (readonly [boolean, ErrorType])[]): { warning?: ErrorType } {
+	const first = warnings.find(([happened]) => happened);
+	return first === undefined ? {} : { warning: first[1] };
+}
+
+export function implicit_interrupt_parent(
+	overlay: DeviceTreeOverlay,
+	base_dt: DeviceTree,
+	target_reference: DTLabel | DTPath,
+	found: FoundNodeResult | undefined,
+	is_base_target: boolean,
+	property_name: string,
+	built: DTProperty | undefined,
+): { message?: string; warning?: string } {
+	if (property_name !== "interrupts") { return {}; }
+	if (built === undefined) { return {}; }
+	// A value that isn't cells (`interrupts = "hello"`) has no interrupt parent to inherit.
+	const row_count = count_interrupt_cells(built);
+	if (row_count === undefined) { return {}; }
+
+	const node_path = found?.node_path;
+	if (node_path === undefined) { return {}; }
+
+	const has_interrupt_parent = found?.node.properties.some(p => p.name === "interrupt-parent") ?? false;
+	if (has_interrupt_parent) { return {}; }
+
+	// The base with the overlay applied, as Linux walks it: an interrupt-parent the overlay sets on an ancestor counts.
+	const tree = overlay.merged_tree() ?? base_dt;
+	const inherited = effective_interrupt_parent(base_lookup(tree), node_path, tree);
+	if (inherited === undefined) {
+		return { warning: `No interrupt-parent inherited for ${node_path}; set one: update ${node_path} interrupt-parent <controller>` };
+	}
+
+	const warning = inherited.interrupt_cells === undefined || row_count === inherited.interrupt_cells
+		? undefined
+		: `${inherited.label ?? inherited.path} has #interrupt-cells = <${inherited.interrupt_cells}> but interrupts has ${row_count} cells; set interrupt-parent explicitly`;
+
+	// The node's own base interrupt-parent is written already: nothing inherited to show.
+	if (inherited.from === node_path) { return { warning }; }
+
+	if (inherited.label === undefined) {
+		return { warning: `Inherited interrupt-parent at ${inherited.from} has no label; cannot write &{/path} in a plugin` };
+	}
+
+	const ip_built = PropertyBuilder.build_cell_array()
+		.with_cells(PropertyBuilder.label(inherited.label))
+		.with_name("interrupt-parent")
+		.build();
+
+	place_property(overlay, target_reference, found, is_base_target, ip_built, "interrupt-parent");
+
+	return {
+		message: `Set interrupt-parent = <&${inherited.label}> on ${node_path} (inherited from ${inherited.from})`,
+		warning,
+	};
+}
+
+function count_interrupt_cells(property: DTProperty): number | undefined {
+	if (is_dt_flag(property.value)) { return undefined; }
+	const first = property.value[0];
+	if (first?.kind !== "array") { return undefined; }
+	return first.elements.length;
+}
+
+function upsert_property(found_node: DTNode, property: DTProperty): void {
+	const existing = found_node.properties.find(p => p.name === property.name);
+	if (existing === undefined) { found_node.properties.push(property); return; }
+	existing.value = structuredClone(property.value);
+}
+
+export function place_property(
+	overlay: DeviceTreeOverlay,
+	target: NodeTarget,
+	found: FoundNodeResult | undefined,
+	is_base_target: boolean,
+	built: DTProperty | undefined,
+	property_name: string,
+): void {
+	if (is_base_target) {
+		if (built === undefined) {
+			overlay.remove_property(target, property_name);
+		} else {
+			overlay.add_fragment(target, undefined, built);
+		}
+		return;
+	}
+
+	if (found !== undefined) {
+		if (built === undefined) {
+			overlay.remove_property(found.node_path, property_name);
+		} else {
+			upsert_property(overlay.property_node(found.node_path, property_name) ?? found.node, built);
+		}
+	}
+}
+
+if (import.meta.vitest) {
+	const { test, expect } = import.meta.vitest;
+
+	const base_dts = `/dts-v1/;
+/ {
+    soc {
+        gpio: gpio@7e200000 {
+            compatible = "brcm,bcm2711-gpio";
+            gpio-controller;
+            #gpio-cells = <2>;
+        };
+        spi0: spi@7e204000 {
+            compatible = "brcm,bcm2835-spi";
+        };
+    };
+};`;
+
+	const empty_overlay = `/dts-v1/;
+/plugin/;
+
+/ {
+};
+`;
+
+	const overlay_with_imu = `/dts-v1/;
+/plugin/;
+
+&spi0 {
+    imu1: adi,ad7124-8@0 {
+        compatible = "adi,ad7124-8";
+    };
+};`;
+
+	const parse = (overlay_source: string) => {
+		const base = DeviceTree.new_from_string(base_dts);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(overlay_source, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		return { base, overlay };
+	};
+
+	const base_is_label = (name: string): boolean => {
+		const { base, overlay } = parse(empty_overlay);
+		if (base.node_exists(name)) { return true; }
+		return overlay.find_node(name) !== undefined;
+	};
+
+	test("implicit_interrupt_parent — an inherited parent is written, the node's own base one isn't", () => {
+		const base = DeviceTree.new_from_string(`/dts-v1/;
+/ {
+    interrupt-parent = <&gic>;
+    gic: gic {
+        interrupt-controller;
+        #interrupt-cells = <3>;
+    };
+    aon: aon {
+        interrupt-controller;
+        #interrupt-cells = <1>;
+    };
+    hdmi: hdmi {
+        interrupt-parent = <&aon>;
+    };
+    dsi: dsi {
+    };
+};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const run = (label: string, cells: string) => {
+			const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n&${label} {\n\tinterrupts = <${cells}>;\n};`, base);
+			if (typeof overlay === "string") { throw new TypeError(overlay); }
+			const { target_reference, found, is_base_target } = resolve_write_target(label, overlay, base);
+			const built = found?.node.properties.find(p => p.name === "interrupts");
+			const result = implicit_interrupt_parent(overlay, base, target_reference, found, is_base_target, "interrupts", built);
+			const written = overlay.overlay_properties(`/${label}`).some(p => p.name === "interrupt-parent");
+			return { ...result, written };
+		};
+		expect(run("dsi", "1 2 3")).toEqual({ message: "Set interrupt-parent = <&gic> on /dsi (inherited from /)", warning: undefined, written: true });
+		expect(run("hdmi", "1")).toEqual({ warning: undefined, written: false });
+		// The cells are still checked against it.
+		expect(run("hdmi", "1 2")).toEqual({
+			warning: "aon has #interrupt-cells = <1> but interrupts has 2 cells; set interrupt-parent explicitly", written: false,
+		});
+	});
+
+	test("implicit_interrupt_parent — the parent the overlay sets on an ancestor is inherited; a value that isn't cells gets none", async () => {
+		const { print_property } = await import("linux-lib");
+		const base = DeviceTree.new_from_string(`/dts-v1/;
+/ {
+    interrupt-parent = <&gic>;
+    gic: gic {
+        interrupt-controller;
+        #interrupt-cells = <3>;
+    };
+    gpio: gpio {
+        interrupt-controller;
+        #interrupt-cells = <2>;
+    };
+    bus: bus {
+        dev: dev {
+        };
+    };
+};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const run = (fragments: string) => {
+			const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n${fragments}`, base);
+			if (typeof overlay === "string") { throw new TypeError(overlay); }
+			const { target_reference, found, is_base_target } = resolve_write_target("dev", overlay, base);
+			const built = found?.node.properties.find(p => p.name === "interrupts");
+			const result = implicit_interrupt_parent(overlay, base, target_reference, found, is_base_target, "interrupts", built);
+			const written = overlay.overlay_properties("/bus/dev").find(p => p.name === "interrupt-parent");
+			return { ...result, written: written === undefined ? undefined : print_property(written, "", 0).trim() };
+		};
+		expect(run("&bus {\n\tinterrupt-parent = <&gpio>;\n};\n&dev {\n\tinterrupts = <25 2>;\n};")).toEqual({
+			message: "Set interrupt-parent = <&gpio> on /bus/dev (inherited from /bus)", warning: undefined, written: "interrupt-parent = <&gpio>;",
+		});
+		expect(run(`&dev {\n\tinterrupts = "hello";\n};`)).toEqual({ written: undefined });
+	});
+
+	test("decide_update — known flag, no value → set-flag", () => {
+		expect(decide_update("flag", [], false)).toBe("set-flag");
+	});
+
+	test("decide_update — known non-flag, no value → read", () => {
+		expect(decide_update("cells", [], false)).toBe("read");
+		expect(decide_update("strings", [], false)).toBe("read");
+	});
+
+	test("decide_update — unknown and absent, no value → set-flag", () => {
+		expect(decide_update(undefined, [], false)).toBe("set-flag");
+	});
+
+	test("decide_update — unknown and present with value, no value → read", () => {
+		expect(decide_update(undefined, [], true)).toBe("read");
+	});
+
+	test("decide_update — value under flag hint → error", () => {
+		const result = decide_update("flag", ["true"], false);
+		expect(typeof result).toBe("object");
+		expect((result as { error: string }).error).toContain("is a flag");
+	});
+
+	test("decide_update — value with any other hint → value", () => {
+		expect(decide_update("cells", ["19", "2"], false)).toBe("value");
+		expect(decide_update(undefined, ["okay"], false)).toBe("value");
+	});
+
+	test("create_child_node - writes reg in the radix the parent's pattern names, returns the child's path", () => {
+		const { overlay } = parse(overlay_with_imu);
+		const path = "/soc/spi@7e204000/adi,ad7124-8@0";
+		expect(create_child_node(overlay, path, "channel@10", ["^channel@([0-9]|1[0-5])$"])).toBe(`${path}/channel@10`);
+		const printed = overlay.print();
+		expect(printed).toMatch(/channel@10 \{\s*reg = <10>;/);
+		expect(printed).toContain("#address-cells = <1>;");
+		expect(create_child_node(overlay, path, "port@a", ["^port@[0-9a-f]+$"])).toBe(`${path}/port@a`);
+		expect(overlay.print()).toMatch(/port@a \{\s*reg = <0xa>;/);
+	});
+
+	test("create_child_node - a name without @ is the child's whole name, with no reg", () => {
+		const { overlay } = parse(overlay_with_imu);
+		const path = "/soc/spi@7e204000/adi,ad7124-8@0";
+		expect(create_child_node(overlay, path, "buck0", ["^buck[0-2]$"])).toBe(`${path}/buck0`);
+		expect(overlay.effective_children(path).has("buck0")).toBe(true);
+		expect(overlay.print()).toMatch(/buck0 \{\s*\};/);
+	});
+
+	test("defines_child_node - a named property by its type, else a child-node pattern; @ decides nothing", () => {
+		const binding = {
+			child_nodes: [{ pattern: "^buck[0-2]$", description: "", properties: [], required: [] }],
+			property_patterns: [{ pattern: "^x,gain@[0-9]$", description: "", value: { _t: "flag" } as const }],
+		};
+		const properties: ResolvedProperty[] = [
+			{ key: "regulators", value: { _t: "node", properties: [] } },
+			{ key: "adi,ocp-blanking", value: { _t: "flag" } },
+			{ key: "buck2", value: { _t: "flag" } },
+		];
+		expect(defines_child_node(binding, properties, "buck0")).toBe(true);
+		expect(defines_child_node(binding, properties, "regulators")).toBe(true);
+		expect(defines_child_node(binding, properties, "adi,ocp-blanking")).toBe(false);
+		// The named property comes first, as property_definition takes it.
+		expect(defines_child_node(binding, properties, "buck2")).toBe(false);
+		expect(defines_child_node(binding, properties, "x,gain@1")).toBe(false);
+		expect(defines_child_node(binding, properties, "channel@0")).toBe(false);
+	});
+
+	test("place_property - writes a true multi-row matrix as separate <...> groups", () => {
+		const { overlay } = parse(empty_overlay);
+		const built = build_raw_property("1 2,3 4", "reg", "cells", () => false);
+		expect(built).toBeDefined();
+		expect("error" in built!).toBe(false);
+		place_property(overlay, "spi0", undefined, true, built as DTProperty, "reg");
+
+		const output = overlay.print();
+		expect(output).toMatch(/<[^>]*>,\s*<[^>]*>/);
+	});
+
+	test("place_property - adds a property to a base node with no fragment yet", () => {
+		const { overlay } = parse(empty_overlay);
+
+		expect(overlay.get_fragments().length).toBe(0);
+
+		const built = build_raw_property("5000000", "spi-max-frequency", "cells", () => false);
+		expect(built).toBeDefined();
+		expect("error" in built!).toBe(false);
+		place_property(overlay, "spi0", undefined, true, built as DTProperty, "spi-max-frequency");
+
+		const output = overlay.print();
+		expect(output).toContain("spi0");
+		expect(output).toContain("spi-max-frequency");
+		expect(overlay.get_fragments().length).toBe(1);
+	});
+
+	test("place_property - updating a base-node property reuses the fragment", () => {
+		const { overlay } = parse(empty_overlay);
+
+		const b1 = build_raw_property("1", "spi-max-frequency", "cells", () => false) as DTProperty;
+		const b2 = build_raw_property("2", "spi-max-frequency", "cells", () => false) as DTProperty;
+		place_property(overlay, "spi0", undefined, true, b1, "spi-max-frequency");
+		place_property(overlay, "spi0", undefined, true, b2, "spi-max-frequency");
+
+		expect(overlay.get_fragments().length).toBe(1);
+		expect(overlay.print()).toContain("spi-max-frequency");
+	});
+
+	test("place_property - removing a base-node boolean prunes the emptied fragment", () => {
+		const { overlay } = parse(empty_overlay);
+
+		const built = PropertyBuilder.build_flag().set_flag().with_name("wakeup-source").build();
+		place_property(overlay, "spi0", undefined, true, built, "wakeup-source");
+		expect(overlay.get_fragments().length).toBe(1);
+
+		place_property(overlay, "spi0", undefined, true, undefined, "wakeup-source");
+		expect(overlay.print()).not.toContain("wakeup-source");
+		expect(overlay.get_fragments().length).toBe(0);
+	});
+
+	test("place_property - mutates an overlay-added node in place", () => {
+		const { overlay } = parse(overlay_with_imu);
+		const found = overlay.find_node("imu1");
+		expect(found).toBeDefined();
+
+		const built = build_raw_property("0", "reg", "cells", () => false) as DTProperty;
+		place_property(overlay, "imu1", found, false, built, "reg");
+
+		const output = overlay.print();
+		expect(output).toContain("imu1");
+		expect(output).toContain("reg");
+	});
+
+}

@@ -1,0 +1,5 @@
+$type: extern
+$symbol: dualpart_dac_ops
+$provides: test_dac_ops
+$header: dualpart.h
+$description: "The DAC side's ops table"

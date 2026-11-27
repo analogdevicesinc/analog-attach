@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "list-node.schema.json",
+  "title": "list node response",
+  "description": "Where the backend is linux: standard output of list node in JSON mode (LIST-142), or a refusal. The command is the Linux backend's own (overview 2.1), so there is no base or noos shape. ListNodeResponse in src/backends/linux/protocol/types.ts.",
+  "oneOf": [
+    {
+      "description": "list node (LIST-140 to LIST-142): the nodes of the merged tree, depth first in tree order, the root first; with a filter, those it matches (LIST-143).",
+      "required": [
+        "nodes"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "message": {
+          "type": "string",
+          "pattern": "^[0-9]+ nodes?( match(es)? \".*\")?$",
+          "description": "<n> node[s], or <n> node[s] match[es] \"<filter>\" with a filter (LIST-142, LIST-143)."
+        },
+        "severity": {
+          "const": "info"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "key",
+              "labels",
+              "compatible",
+              "origin",
+              "change",
+              "has_children"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^/",
+                "description": "Absolute, as read takes it."
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The node's name with its unit address (gpio@7e200000); / for the root."
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The base's labels, then the overlay's."
+              },
+              "compatible": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Its compatible strings, in order; none without a compatible."
+              },
+              "status": {
+                "type": "string",
+                "description": "Its status property (okay, disabled, ...), when it has one."
+              },
+              "origin": {
+                "enum": [
+                  "internal",
+                  "external"
+                ],
+                "description": "As read's: internal when the overlay adds or changes the node, external when only the base has it."
+              },
+              "change": {
+                "enum": [
+                  "added",
+                  "changed",
+                  "none"
+                ],
+                "description": "added: none of its properties is the base's and the overlay sets one or adds it; changed: the overlay sets a property of a base node; none otherwise (LIST-141)."
+              },
+              "has_children": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "common.schema.json#/$defs/common"
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    {
+      "$ref": "common.schema.json#/$defs/refusal"
+    },
+    {
+      "$ref": "common.schema.json#/$defs/config-refusal"
+    }
+  ]
+}

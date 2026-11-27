@@ -1,0 +1,19 @@
+plans/
+dist
+dist-binary/
+tsconfig.tsbuildinfo
+node_modules
+
+# The build's assets (yarn build), and its copy of the repository's skills/
+bundled/
+/skills/
+
+# The Linux tree of the linux functional tests (test/functional/linux-tree.sh)
+linux-adi/
+linux-adi-caches/
+linux-adi.lock
+
+# The workspace of demo/typical-flow.sh
+demo/workspace/
+# The workspace of demo/full-devicetree.sh
+demo/full-devicetree-workspace/

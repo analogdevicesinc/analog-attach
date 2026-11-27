@@ -1,0 +1,389 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { attach_eval_board, bootstrap, pin_driver, referenced_nodes } from "../../src/bootstrap/bootstrap";
+import { capi_project } from "../../src/codegen/capi_project";
+import { generate_project } from "../../src/codegen/codegen";
+import { load_devices } from "../../src/codegen/device_loader";
+import { find_board } from "../../src/registry/platforms";
+import { get_registry } from "../../src/registry/registry";
+import { driver_root, driver_root_for } from "../../src/registry/roots";
+import { load_resolved_ruleset_for_board } from "../../src/resolver/resolver";
+import { validate_workfile } from "../../src/validator/validator";
+import {
+	add_symbol,
+	create_workfile,
+	export_minimal,
+	import_minimal,
+	remove_symbol,
+	set_value,
+} from "../../src/workfile_handler/workfile_handler";
+import type { Workfile } from "../../src/workfile_handler/types";
+import { expectOk, setup_test_config, teardown_test_config } from "../test_utilities";
+
+// Bootstrap against the real CAPI repos: the ADXL355 Pmod on the MAX32655FTHR, the pair the
+// rulesets were written for. The fixtures cover the rules; this catches the repos drifting
+// from what the rules assume (a renamed symbol, a board.yml losing its `pins:`).
+//
+// The repos are found from CAPI_PATH and CAPI_MODULE_PATHS (":"-separated), or from the
+// usual checkouts next door. Without them the suite is skipped.
+
+function find_repos(): { capi: string; modules: string[] } | undefined {
+	const home = path.join(os.homedir(), "aurel");
+	const capi = process.env.CAPI_PATH ?? path.join(home, "capi");
+	// capi-util is optional here: the suite runs without it, and checks it when it is there.
+	const utility = path.join(home, "capi-util");
+	const modules = process.env.CAPI_MODULE_PATHS?.split(":")
+		?? [path.join(home, "capi-maxim"), path.join(home, "capi-noos"), ...(fs.existsSync(utility) ? [utility] : [])];
+	return [capi, ...modules].every(directory => fs.existsSync(directory)) ? { capi, modules } : undefined;
+}
+
+const REPOS = find_repos();
+const BOARD = "max32655fthr";
+
+function stored(workfile: Workfile): Record<string, Record<string, unknown>> {
+	const exported = export_minimal(workfile);
+	expectOk(exported);
+	return exported.value.symbols as Record<string, Record<string, unknown>>;
+}
+
+/** What `analog-attach add <driver>` does: the driver's root, named after the driver, then bootstrap. */
+function add_driver(workfile: Workfile, driver: string, name: string, interface_?: string): void {
+	const root = interface_ === undefined ? driver_root(driver) : driver_root_for(driver, interface_);
+	expectOk(root);
+	const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
+	expectOk(ruleset);
+	expectOk(add_symbol(workfile, name, ruleset.value));
+	expectOk(pin_driver(workfile, name, driver));
+	// On its eval board, as `analog-attach add <eval board>` puts it, so its pinout wires it.
+	expectOk(attach_eval_board(workfile, EVAL_BOARDS[driver] ?? "", name));
+	expectOk(bootstrap(workfile));
+}
+
+function add_adxl355(workfile: Workfile, name: string): void {
+	add_driver(workfile, "adxl355", name);
+}
+
+/** The eval board each part sits on in these tests. */
+const EVAL_BOARDS: Record<string, string> = {
+	adxl355: "eval-adxl355-pmdz",
+	ad74413r: "eval-ad-swio-2-click",
+	adt7420: "eval-adt7420-pmdz",
+	ad7156: "eval-pmodcdc1",
+};
+
+function board_workfile(): Workfile {
+	const created = create_workfile("max32655");
+	expectOk(created);
+	created.value.board = BOARD;
+	return created.value;
+}
+
+describe.skipIf(REPOS === undefined)("adxl355 on max32655fthr, from the real repos", () => {
+	beforeEach(() => { setup_test_config(REPOS); });
+	afterEach(() => { teardown_test_config(); });
+
+	test("one node becomes a valid workfile, on the board's SPI bus and chip-select", () => {
+		const workfile = board_workfile();
+		add_adxl355(workfile, "adxl355");
+
+		expect(validate_workfile(workfile).valid).toBe(true);
+		const symbols = stored(workfile);
+		expect(symbols["adxl355_spi_dev"]?.controller).toBe("bsp_spi1_cfg_handle");
+		// P2_0, J9 pin 5: the chip-select line board.yml declares for this bus.
+		expect(symbols["adxl355_cs_gpio"]).toMatchObject({ port_handle: "bsp_gpio2_cfg_handle", number: 0 });
+	});
+
+	test("a second one gets a chain of its own, but not the taken chip-select", () => {
+		const workfile = board_workfile();
+		add_adxl355(workfile, "adxl355");
+		add_adxl355(workfile, "adxl355_1");
+
+		const symbols = stored(workfile);
+		expect(symbols["adxl355_1_ip"]?.comm_init).toEqual({ spi_dev: "adxl355_1_spi_dev" });
+		expect(symbols["adxl355_1_spi_dev"]?.controller).toBe("bsp_spi1_cfg_handle");
+		expect(symbols["adxl355_1_spi_dev"]?.cs_gpio).toBeUndefined();
+		// validate is what tells the user: the second device has no chip-select yet.
+		const errors = validate_workfile(workfile).errors.map(entry => entry.path);
+		expect(errors).toContain("adxl355_1_spi_dev.cs_gpio");
+	});
+
+	test("switching to I2C rebuilds the bus and deletes the SPI side", () => {
+		const workfile = board_workfile();
+		add_adxl355(workfile, "adxl355");
+		expectOk(set_value(workfile, "adxl355_ip", "comm_type", "ADXL355_I2C_COMM"));
+		const report = bootstrap(workfile);
+		expectOk(report);
+
+		expect(validate_workfile(workfile).valid).toBe(true);
+		const symbols = stored(workfile);
+		expect(symbols["adxl355_i2c_dev"]).toMatchObject({ controller: "bsp_i2c2_cfg_handle", address: 0x1D });
+		expect(report.value.deleted.sort()).toEqual(["adxl355_cs_gpio", "adxl355_spi_dev"]);
+	});
+
+	test("deleting the eval board leaves the part as a bare one", () => {
+		const workfile = board_workfile();
+		add_adxl355(workfile, "adxl355");
+		const before = referenced_nodes(workfile);
+		expectOk(remove_symbol(workfile, "eval_adxl355_pmdz"));
+		expectOk(bootstrap(workfile, { referenced_before: before }));
+
+		// Exactly what `add adxl355` on its own gives: the chain, without the eval board wiring.
+		const bare = board_workfile();
+		const root = driver_root("adxl355");
+		expectOk(root);
+		const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
+		expectOk(ruleset);
+		expectOk(add_symbol(bare, "adxl355", ruleset.value));
+		expectOk(pin_driver(bare, "adxl355", "adxl355"));
+		expectOk(bootstrap(bare));
+		expect(stored(workfile)).toEqual(stored(bare));
+		expect(stored(workfile)["adxl355_spi_dev"]?.cs_gpio).toBeUndefined();
+	});
+
+	test("the platform's ops tables come from its interfaces_file", () => {
+		const workfile = board_workfile();
+		expect(Object.keys(workfile.platform_ops)).toEqual(expect.arrayContaining(["maxim_capi_spi_ops", "maxim_capi_i2c_ops", "maxim_capi_gpio_ops", "maxim_capi_uart_ops"]));
+		expect(workfile.platform_ops["maxim_capi_spi_ops"]).toMatchObject({ $capability: "spi", $headers: ["maxim_capi_spi.h", "capi_spi.h"] });
+	});
+
+	test("a SPI config the user makes gets the platform's SPI ops, by its capability", () => {
+		const workfile = board_workfile();
+		const config = load_resolved_ruleset_for_board("capi_spi_config", BOARD);
+		expectOk(config);
+		expectOk(add_symbol(workfile, "my_spi", config.value));
+		expectOk(bootstrap(workfile));
+		expect(stored(workfile)["my_spi"]?.ops).toBe("maxim_capi_spi_ops");
+	});
+
+	test("main.c runs its example once everything is up, or the app when examples are off", () => {
+		const workfile = board_workfile();
+		add_adxl355(workfile, "adxl355");
+		const board = find_board(BOARD);
+		expectOk(board);
+		const main = (example: boolean): string => {
+			const output = fs.mkdtempSync(path.join(os.tmpdir(), "aa-example-"));
+			try {
+				expectOk(generate_project({
+					workfile, platform_name: "max32655", platform_vendor: "maxim", board: board.value,
+					project_name: "p", project_path: path.join(output, "p"), capi_path: REPOS?.capi ?? "", template_set: "capi", example,
+				}));
+				return fs.readFileSync(path.join(output, "p", "src", "main.c"), "utf8");
+			} finally {
+				fs.rmSync(output, { recursive: true, force: true });
+			}
+		};
+
+		const with_example = main(true);
+		// The setup out of standby once, then the reading in the loop.
+		expect(with_example).toContain("ret = adxl355_set_op_mode(adxl355->priv, ADXL355_MEAS_TEMP_ON_DRDY_OFF);");
+		expect(with_example).toContain("ret = capi_accel_sensor_get_xyz(adxl355, &x, &y, &z);");
+		expect(with_example.indexOf("adxl355_set_op_mode")).toBeLessThan(with_example.indexOf("while (1)"));
+		expect(with_example).toContain("return example_main();");
+
+		const without = main(false);
+		expect(without).toContain("return app_main();");
+		expect(without).not.toContain("capi_accel_sensor_get_xyz");
+	});
+
+	test("the bootstrapped workfile survives a save and load unchanged", () => {
+		const workfile = board_workfile();
+		add_adxl355(workfile, "adxl355");
+		const exported = export_minimal(workfile);
+		expectOk(exported);
+		const reloaded = import_minimal(JSON.parse(JSON.stringify(exported.value)));
+		expectOk(reloaded);
+
+		expect(stored(reloaded.value)).toEqual(stored(workfile));
+		expect(validate_workfile(reloaded.value).valid).toBe(true);
+	});
+});
+
+describe.skipIf(REPOS === undefined)("ad74413r on max32655fthr, from the real repos", () => {
+	beforeEach(() => { setup_test_config(REPOS); });
+	afterEach(() => { teardown_test_config(); });
+
+	test("one node becomes a valid workfile, set up like the eval board's own project", () => {
+		const workfile = board_workfile();
+		add_driver(workfile, "ad74413r", "ad74413r", "adc");
+
+		expect(validate_workfile(workfile).valid).toBe(true);
+		const symbols = stored(workfile);
+		expect(symbols["ad74413r_cfg"]).toMatchObject({ adc_ops: "ad74413r_capi_adc_ops", extra: "ad74413r_ip" });
+		// Through $node: SPI mode 1 and 1 MHz, from the part, on the generic SPI device.
+		expect(symbols["ad74413r_spi_dev"]).toMatchObject({ controller: "bsp_spi1_cfg_handle", mode: "CAPI_SPI_MODE_1", max_speed_hz: 1_000_000 });
+		expect(symbols["ad74413r_cs_gpio"]).toMatchObject({ port_handle: "bsp_gpio2_cfg_handle", number: 0 });
+		// The reset line is optional: the driver falls back to a software reset.
+		expect(symbols["ad74413r_ip"]?.reset_gpio).toBeUndefined();
+	});
+
+	test("an ADC channel finds its ADC and the driver's channel struct, with nothing declared", () => {
+		const workfile = board_workfile();
+		add_driver(workfile, "ad74413r", "ad74413r", "adc");
+		for (const name of ["ch0", "ch1"]) {
+			const channel = load_resolved_ruleset_for_board("capi_adc_chan", BOARD);
+			expectOk(channel);
+			expectOk(add_symbol(workfile, name, channel.value));
+			expectOk(bootstrap(workfile));
+		}
+
+		const symbols = stored(workfile);
+		// Both on the one ADC handle, each with a channel config of its own. Its extra is
+		// the ad74413r struct left once the device's own (ad74413r_ip) is taken.
+		expect(symbols["ch0_cfg"]).toMatchObject({ adc_handle: "ad74413r", extra: "ch0_ip" });
+		expect(symbols["ch1_cfg"]).toMatchObject({ adc_handle: "ad74413r", extra: "ch1_ip" });
+		expect(symbols["ad74413r_cfg"]?.extra).toBe("ad74413r_ip");
+	});
+
+	test("the DAC side is brought up before an ADC channel added ahead of it", () => {
+		const workfile = board_workfile();
+		add_driver(workfile, "ad74413r", "ad74413r_adc", "adc");
+		const channel = load_resolved_ruleset_for_board("capi_adc_chan", BOARD);
+		expectOk(channel);
+		expectOk(add_symbol(workfile, "adc_ch0", channel.value));
+		expectOk(bootstrap(workfile));
+		// `add ad74413r --as dac` afterwards, on the same chip.
+		const dac = driver_root_for("ad74413r", "dac");
+		expectOk(dac);
+		const dac_ruleset = load_resolved_ruleset_for_board(dac.value, BOARD);
+		expectOk(dac_ruleset);
+		expectOk(add_symbol(workfile, "ad74413r_dac", dac_ruleset.value));
+		expectOk(pin_driver(workfile, "ad74413r_dac", "ad74413r", "ad74413r_adc_ip"));
+		expectOk(bootstrap(workfile));
+
+		const names = load_devices(workfile).map(device => device.descriptor_name);
+		expect(names.indexOf("ad74413r_dac")).toBeLessThan(names.indexOf("adc_ch0"));
+		expect(names.indexOf("ad74413r_adc")).toBeLessThan(names.indexOf("adc_ch0"));
+	});
+
+	test("next to an adxl355 it shares the bus, not the chip-select", () => {
+		const workfile = board_workfile();
+		add_adxl355(workfile, "adxl355");
+		add_driver(workfile, "ad74413r", "ad74413r", "adc");
+
+		const symbols = stored(workfile);
+		expect(symbols["ad74413r_spi_dev"]?.controller).toBe("bsp_spi1_cfg_handle");
+		expect(symbols["ad74413r_spi_dev"]?.cs_gpio).toBeUndefined();
+		// Each part's mode stays its own, though both devices are the same schema.
+		expect(symbols["adxl355_spi_dev"]?.mode).toBe("CAPI_SPI_MODE_0");
+		expect(symbols["ad74413r_spi_dev"]?.mode).toBe("CAPI_SPI_MODE_1");
+	});
+});
+
+describe.skipIf(REPOS === undefined)("ad7156 on max32655fthr, from the real repos", () => {
+	beforeEach(() => { setup_test_config(REPOS); });
+	afterEach(() => { teardown_test_config(); });
+
+	test("one node becomes a valid workfile, set up like the eval board's own project", () => {
+		const workfile = board_workfile();
+		add_driver(workfile, "ad7156", "ad7156");
+
+		expect(validate_workfile(workfile).valid).toBe(true);
+		const symbols = stored(workfile);
+		// The adapter's struct is the extra; the part's own is embedded in it as `device`.
+		expect(symbols["ad7156_cfg"]).toMatchObject({ extra: "ad7156_ip", ops: "ad7156_capi_proximity_ops" });
+		expect(symbols["ad7156_ip"]?.device).toBe("ad7156_device");
+		expect(symbols["ad7156_device"]).toMatchObject({ i2c_dev: "ad7156_i2c_dev", channel1_range: 2, channel2_range: 2 });
+		// Fixed in silicon, and on the board's only I2C bus.
+		expect(symbols["ad7156_i2c_dev"]).toMatchObject({ address: 0x48, speed: "CAPI_I2C_SPEED_FAST", controller: "bsp_i2c2_cfg_handle" });
+	});
+
+	test("its eval board wires it to the board's I2C pins", () => {
+		const workfile = board_workfile();
+		const root = driver_root("ad7156");
+		expectOk(root);
+		const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
+		expectOk(ruleset);
+		expectOk(add_symbol(workfile, "ad7156", ruleset.value));
+		expectOk(pin_driver(workfile, "ad7156", "ad7156"));
+		expectOk(attach_eval_board(workfile, "eval-pmodcdc1", "ad7156"));
+		const report = bootstrap(workfile);
+		expectOk(report);
+
+		const wiring = report.value.wiring.find(entry => entry.interface === "i2c");
+		expect(wiring?.problems).toEqual([]);
+		expect(wiring?.peripheral).toBe("bsp_i2c2_cfg");
+		expect(wiring?.connections.map(connection => `${connection.role} -> ${connection.to.connector} ${connection.to.pin}`))
+			.toEqual(expect.arrayContaining(["i2c_scl -> J7 11", "i2c_sda -> J7 12"]));
+	});
+});
+
+describe.skipIf(REPOS === undefined)("max31889 on max32655fthr, from the real repos", () => {
+	beforeEach(() => { setup_test_config(REPOS); });
+	afterEach(() => { teardown_test_config(); });
+
+	/** `analog-attach add max31889`: no eval board carries it, so it is a bare part. */
+	function bare_max31889(workfile: Workfile) {
+		const root = driver_root("max31889");
+		expectOk(root);
+		const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
+		expectOk(ruleset);
+		expectOk(add_symbol(workfile, "max31889", ruleset.value));
+		expectOk(pin_driver(workfile, "max31889", "max31889"));
+		const report = bootstrap(workfile);
+		expectOk(report);
+		return report.value;
+	}
+
+	test("a bare I2C part is a valid workfile on the board's only I2C bus", () => {
+		const workfile = board_workfile();
+		bare_max31889(workfile);
+
+		expect(validate_workfile(workfile).valid).toBe(true);
+		const symbols = stored(workfile);
+		expect(symbols["max31889_cfg"]).toMatchObject({ extra: "max31889_ip", ops: "max31889_capi_temp_ops" });
+		expect(symbols["max31889_ip"]?.i2c_dev).toBe("max31889_i2c_dev");
+		expect(symbols["max31889_i2c_dev"]).toMatchObject({ address: 0x50, speed: "CAPI_I2C_SPEED_FAST", controller: "bsp_i2c2_cfg_handle" });
+	});
+
+	test("depends on capi-util although the driver names no package", () => {
+		const workfile = board_workfile();
+		bare_max31889(workfile);
+
+		const registry = get_registry();
+		expectOk(registry);
+		const utilities = registry.value.modules.filter(module => module.type === "utility").map(module => module.name);
+		// Nothing to check without capi-util among the configured modules.
+		if (utilities.length === 0) {
+			return;
+		}
+
+		const project = capi_project(workfile);
+		expectOk(project);
+		const names = project.value.dependencies.map(dependency => dependency.name);
+		expect(names).toEqual(expect.arrayContaining(utilities));
+		expect(new Set(names).size).toBe(names.length);
+	});
+
+	test("its wiring is the user's, but the report says which board pins the bus is on", () => {
+		const report = bare_max31889(board_workfile());
+		const wiring = report.wiring.find(entry => entry.interface === "i2c");
+		expect(wiring?.problems.join(" ")).toContain("no eval board carries this max31889");
+		expect(wiring?.peripheral).toBe("bsp_i2c2_cfg");
+		expect(wiring?.board_pins).toEqual([
+			{ signal: "scl", at: { connector: "J7", pin: "11" } },
+			{ signal: "sda", at: { connector: "J7", pin: "12" } },
+		]);
+	});
+
+	test("main.c reads the temperature on every pass, with no setup", () => {
+		const workfile = board_workfile();
+		bare_max31889(workfile);
+		const board = find_board(BOARD);
+		expectOk(board);
+		const output = fs.mkdtempSync(path.join(os.tmpdir(), "aa-example-"));
+		try {
+			expectOk(generate_project({
+				workfile, platform_name: "max32655", platform_vendor: "maxim", board: board.value,
+				project_name: "p", project_path: path.join(output, "p"), capi_path: REPOS?.capi ?? "", template_set: "capi",
+			}));
+			const main = fs.readFileSync(path.join(output, "p", "src", "main.c"), "utf8");
+			const loop = main.slice(main.indexOf("while (1)"));
+			expect(loop).toContain("ret = capi_temp_sensor_read_temp(max31889, &temp);");
+			expect(main.slice(0, main.indexOf("while (1)"))).not.toContain("max31889");
+		} finally {
+			fs.rmSync(output, { recursive: true, force: true });
+		}
+	});
+});

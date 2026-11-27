@@ -1,44 +1,42 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-- `src/extension.ts`: VS Code extension entry (Node context).
-- `src/AttachLib/*`: Core attach/parsing logic; keep UI-free and testable.
-- `src/AttachSession/*`: Platform-specific commands and session management.
-- `src/webview/*`: Webview UI (browser context) bundled separately.
-- `src/test/*`: Integration/tests and fixtures (`*.test.ts`, `.dts`, `.json`).
-- `dist/`: Webpack output (`extension.js`, `webview.js`).
-- `out/`: Transpiled tests output.
-- `media/`: Static assets used by the webview.
+## Project Structure
+- `packages/cli`: the `analog-attach` CLI. `src/front` parses the command line; `src/backends/linux`
+  and `src/backends/noos` implement the commands; `docs/spec` is the specification it follows
+  (requirements, grammar, the JSON protocol); `test/functional` the bats tests that check it.
+  See `packages/cli/CLAUDE.md`.
+- `packages/gui`: the browser GUI `analog-attach gui` serves: plain ES modules, every action an
+  `analog-attach` command. See `packages/gui/README.md`.
+- `packages/linux-lib`: devicetree parsing, bindings and validation (the `linux` backend).
+- `packages/capi-lib`: the CAPI registry, rulesets, wiring and code generation (the `noos` backend).
+- `skills/`: the Claude Code skills `analog-attach skill install` installs
+  (`analog-attach-linux/`, `analog-attach-noos/`, each folder named after its skill), copied into
+  the CLI's package by its build.
 
 ## Build, Test, and Development Commands
-- `npm run watch`: Incremental build in watch mode.
-- `npm run compile`: Webpack build for extension and webview.
-- `npm run package`: Production bundle with hidden source maps.
-- `npm run lint`: ESLint over `src`.
-- `npm test`: Runs VS Code integration tests (`pretest` compiles + lints).
-Tip: Use VS Code “Run Extension” (F5) to debug locally.
+- `yarn build`: the libraries, then the CLI (which bundles them).
+- `yarn test`: the unit tests (vitest) of linux-lib, the CLI and capi-lib.
+- `yarn test:functional`: the CLI's functional tests (bats).
+- `yarn verify`: build, type-check, test and lint everything (`scripts/verify.sh`).
+- `yarn lint`: ESLint over every package; `yarn lint:cli`, `yarn workspace <package> lint` one.
 
 ## Coding Style & Naming Conventions
-- **Language**: TypeScript with `strict` compiler options (see `tsconfig.json`).
-- **Linting**: ESLint with `@typescript-eslint` and `unicorn`. Fix warnings where practical.
-- **Names**: PascalCase for classes/types, camelCase for functions/variables; keep filenames consistent with existing patterns (e.g., `AnalogAttachPanel.ts`).
-- **Formatting**: Use VS Code’s default TS formatter; avoid large unrelated reformatting in PRs.
+- **Language**: TypeScript with `strict` compiler options; the GUI is plain JavaScript (ES modules).
+- **Linting**: ESLint with `@typescript-eslint` and `unicorn`.
+- **Names**: snake_case for functions and variables, PascalCase for types, as the code around.
+- **Formatting**: tabs, and `;` after type members, everywhere (`eslint.stylistic.mjs`, errors in
+  `yarn lint`); avoid large unrelated reformatting.
 
 ## Testing Guidelines
-- **Location**: Place tests in `src/test` and name as `*.test.ts` (e.g., `extension.test.ts`).
-- **Scope**: Prefer testing pure logic in `AttachLib`; use fixtures in `src/test/` for DTS/JSON cases.
-- **Run**: `npm test` (automatically compiles and lints). Ensure new behavior is covered.
+- Unit tests sit next to the code (`*.test.ts`) or in the package's `test/`.
+- A CLI behaviour the specification describes gets a functional test in
+  `packages/cli/test/functional/<backend>/`, tagged with its requirement and test id.
 
 ## Commit & Pull Request Guidelines
-- **Commits**: Use short, imperative messages (present tense). Example: `move pure attach files to lib folder` or `update UI to vscode-elements`.
-- **PRs**: Provide a clear description, link related issues, include screenshots/GIFs for webview changes, list testing steps, and ensure `npm run lint` and `npm test` pass.
+- **Commits**: `area: what changed` in the present tense (`gui: …`, `cli: …`), signed off
+  (`git commit -s`, the DCO in `.dco`).
+- **PRs**: a clear description, the testing done, and green `yarn verify` and functional tests.
 
 ## Security & Configuration Tips
-- Configure device paths/commands via settings, not code. Example (User Settings):
-```json
-{
-  "analog-attach.defaultLinuxRepository": "~/linux",
-  "analog-attach.defaultDtSchemaRepository": "~/dt-schema"
-}
-```
-- Do not commit secrets or hard-coded IPs/passwords. The defaults in `package.json` are placeholders—override them locally.
+- Paths and targets are project settings (`analog-attach config`), not code.
+- Do not commit secrets, hard-coded IPs or passwords.

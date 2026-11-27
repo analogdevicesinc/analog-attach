@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "config.schema.json",
+  "title": "config responses",
+  "description": "Standard output of config in JSON mode: showing (CONFIG-015), setting (CONFIG-130), resetting (CONFIG-202), --reload (CONFIG-022), the scripts' variables where the backend is linux (config var, CONFIG-300 to CONFIG-312), or a refusal: a value the setting can't take (CONFIG-103 to CONFIG-106, CONFIG-500 to CONFIG-504), a linux whose caches weren't built (CONFIG-122, CONFIG-123, CONFIG-023), or a --reload whose settings don't load (config-refusal, CONFIG-021). Problems with the settings files go to standard error with status 2: as config-error.schema.json when showing (CONFIG-005), as text when setting or resetting (CONFIG-102, CONFIG-200). config is the front end's: the same shape for every backend; only the fields differ.",
+  "oneOf": [
+    { "$ref": "#/$defs/fields" },
+    { "$ref": "#/$defs/variables" },
+    { "$ref": "#/$defs/done" },
+    { "$ref": "common.schema.json#/$defs/refusal" },
+    { "$ref": "common.schema.json#/$defs/config-refusal" }
+  ],
+  "$defs": {
+    "fields": {
+      "description": "config [<key>]: the fields shown, all of them or the one named (ConfigResponse).",
+      "type": "object",
+      "required": ["ok", "message", "severity", "configs"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^[0-9]+ config field\\(s\\)$" },
+        "severity": { "const": "info" },
+        "configs": { "type": "array", "items": { "$ref": "#/$defs/config" } },
+        "variables": {
+          "description": "config with no key, where the backend runs scripts (linux): their variables, the system ones then the project's (CONFIG-016). Absent in config <key>, and where the backend is noos.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/variable" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "variables": {
+      "description": "config var [<NAME>] (CONFIG-300, CONFIG-301): every variable, or the one named.",
+      "type": "object",
+      "required": ["ok", "message", "severity", "variables"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^[0-9]+ variable\\(s\\)$" },
+        "severity": { "const": "info" },
+        "variables": { "type": "array", "items": { "$ref": "#/$defs/variable" } }
+      },
+      "additionalProperties": false
+    },
+    "variable": {
+      "description": "VariableEntry: one variable of the scripts (02-common.md §8.6).",
+      "type": "object",
+      "required": ["name", "kind", "value", "scripts"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+        "kind": { "enum": ["system", "executable", "project", "secret"], "description": "system: computed by the CLI, named AA_… (COM-153); executable: a command the CLI runs, AA_BUILD, AA_DEPLOY or AA_PREPROCESS_COMMAND, with a default (COM-158); project: config var <NAME> <value>; secret: config var <NAME> --secret, its value never stored or shown (COM-157)." },
+        "description": { "type": "string", "description": "A system or executable variable's (COM-153, COM-158); absent for the others." },
+        "value": { "type": ["string", "null"], "description": "The value as the settings stand; null for a secret, and for a system variable that has none now (a setting it follows unset, for the other output, or set for each file, AA_PREPROCESS_INPUT and AA_PREPROCESS_OUTPUT). An executable variable's is its command, the default when the project hasn't changed it; it may have several lines." },
+        "runs": { "enum": ["build", "deploy", "preprocess"], "description": "An executable variable only: what runs it (COM-158)." },
+        "default": { "type": "string", "description": "An executable variable only: its command when the project hasn't changed it (COM-158); value equals it then." },
+        "scripts": { "type": "array", "items": { "enum": ["build", "deploy", "preprocess"] }, "uniqueItems": true, "description": "The commands that get it in their environment (COM-156): AA_BUILD's (build), AA_DEPLOY's (deploy), AA_PREPROCESS_COMMAND's (preprocess). Empty for an executable variable, at least one for the others." },
+        "in_environment": { "type": "boolean", "description": "A secret only: whether the environment config runs in has a non-empty value for it, as deploy would read it (DEPLOY-040)." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "secret" } } },
+          "then": { "required": ["in_environment"], "properties": { "value": { "const": null }, "scripts": { "const": ["deploy"] } } },
+          "else": { "not": { "required": ["in_environment"] } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "executable" } } },
+          "then": { "required": ["description", "runs", "default"], "properties": { "value": { "type": "string" }, "scripts": { "maxItems": 0 } } },
+          "else": { "properties": { "scripts": { "minItems": 1 } }, "not": { "anyOf": [{ "required": ["runs"] }, { "required": ["default"] }] } }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "config": {
+      "description": "ConfigEntry: one field, backend first, then the backend's in its order (CONFIG-010). The backend's come from its section of the settings files (COM-131); another backend's section is never listed.",
+      "type": "object",
+      "required": ["field_name", "category", "description", "type", "required", "default", "value", "source"],
+      "properties": {
+        "field_name": { "type": "string", "description": "backend, or one of the backend's fields: linux, devicetree, workfile, overlay-syntax, interview, output, build-dir where the backend is linux; capi-path, module-paths, target, workfile, bootstrap, interview, project-name, project-path, project-template, example, build-command, deploy-command, probe, build-dir where it is noos (COM-500)." },
+        "category": { "type": "string", "description": "The group the human table lists it under: General for backend; Workspace and Build where the backend is linux; Sources, Target, Workfile, Project and Build where it is noos." },
+        "description": { "type": "string" },
+        "type": {
+          "description": "The kind; a setting with options gives them instead: a fixed list (overlay-syntax, output, probe; true and false for a noos bool), or the names the backend scans (noos target, which is string when it finds none, CONFIG-510).",
+          "oneOf": [
+            { "enum": ["path", "path_list", "string", "numeric", "bool"] },
+            {
+              "type": "object",
+              "required": ["options"],
+              "properties": { "options": { "type": "array", "items": { "type": "string" }, "minItems": 1 } },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "required": { "type": "boolean", "description": "Display only (the * of the table)." },
+        "default": { "type": ["string", "null"] },
+        "value": {
+          "description": "The effective value: local, then global, then the default, a backend's field from its section of each file (COM-124); absolute for a local path; null when it has none.",
+          "anyOf": [{ "type": ["string", "null"] }, { "type": "array", "items": { "type": "string" } }]
+        },
+        "source": { "enum": ["local", "global", "default", "unset"], "description": "Where value comes from." },
+        "suggestions": {
+          "description": "config <key> of a setting that takes any value: values found for it, offered, not required (CONFIG-017). Where the backend is noos: the capi checkouts near the project for capi-path, the module repositories beside the capi for module-paths. Absent when none are found, and in config with no key.",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestion" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "done": {
+      "description": "config --reload (message: the build summary, CONFIG-022), config <key> <value> (message: Set <key> = <value>, then (global), then the backend's addition, CONFIG-130), config <key> --reset (message: Reset <key>, then (global), then what applies now, CONFIG-202), or a variable set or reset (config var <NAME> <value>, --secret, --reset: CONFIG-303 to CONFIG-305; an executable variable's reset says its default, CONFIG-311).",
+      "type": "object",
+      "required": ["ok", "message", "severity"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^(Set [a-z-]+ = .*|Reset [a-z-]+( \\(global\\))? \\((still set in the (local|global) config: .*|default: .+|not set)\\)|Set variable [A-Za-z_][A-Za-z0-9_]* (= [\\s\\S]+|as a secret( \\(its stored value removed\\))?)|Reset variable [A-Za-z_][A-Za-z0-9_]* \\((not set|default .+)\\)|Indexed [0-9]+ compatibles from [0-9]+ bindings and compiled binding schemas in .+|Nothing to rebuild: .+)$" },
+        "severity": { "enum": ["info", "warn"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

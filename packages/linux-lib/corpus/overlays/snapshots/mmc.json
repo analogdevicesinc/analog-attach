@@ -1,0 +1,41 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node1",
+          "mmc_pins",
+          "brcm,function"
+        ],
+        "message": "mmc_pins: brcm,function: b'\\x00\\x00\\x00\\x07' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "mmc_pins",
+          "brcm,pins"
+        ],
+        "message": "mmc_pins: brcm,pins: b'\\x00\\x00\\x000\\x00\\x00\\x001\\x00\\x00\\x002\\x00\\x00\\x003\\x00\\x00\\x004\\x00\\x00\\x005' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "mmc_pins",
+          "brcm,pull"
+        ],
+        "message": "mmc_pins: brcm,pull: b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x02' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

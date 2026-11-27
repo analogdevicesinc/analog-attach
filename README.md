@@ -1,148 +1,78 @@
 # Analog Attach
 
-A Visual Studio Code extension for editing Device Tree Source (DTS) and Device
-Tree Overlay (DTSO) files with schema validation, binding support, and remote
-deployment capabilities.
+Configure Analog Devices parts for a board running Linux, from a command line or a page in the
+browser: devicetree overlays (`.dtso`) checked against the Linux kernel's bindings, built into a
+`.dtbo` and deployed to the target over SSH.
 
-## Features
-
-### Dual Editor Approach
-
-- **Plug and Play Editor** (default for `.dtso`): Intuitive, guided experience
-  for quick device integration with a three-panel interface
-- **Tree Config Editor** (default for `.dts`): Full tree visualization for
-  advanced device tree modifications
-
-### Comprehensive Device Support
-
-- **Device Catalog**: Searchable list of supported devices grouped by category
-- **Smart Configuration**: Dynamic property panels with real-time validation
-- **Binding Compliance**: Automatic validation against Linux kernel device tree
-  binding specifications
-- **Channel Support**: Add and configure device channels with regex-validated naming
-
-### Complete Workflow Integration
-
-- **Local Compilation**: Built-in device tree compilation using `dtc`
-- **Remote Deployment**: SSH-based deployment to target hardware
-- **Auto-merge**: Automatically remembers and re-merges DTS bases for DTSO overlays
+The tool is the `analog-attach` CLI (`packages/cli`). `analog-attach gui` serves a GUI for it in the
+browser (`packages/gui`), where every action is an `analog-attach` command.
 
 ## Requirements
 
-Analog Attach requires a valid Linux kernel repository to be configured before
-use.
+- Node.js 22 or newer.
+- A Linux kernel source tree (its bindings and includes).
+- On PATH:
+  - `dtc` 1.6.0 or newer, to build and validate;
+  - `cpp` (gcc), to preprocess the devicetree's includes;
+  - dt-schema 2026.9, to validate:
+    `pipx install dtschema==2026.9`, then `pipx inject dtschema ruamel.yaml.clib`;
+  - `ssh` and `scp`, to deploy.
 
-For full functionality, install the following packages:
-
-```bash
-sudo apt install gcc                    # C preprocessor for DTS includes
-sudo apt install device-tree-compiler   # dtc compiler
-sudo apt install ssh                    # Remote connections
-sudo apt install sshpass                # Password-based SSH for deployment
-```
+  `analog-attach` alone on a terminal (the setup) checks them and gives the command that
+  installs one missing or too old; so does a command that needs it.
 
 ## Installation
 
-### From Marketplace
-
-See [Analog Attach Extension](https://marketplace.visualstudio.com/items?itemName=AnalogDevices.analog-attach)
-
-### From VSIX
-
-1. Download the `.vsix` file from the project releases
-2. In VS Code, open Command Palette (`Ctrl+Shift+P`)
-3. Run **Extensions: Install from VSIX**
-4. Select the downloaded file
-
-### From Source
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions.
-
-## Configuration
-
-### Initial Setup
-
-Before using the extension, configure the path to your Linux kernel repository:
-
-1. Open VS Code Settings (`Ctrl+,`)
-2. Search for "Analog Attach"
-3. Set **Default Linux Repository** to your Linux kernel source path
-   (e.g., `~/linux` or `~/analogdevicesinc/linux`)
-
-### Available Settings
-
-| Setting | Description |
-|---------|-------------|
-| `defaultLinuxRepository` | Path to the Linux kernel repository (required) |
-| `defaultDtSchemaRepository` | Path to dt-schema repository (optional, uses bundled version if not set) |
-| `enableAutoMergeDtsoBase` | Automatically merge DTSO with last selected DTS base |
-| `preprocessDtsFilesCommand` | Command for preprocessing DTS files with includes |
-| `compileDtsFileCommand` | Command for compiling DTS/DTSO files |
-| `remoteHost` | Target device IP address for deployment |
-| `remoteUser` | SSH username for target device |
-| `remotePassword` | SSH password for target device |
+Download `analog-attach-cli-<version>.tgz` from the
+[releases](https://github.com/analogdevicesinc/analog-attach/releases), then
+`npm install -g ./analog-attach-cli-<version>.tgz`. From source, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Usage
 
-### Opening Files
+```sh
+analog-attach config                 # the project's settings: the backend (`linux`), the kernel tree, the target
+analog-attach init                   # create the workfile, an overlay
+analog-attach import <source>        # or start it from an existing source
+analog-attach list devices adxl      # what can be added
+analog-attach add <device>           # add a device
+analog-attach read                   # the workfile; `read <node>` a node, `read <node> <property>` one value
+analog-attach update <node> <property> <value>
+analog-attach delete <node> [<property>]
+analog-attach validate
+analog-attach build                  # the .dtbo
+analog-attach deploy                 # to the target over SSH
+analog-attach gui                    # the same, in the browser
+```
 
-- `.dtso` files open in **Plug and Play** editor by default
-- `.dts` files open in **Tree Config** editor by default
+`analog-attach --help` lists every command (`rename`, `completion` and the others),
+`analog-attach <command> --help` explains one, and `analog-attach --help --all` prints them all.
+With `--json`, every answer has the form `packages/cli/docs/spec/04-protocol` describes.
 
-To switch editors:
-- Right-click the file tab and select **Reopen Editor With...**
-- Or use the Analog Attach side panel and click **Switch View**
+`analog-attach skill install analog-attach-linux` installs the skill that drives the CLI for an
+AI agent: Claude Code by default, or `--agent codex`, `gemini` or `all`. `analog-attach skill
+install` alone lists the skills.
 
-### Plug and Play Editor
+The user guide is in [`docs/`](docs/README.md) (Sphinx).
 
-Best for creating new overlays and quick device integration.
+## Repository
 
-1. **Merge a DTS base**: Run `Analog Attach: Add Device Tree file to current overlay`
-   (`Ctrl+Shift+P`) to provide context for parent suggestions
-2. **Add devices**: Use the left panel to search and add devices from the catalog
-3. **Select parent**: Choose a valid parent node for the device
-4. **Configure**: Use the right panel to set properties and add channels
-5. **Save**: Changes are automatically saved to the `.dtso` file
+| Package | What it is |
+|---|---|
+| `packages/cli` | The `analog-attach` CLI and its specification (`docs/spec`) |
+| `packages/gui` | The browser GUI `analog-attach gui` serves |
+| `packages/linux-lib` | Devicetree parsing, the Linux bindings, validation |
+| `skills` | The AI agent skill `analog-attach skill install` installs |
+| `skill-evals` | Evaluations of the skills |
+| `docs` | The user guide (Sphinx, adi-doctools) |
 
-### Tree Config Editor
+## Issues
 
-For users requiring maximum flexibility and control.
-
-1. **Navigate**: Click nodes in the tree to view their configuration
-2. **Add nodes**: Use the **+** button to add devices or custom nodes
-3. **Configure**: Edit properties in the main panel
-4. **Search**: Use the search bar to find nodes by path
-5. **Go to references**: Use the hyperlink button to navigate to referenced nodes
-
-### Commands
-
-Access via Command Palette (`Ctrl+Shift+P`):
-
-- **Analog Attach: Add Device Tree file to current overlay** - Merge a DTS base into the current DTSO
-- **Analog Attach: Compile Device Tree** - Compile the current file to DTB/DTBO
-- **Analog Attach: Deploy Device Tree** - Deploy compiled binary to target via SSH
-
-### Sidebar
-
-The Analog Attach side panel (click the AA icon in the activity bar) provides:
-
-- Quick access to merge, compile, and deploy commands
-- Remote settings editor (IP, user, password)
-- View switcher between editors
-- Settings shortcut
-
-## Troubleshooting
-
-Analog Attach writes logs to `analog-attach.log` in the VS Code extension log
-directory. The path is printed in the **Extension Host** output at startup.
-
-For issues and bug reports, see
-[GitHub Issues](https://github.com/analogdevicesinc/analog-attach/issues).
+See [GitHub Issues](https://github.com/analogdevicesinc/analog-attach/issues).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-See [LICENSE](LICENSE.txt) for details.
+See [LICENSE](LICENSE.txt).

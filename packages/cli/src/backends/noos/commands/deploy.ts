@@ -1,0 +1,146 @@
+import fs from "node:fs";
+import { DEFAULT_PROBE, PROBE_OPTIONS, get_effective_setting_value, get_setting_value } from "capi-lib";
+import {
+	answer,
+	command,
+	input_error,
+	refuse,
+	type DeployArguments,
+	type FlagSpecs,
+	type Outcome,
+	type Session,
+} from "../../../interface/backend-interface";
+import { refuse_error } from "./shared";
+import {
+	build_arguments,
+	configure_arguments,
+	plan_build,
+	preflight,
+} from "../build/cmake_build";
+import { run, run_shell } from "../../shell";
+import { common_ok, type CommonResponse } from "../protocol/responses";
+import { project_directory } from "./build";
+
+// The platform SDK names the flash target `flash` (capi-maxim sdk/flash.cmake), not after the project.
+const FLASH_TARGET = "flash";
+
+const DEPLOY_FLAGS = {
+	probe: { kind: "value", brief: `Debug probe used to flash: ${PROBE_OPTIONS.join(" or ")} (default: the 'probe' setting)`, placeholder: "probe" },
+} as const satisfies FlagSpecs;
+
+/**
+ * `deploy`: flash the built project.
+ *
+ * Same as `build`: the project comes from settings, and so does the probe, so it runs with
+ * no arguments.
+ */
+export const deploy = command<DeployArguments, CommonResponse, typeof DEPLOY_FLAGS>({
+	flags: DEPLOY_FLAGS,
+	docs: {
+		brief: "Flash the generated CAPI project to the board",
+		full:
+			"Flashes the project 'generate' writes: the 'project-path' setting, or\n"
+			+ "out/<project-name> when it is unset.\n\nExamples:\n  $ analog-attach deploy\n  $ analog-attach deploy --probe jlink\n  $ analog-attach config probe jlink"
+	},
+	run(_arguments, flags, session) {
+		return run_deploy(flags.probe, session);
+	}
+});
+
+/**
+ * Why there is nothing to deploy: no image where build puts it. Only when that place is known,
+ * the project built by the CLI's own step; with a build-command of the user's, the image is
+ * wherever that command puts it, so nothing is said.
+ */
+function not_built(target_path: string, program: string): string | undefined {
+	const own_build = get_effective_setting_value("build-command");
+	if (!own_build.ok || (own_build.value !== undefined && own_build.value !== "")) { return undefined; }
+	const capi = get_effective_setting_value("capi-path");
+	if (!capi.ok || capi.value === undefined) { return undefined; }
+	const plan = plan_build(target_path, capi.value, program);
+	if (!plan.ok || fs.existsSync(plan.value.elf_path)) { return undefined; }
+	return `${plan.value.target} is not built for ${plan.value.board} (no ${plan.value.elf_path}). Build it first: ${program} build`;
+}
+
+async function run_deploy(probe_flag: string | undefined, session: Session): Promise<Outcome<CommonResponse>> {
+	// A probe that can't be is what was typed, whatever the project's state.
+	if (probe_flag !== undefined && !PROBE_OPTIONS.includes(probe_flag)) {
+		return refuse(`Unknown probe '${probe_flag}'. Supported: ${PROBE_OPTIONS.join(", ")}`, { type: "unknown-choice" });
+	}
+
+	const project = project_directory(session);
+	if (!project.ok) {
+		return project.outcome;
+	}
+	const target_path = project.path;
+
+	// Deploy puts what build made on the board: it doesn't build it itself (DEPLOY-01).
+	const unbuilt = not_built(target_path, session.program);
+	if (unbuilt !== undefined) {
+		return refuse(unbuilt, { type: "not-generated" });
+	}
+
+	// An explicit deploy-command takes the step over completely.
+	const override = get_effective_setting_value("deploy-command");
+	if (!override.ok) {
+		return refuse_error(override.error);
+	}
+
+	if (override.value !== undefined && override.value !== "") {
+		const progress = session.progress(`Deploying ${target_path} with '${override.value}'`);
+		const result = await run_shell(override.value, target_path, { line: text => { progress.line(text); }, signal: session.signal });
+		progress.done();
+		if (result.exit_code !== 0) {
+			return refuse(`Deploy failed with exit code ${String(result.exit_code)}`, { type: "tool-failed" });
+		}
+
+		const message = `Deployed ${target_path} with '${override.value}'`;
+		return answer(common_ok(message), "Deploy completed successfully");
+	}
+
+	const configured_probe = get_effective_setting_value("probe");
+	if (!configured_probe.ok) {
+		return refuse_error(configured_probe.error);
+	}
+
+	const probe = probe_flag ?? configured_probe.value ?? DEFAULT_PROBE;
+	if (!PROBE_OPTIONS.includes(probe)) {
+		return refuse(`Unknown probe '${probe}' in the 'probe' setting. Supported: ${PROBE_OPTIONS.join(", ")}`, { type: "invalid-setting" });
+	}
+
+	const capi_path = get_setting_value("capi-path");
+	if (!capi_path.ok) {
+		return refuse(`capi-path is not configured. Run: ${session.program} config capi-path <path>`, { type: "missing-setting" });
+	}
+
+	const plan = plan_build(target_path, capi_path.value, session.program);
+	if (!plan.ok) {
+		return refuse_error(plan.error);
+	}
+
+	const checks = preflight(plan.value, capi_path.value);
+	if (!checks.ok) {
+		return refuse_error(checks.error);
+	}
+
+	const progress = session.progress(`Flashing ${plan.value.target} to ${plan.value.board} via ${probe}`);
+	const sink = { line: (text: string) => { progress.line(text); }, signal: session.signal };
+
+	// PROBE is read when the build directory is configured, so configure runs here even
+	// if the project was already built. The `flash` target builds what it needs first.
+	const { project_directory: directory, environment } = plan.value;
+	const configure = await run("cmake", configure_arguments(plan.value, [`-DPROBE=${probe}`]), directory, sink, environment);
+	if (configure.exit_code !== 0) {
+		progress.done();
+		return refuse(`CMake configure failed with exit code ${String(configure.exit_code)}`, { type: "tool-failed" });
+	}
+
+	const flash = await run("cmake", build_arguments(plan.value, FLASH_TARGET), directory, sink, environment);
+	progress.done();
+	if (flash.exit_code !== 0) {
+		return refuse(`Deploy failed with exit code ${String(flash.exit_code)}`, { type: "tool-failed" });
+	}
+
+	const message = `Flashed ${plan.value.target} to ${plan.value.board} via ${probe}`;
+	return answer(common_ok(message), "Deploy completed successfully");
+}

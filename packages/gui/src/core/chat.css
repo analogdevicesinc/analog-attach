@@ -1,0 +1,46 @@
+/* The chat with the assistant (chat.mjs), the core's: a panel on the right, below the header, after
+   Harmonic's AI chat (its chat message and chat input). While it is open, the views and the
+   console make room for it. Docked in a part (chat.mjs's dock), it is in the part's flow instead. */
+.chat { position: fixed; top: 57px; right: 0; bottom: 0; width: 420px; background: var(--bg); border-left: 1px solid var(--line); display: flex; flex-direction: column; z-index: 8; }
+body.with-chat main, body.with-chat footer { margin-right: 420px; }
+.chat-bar { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 12px 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.chat-bar strong { font: var(--type-subtitle-m); }
+.chat-bar .subtle { font: var(--type-body-xs); }
+/* Its text on the left, its button on the right, centred beside it (under it, when the text needs the width). */
+.chat-notice { background: var(--warn-tint); border-bottom: 1px solid var(--warn-edge); color: var(--hmc-color-notification-warning-default-text); padding: 8px 12px; font: var(--type-body-s); }
+.chat-notice:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.chat-notice-text { flex: 1 1 200px; }
+.chat-notice button { flex: none; height: 24px; font: var(--type-action-s); }
+/* The skill's install refused, in a project without toasts: under its button, the notice's width. */
+.chat-notice-problem { flex-basis: 100%; color: var(--err); font: var(--type-body-xs); }
+.chat-messages { flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.chat-hint { color: var(--muted); font: var(--type-body-s); }
+/* A message: Harmonic's chat message body. The user's on the right, in the selection colour. */
+.chat-msg { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; max-width: 92%; overflow-wrap: anywhere; background: var(--panel); font: var(--type-body-s); }
+.chat-msg.user { align-self: flex-end; background: var(--accent-soft); border-color: transparent; }
+.chat-msg.assistant { align-self: flex-start; }
+.chat-msg.error { align-self: stretch; background: var(--err-tint); border-color: transparent; border-left: 2px solid var(--err-edge); border-radius: 4px; }
+.chat-msg pre, .chat-cmd pre { background: var(--console-bg); color: var(--console-fg); border-radius: 4px; padding: 8px; overflow: auto; font: var(--type-code-xs); margin: 8px 0 0; white-space: pre-wrap; }
+.chat-table { border-collapse: collapse; margin: 8px 0; font: var(--type-body-xs); width: auto; }
+.chat-table th, .chat-table td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+.chat-msg code { font-family: var(--mono); background: var(--chip); padding: 0 4px; }
+/* A command the assistant ran: a card with its state on the left edge. */
+.chat-cmd { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 4px; padding: 8px 12px; font: var(--type-body-xs); }
+.chat-cmd.done { border-left-color: var(--hmc-color-system-success-default); }
+.chat-cmd.failed { border-left-color: var(--hmc-color-system-warning-default); }
+.chat-cmd.refused { border-left-color: var(--err); }
+.chat-cmd summary { color: var(--muted); cursor: pointer; font: var(--type-body-xs); margin-top: 4px; }
+.chat-refused { color: var(--err); font: var(--type-body-xs); margin-top: 4px; }
+.chat-meta { color: var(--muted); font: var(--type-body-xs); text-align: center; }
+/* The input: Harmonic's chat input, a framed area with the send action in its footer. */
+.chat-input { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+.chat-input textarea { width: 100%; resize: vertical; font: var(--type-body-s); border-radius: 4px; padding: 8px; min-height: 72px; }
+.chat-input .actions-row { justify-content: flex-end; }
+/* Docked: filling the part's place for it, its title the part's (a tab), closed from there. */
+.chat.docked { position: static; width: auto; flex: 1; min-height: 0; border-left: none; z-index: auto; }
+.chat.docked .chat-bar { min-height: 40px; padding: 4px 12px 4px 16px; }
+.chat.docked .chat-bar > strong, .chat.docked #chat-close { display: none; }
+@media (max-width: 900px) {
+	.chat { width: 100%; }
+	body.with-chat main, body.with-chat footer { margin-right: 0; }
+}

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# pre-push: the CLI's functional tests as CI runs them (every call the real binary), before a push
+# with a change under packages/. On with `yarn hooks:install` (core.hooksPath); `git push
+# --no-verify` skips it.
+#
+# The tests run on the working tree, so it refuses a push of anything but HEAD, or with changes
+# to tracked files under packages/ not committed: what passed is then what is pushed. A commit that
+# passed isn't run again (another remote, a push that failed on the network).
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+zero=0000000000000000000000000000000000000000
+head=$(git rev-parse HEAD)
+
+needed=no
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+	[ "$local_sha" = "$zero" ] && continue # a deletion
+	if [ "$remote_sha" = "$zero" ]; then
+		# A new branch: what it has that dev hasn't (all of it, without a dev to compare).
+		base=$(git merge-base origin/dev "$local_sha" 2>/dev/null) || base=""
+	else
+		base=$remote_sha
+	fi
+	if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null &&
+		git diff --quiet "$base" "$local_sha" -- packages; then
+		continue
+	fi
+	if [ "$local_sha" != "$head" ]; then
+		echo "pre-push: the functional tests run on the working tree, which is HEAD, not ${local_sha:0:12}." >&2
+		echo "pre-push: check it out and push again, or push with --no-verify." >&2
+		exit 1
+	fi
+	needed=yes
+done
+
+[ "$needed" = yes ] || exit 0
+if ! git diff --quiet HEAD -- packages; then
+	echo "pre-push: packages/ has changes that aren't committed, so the run wouldn't be what is pushed." >&2
+	echo "pre-push: commit or stash them and push again, or push with --no-verify." >&2
+	exit 1
+fi
+stamp=$(git rev-parse --git-path functional-pass)
+[ "$(cat "$stamp" 2>/dev/null)" = "$head" ] && exit 0
+
+echo "pre-push: building the CLI and running the functional tests (packages/cli/test/functional/out/)..." >&2
+log=$(git rev-parse --git-path functional-pre-push.log)
+options=(--fail-unless-gap --require-steps)
+command -v parallel >/dev/null && options+=(--jobs 4)
+started=$(date +%s)
+if ! { yarn build:cli && packages/cli/test/functional/run.sh "${options[@]}"; } >"$log" 2>&1 </dev/null; then
+	tail -30 "$log" >&2
+	echo "pre-push: the functional tests failed (the whole output: $log). Not pushed." >&2
+	exit 1
+fi
+echo "$head" >"$stamp"
+echo "pre-push: the functional tests passed in $(($(date +%s) - started)) s." >&2

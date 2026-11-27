@@ -1,0 +1,7 @@
+$type: struct
+$symbol: dualpart_channel_config
+$description: "One channel's configuration: the channel level's extra"
+function:
+  type: uint8_t
+  default: 0
+  description: "What the channel does"

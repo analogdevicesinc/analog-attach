@@ -1,215 +1,42 @@
 {
   "name": "analog-attach",
-  "displayName": "Analog Attach",
-  "description": "Device Tree Source (DTS/DTSO) editor with schema validation and binding support",
-  "version": "0.1.0",
-  "publisher": "AnalogDevices",
+  "description": "Configure devices with a command line and a browser GUI: Linux devicetree overlays",
+  "version": "0.0.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/analogdevicesinc/analog-attach"
   },
-  "icon": "packages/extension/media/ADI-Analog-Attach-logo.png",
-  "engines": {
-    "vscode": "^1.96.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "main": "./packages/extension/dist/extension.js",
   "private": true,
   "workspaces": [
     "packages/*"
   ],
-  "contributes": {
-    "commands": [
-      {
-        "command": "analog-attach.addDeviceTree",
-        "title": "Analog Attach: Add Device Tree file to current overlay"
-      },
-      {
-        "command": "analog-attach.compileDeviceTree",
-        "title": "Analog Attach: Compile current Device Tree file"
-      },
-      {
-        "command": "analog-attach.deployDeviceTree",
-        "title": "Analog Attach: Deploy the current compiled Device Tree"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "analog-attach.navigateBack",
-        "key": "alt+left",
-        "mac": "ctrl+-",
-        "when": "activeCustomEditorId == 'analog-attach.dtsEditor' || activeCustomEditorId == 'analog-attach.dtsPlugAndPlayEditor'"
-      },
-      {
-        "command": "analog-attach.navigateForward",
-        "key": "alt+right",
-        "mac": "ctrl+shift+-",
-        "when": "activeCustomEditorId == 'analog-attach.dtsEditor' || activeCustomEditorId == 'analog-attach.dtsPlugAndPlayEditor'"
-      }
-    ],
-    "customEditors": [
-      {
-        "viewType": "analog-attach.dtsEditor",
-        "displayName": "Advanced device tree editor",
-        "selector": [
-          {
-            "filenamePattern": "*.dts"
-          },
-          {
-            "filenamePattern": "*.dtso"
-          }
-        ],
-        "priority": "option"
-      },
-      {
-        "viewType": "analog-attach.dtsPlugAndPlayEditor",
-        "displayName": "Plug and Play",
-        "selector": [
-          {
-            "filenamePattern": "*.dts"
-          },
-          {
-            "filenamePattern": "*.dtso"
-          }
-        ],
-        "priority": "option"
-      }
-    ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "analog-attach-sidebar",
-          "title": "Analog Attach",
-          "icon": "packages/extension/media/sidebar-icon.svg"
-        }
-      ]
-    },
-    "views": {
-      "analog-attach-sidebar": [
-        {
-          "id": "analog-attach-sidebar-view",
-          "name": "Analog Attach",
-          "type": "webview",
-          "icon": "packages/extension/media/sidebar-icon.svg"
-        }
-      ]
-    },
-    "configuration": {
-      "title": "Analog Attach",
-      "type": "object",
-      "properties": {
-        "analog-attach.defaultLinuxRepository": {
-          "type": "string",
-          "markdownDescription": "Path to the Linux Repository to be used by default"
-        },
-        "analog-attach.defaultDtSchemaRepository": {
-          "type": "string",
-          "markdownDescription": "Path to the dt-schema Repository to be used by default"
-        },
-        "analog-attach.enableAutoMergeDtsoBase": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Automatically merge a DTSO overlay with the last DTS base you selected for that file."
-        },
-        "analog-attach.preprocessDtsFilesCommand": {
-          "type": "string",
-          "default": "cpp -nostdinc -I {include_dir_path} -I {arch_dir_path} -undef -x assembler-with-cpp",
-          "markdownDescription": "Command used to call the preprocessor on a dts file that contains include directives."
-        },
-        "analog-attach.compileDtsFileCommand": {
-          "type": "string",
-          "default": "dtc -O dtb -I dts",
-          "markdownDescription": "Command used for compiling a valid dts file."
-        },
-        "analog-attach.decompileDtbFileCommand": {
-          "type": "string",
-          "default": "dtc -O dts -I dts",
-          "markdownDescription": "Command used for decompiling a valid dtb file."
-        },
-        "analog-attach.sshpassConfig": {
-          "type": "string",
-          "default": "sshpass -p {remotePassword}",
-          "markdownDescription": "Command used to upload on the target device\n\n"
-        },
-        "analog-attach.sshConfig": {
-          "type": "string",
-          "default": "ssh -o StrictHostKeyChecking=no {remoteUser}@{remoteHost} '{command}'",
-          "markdownDescription": "SSH command to connect to remote and execute a command on remote.\n\n{command} will be replaced with rebootDevice command or writeDtbToOverlays command"
-        },
-        "analog-attach.remoteHost": {
-          "type": "string",
-          "default": "10.87.54.71",
-          "markdownDescription": "Remote host/IP used to derive sshConfig."
-        },
-        "analog-attach.remoteUser": {
-          "type": "string",
-          "default": "root",
-          "markdownDescription": "Remote user used to derive sshConfig."
-        },
-        "analog-attach.remotePassword": {
-          "type": "string",
-          "default": "analog",
-          "markdownDescription": "Remote password used to derive sshpassConfig."
-        },
-        "analog-attach.remoteSudoAuth": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Prefix used for sudo on remote. Leave empty if writeDtbToOverlays already contains sudo."
-        },
-        "analog-attach.rebootDevice": {
-          "type": "string",
-          "default": "bash -c \"sleep 5; reboot now\"",
-          "markdownDescription": "Command used to reboot the remote device after 5 seconds of sleep with sshpass and ssh"
-        },
-        "analog-attach.writeDtbToOverlays": {
-          "type": "string",
-          "default": "sudo tee /boot/overlays/{dtb_name} > /dev/null",
-          "markdownDescription": "Command run on the remote host to consume the DTB from stdin and write it. {dtb_name} will be replaced with the filename (e.g. test-dt.txt or compiled dtb)."
-        },
-        "analog-attach.skipDeleteConfirmation": {
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "When enabled, sensors and channels are deleted immediately without showing a confirmation dialog."
-        }
-      }
-    },
-    "configurationDefaults": {
-      "workbench.editorAssociations": {
-        "*.dts": "analog-attach.dtsEditor",
-        "*.dtso": "analog-attach.dtsPlugAndPlayEditor"
-      }
-    }
+  "engines": {
+    "node": ">=22"
   },
   "scripts": {
-    "build": "yarn run build:all",
-    "watch": "concurrently \"yarn:watch:*\"",
-    "package": "yarn run build:extension-protocol && yarn run build:attach-lib && yarn run build:hds-react && yarn run build:attach-ui-lib && yarn run build:pnp-webview && yarn run build:tree-editor-webview && yarn workspace @analog-attach/extension webpack --mode production --devtool hidden-source-map",
-    "vscode:prepublish": "yarn run package",
-    "compile-tests": "cd packages/extension && tsc -p . --outDir out",
-    "watch-tests": "cd packages/extension && tsc -p . -w --outDir out",
-    "pretest": "yarn run compile-tests && yarn run build",
-    "lint": "yarn workspace @analog-attach/extension lint",
-    "test": "yarn run compile-tests && yarn workspace @analog-attach/extension exec vscode-test && yarn workspace attach-lib test --run",
-    "test-clean": "yarn run pretest && yarn workspace @analog-attach/extension exec vscode-test && yarn workspace attach-lib test --run",
+    "build": "yarn run build:cli",
+    "build:linux-lib": "yarn workspace linux-lib build",
+    "build:capi-lib": "yarn workspace capi-lib build",
+    "build:cli": "yarn run build:linux-lib && yarn run build:capi-lib && yarn workspace @analog-attach/cli build",
+    "build:binary": "yarn run build:cli && yarn workspace @analog-attach/cli build:binary",
+    "lint": "yarn workspaces foreach -A run lint",
+    "lint:cli": "yarn workspace @analog-attach/cli lint",
+    "test": "yarn workspace linux-lib test --run && yarn workspace @analog-attach/cli test --run && yarn workspace capi-lib test --run",
+    "test:linux-lib": "yarn workspace linux-lib test",
+    "test:capi-lib": "yarn workspace capi-lib test",
+    "test:cli": "yarn workspace @analog-attach/cli test",
+    "test:functional": "yarn workspace @analog-attach/cli test:functional",
+    "test-clean": "yarn clean && yarn install && yarn build && yarn test",
+    "verify": "scripts/verify.sh",
+    "verify:linux": "scripts/verify.sh --linux",
+    "verify:no-os": "scripts/verify.sh --no-os",
     "clean": "yarn workspaces foreach -A run clean",
-    "clean:all": "yarn run clean && rm -rf node_modules",
-    "build:all": "yarn run build:extension-protocol && yarn run build:attach-lib && yarn run build:hds-react && yarn run build:attach-ui-lib && yarn run build:pnp-webview && yarn run build:tree-editor-webview && yarn run build:extension",
-    "build:hds-react": "yarn workspace hds-react build",
-    "build:pnp-webview": "yarn workspace pnp-webview build",
-    "build:attach-lib": "yarn workspace attach-lib build",
-    "build:attach-ui-lib": "yarn workspace attach-ui-lib build",
-    "build:tree-editor-webview": "yarn workspace tree-editor-webview build",
-    "build:extension": "yarn workspace @analog-attach/extension build",
-    "build:extension-protocol": "yarn workspace extension-protocol build",
-    "watch:hds-react": "yarn workspace hds-react watch",
-    "watch:attach-ui-lib": "yarn workspace attach-ui-lib watch",
-    "watch:pnp-webview": "yarn workspace pnp-webview watch"
-  },
-  "devDependencies": {
-    "@vitest/coverage-v8": "^4.0.18",
-    "typescript": "^5.7.2"
+    "clean:all": "yarn run clean && rm -rf node_modules packages/node_modules",
+    "clean:linux-lib": "yarn workspace linux-lib run clean",
+    "clean:capi-lib": "yarn workspace capi-lib run clean",
+    "clean:cli": "yarn workspace @analog-attach/cli run clean",
+    "hooks:install": "git config core.hooksPath scripts/git-hooks",
+    "blame:install": "git config blame.ignoreRevsFile .git-blame-ignore-revs"
   },
   "packageManager": "yarn@4.5.3"
 }

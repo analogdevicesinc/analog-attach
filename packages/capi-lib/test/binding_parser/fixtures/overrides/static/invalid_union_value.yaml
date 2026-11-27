@@ -1,0 +1,13 @@
+$type: struct
+$symbol: test_struct
+comm:
+  type: union
+  members:
+    - spi:
+        include: "spi.yaml"
+    - i2c:
+        include: "i2c.yaml"
+
+$override:
+  - comm:
+      value: uart

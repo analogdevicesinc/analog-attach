@@ -1,0 +1,9 @@
+$type: descriptor
+$symbol: test_gpio_port
+$description: "GPIO port handle produced by test_gpio_port_init()"
+$init_function: test_gpio_port_init
+$remove_function: test_gpio_port_deinit
+$init_param:
+  include: test_gpio_port_config
+  pointer: true
+  required: true

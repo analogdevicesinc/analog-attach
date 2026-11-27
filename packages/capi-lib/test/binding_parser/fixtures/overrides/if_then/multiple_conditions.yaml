@@ -1,0 +1,20 @@
+$type: struct
+$symbol: test_struct
+flag1:
+  type: bool
+
+flag2:
+  type: bool
+
+count:
+  type: uint32_t
+
+$override:
+  - $if:
+      flag1:
+        value: true
+      flag2:
+        value: false
+    $then:
+      count:
+        default: 0

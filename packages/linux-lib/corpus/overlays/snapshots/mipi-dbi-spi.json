@@ -1,0 +1,39 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node1",
+          "panel@0",
+          "compatible",
+          "0"
+        ],
+        "message": "panel@0 (panel): compatible:0: 'panel' is not one of ['saef,sftc154b', 'sainsmart18', 'shineworld,lh133k']\n\tfrom schema $id: http://devicetree.org/schemas/display/panel/panel-mipi-dbi-spi.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [
+      {
+        "parent_path": "/soc/spi@7e204000",
+        "nodes": [
+          "spidev@0",
+          "panel@0"
+        ],
+        "address": "0x0",
+        "in_overlay": [
+          false,
+          true
+        ]
+      }
+    ],
+    "chip_select_overflows": []
+  }
+}

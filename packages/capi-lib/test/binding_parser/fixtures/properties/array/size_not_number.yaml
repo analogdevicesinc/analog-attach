@@ -1,0 +1,4 @@
+type: array
+size: "ten"
+element:
+  type: uint8_t

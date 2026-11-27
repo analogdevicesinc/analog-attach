@@ -1,0 +1,735 @@
+{
+    "description": "The ADXL380/ADXL382 is a low noise density, low power, 3-axis\naccelerometer with selectable measurement ranges. The ADXL380\nsupports the ±4 g, ±8 g, and ±16 g ranges, and the ADXL382 supports\n±15 g, ±30 g, and ±60 g ranges.\n\nhttps://www.analog.com/en/products/adxl380.html\n",
+    "examples": [
+        "#include <dt-bindings/interrupt-controller/irq.h>\n\ni2c {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  accelerometer@54 {\n    compatible = \"adi,adxl380\";\n    reg = <0x54>;\n    vddio-supply = <&vddio>;\n    vsupply-supply = <&vsupply>;\n    interrupt-parent = <&gpio>;\n    interrupts = <25 IRQ_TYPE_LEVEL_HIGH>;\n    interrupt-names = \"INT0\";\n  };\n};\n",
+        "#include <dt-bindings/interrupt-controller/irq.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  accelerometer@0 {\n    compatible = \"adi,adxl380\";\n    reg = <0>;\n    spi-max-frequency = <8000000>;\n    vddio-supply = <&vddio>;\n    vsupply-supply = <&vsupply>;\n    interrupt-parent = <&gpio>;\n    interrupts = <25 IRQ_TYPE_LEVEL_HIGH>;\n    interrupt-names = \"INT0\";\n  };\n};\n"
+    ],
+    "properties": [
+        {
+            "dt_type": "string-array",
+            "key": "compatible",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "adi,adxl380",
+                        "adi,adxl382"
+                    ],
+                    "enum_type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "address",
+            "key": "reg",
+            "value": {
+                "_t": "matrix",
+                "description": "Chip select used by the device.",
+                "maxItems": 1,
+                "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "number",
+                            "maximum": "256n",
+                            "minimum": "0n"
+                        },
+                        "maxItems": 1,
+                        "minItems": 1,
+                        "typeSize": 32
+                    }
+                ]
+            }
+        },
+        {
+            "dt_type": "uint32-matrix",
+            "key": "interrupts",
+            "value": {
+                "_t": "matrix",
+                "maxItems": 2,
+                "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": [
+                            {
+                                "_t": "number"
+                            },
+                            {
+                                "_t": "number"
+                            },
+                            {
+                                "_t": "enum",
+                                "enum": [
+                                    "IRQ_TYPE_NONE",
+                                    "IRQ_TYPE_EDGE_RISING",
+                                    "IRQ_TYPE_EDGE_FALLING",
+                                    "IRQ_TYPE_EDGE_BOTH",
+                                    "IRQ_TYPE_LEVEL_HIGH",
+                                    "IRQ_TYPE_LEVEL_LOW"
+                                ],
+                                "enum_type": "macro"
+                            }
+                        ],
+                        "maxItems": 3,
+                        "minItems": 3
+                    }
+                ]
+            }
+        },
+        {
+            "dt_type": "phandle",
+            "key": "interrupt-parent",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "default": "gicv2",
+                    "enum": [
+                        "gpio",
+                        "gicv2",
+                        "aon_intr"
+                    ],
+                    "enum_type": "phandle"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "string-array",
+            "key": "interrupt-names",
+            "value": {
+                "_t": "list",
+                "item": [
+                    {
+                        "_t": "enum",
+                        "enum": [
+                            "INT0",
+                            "INT1"
+                        ],
+                        "enum_type": "string"
+                    },
+                    {
+                        "_t": "enum",
+                        "default": "INT1",
+                        "enum": [
+                            "INT1"
+                        ],
+                        "enum_type": "string"
+                    }
+                ],
+                "maxItems": 2,
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "phandle",
+            "key": "vddio-supply",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "phandle",
+            "key": "vsupply-supply",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "string",
+            "key": "status",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "okay",
+                        "disabled",
+                        "reserved",
+                        "fail",
+                        "fail-needs-probe"
+                    ],
+                    "enum_type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "string-array",
+            "key": "pinctrl-names",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "string"
+                },
+                "minItems": 1,
+                "unique": true
+            }
+        },
+        {
+            "dt_type": "flag",
+            "key": "spi-cs-high",
+            "value": {
+                "_t": "flag",
+                "description": "The device requires the chip select active high."
+            }
+        },
+        {
+            "dt_type": "flag",
+            "key": "spi-lsb-first",
+            "value": {
+                "_t": "flag",
+                "description": "The device requires the LSB first mode."
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "spi-max-frequency",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "description": "Maximum SPI clocking speed of the device in Hz.",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "spi-cs-setup-delay-ns",
+            "value": {
+                "_t": "list",
+                "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "spi-cs-hold-delay-ns",
+            "value": {
+                "_t": "list",
+                "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "spi-cs-inactive-delay-ns",
+            "value": {
+                "_t": "list",
+                "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "spi-rx-bus-width",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        "0n",
+                        "1n",
+                        "2n",
+                        "4n",
+                        "8n"
+                    ],
+                    "enum_type": "number"
+                },
+                "default": "1n",
+                "description": "Bus width to the SPI bus used for read transfers. If 0 is provided, then no RX will be possible on this device.",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "spi-rx-delay-us",
+            "value": {
+                "_t": "list",
+                "description": "Delay, in microseconds, after a read transfer.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "rx-sample-delay-ns",
+            "value": {
+                "_t": "list",
+                "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "spi-tx-bus-width",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        "0n",
+                        "1n",
+                        "2n",
+                        "4n",
+                        "8n"
+                    ],
+                    "enum_type": "number"
+                },
+                "default": "1n",
+                "description": "Bus width to the SPI bus used for write transfers. If 0 is provided, then no TX will be possible on this device.",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "spi-tx-delay-us",
+            "value": {
+                "_t": "list",
+                "description": "Delay, in microseconds, after a write transfer.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint64-array",
+            "key": "stacked-memories",
+            "value": {
+                "_t": "list",
+                "description": "Several SPI memories can be wired in stacked mode. This basically means that either a device features several chip selects, or that different devices must be seen as a single bigger chip. This basically doubles (or more) the total address space with only a single additional wire, while still needing to repeat the commands when crossing a chip boundary. The size of each chip should be provided as members of the array.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "18446744073709551615n",
+                    "minimum": "0n"
+                },
+                "maxItems": 4,
+                "minItems": 2,
+                "typeSize": 64
+            }
+        },
+        {
+            "dt_type": "uint64-array",
+            "key": "parallel-memories",
+            "value": {
+                "_t": "list",
+                "description": "Several SPI memories can be wired in parallel mode. The devices are physically on a different buses but will always act synchronously as each data word is spread across the different memories (eg. even bits are stored in one memory, odd bits in the other). This basically doubles the address space and the throughput while greatly complexifying the wiring because as many busses as devices must be wired. The size of each chip should be provided as members of the array.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "18446744073709551615n",
+                    "minimum": "0n"
+                },
+                "maxItems": 4,
+                "minItems": 2,
+                "typeSize": 64
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "st,spi-midi-ns",
+            "value": {
+                "_t": "list",
+                "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "pl022,interface",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        "0n",
+                        "1n",
+                        "2n"
+                    ],
+                    "enum_type": "number"
+                },
+                "description": "SPI interface type",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "pl022,com-mode",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        "0n",
+                        "1n",
+                        "2n"
+                    ],
+                    "enum_type": "number"
+                },
+                "default": "1n",
+                "description": "Specifies the transfer mode",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "pl022,rx-level-trig",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "4n",
+                    "minimum": "0n"
+                },
+                "description": "Rx FIFO watermark level",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "pl022,tx-level-trig",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "4n",
+                    "minimum": "0n"
+                },
+                "description": "Tx FIFO watermark level",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "pl022,ctrl-len",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "31n",
+                    "minimum": "3n"
+                },
+                "description": "Microwire interface - Control length",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "pl022,wait-state",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        "0n",
+                        "1n"
+                    ],
+                    "enum_type": "number"
+                },
+                "description": "Microwire interface - Wait state",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "pl022,duplex",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        "0n",
+                        "1n"
+                    ],
+                    "enum_type": "number"
+                },
+                "description": "Microwire interface - Full/Half duplex",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "cdns,read-delay",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "description": "Delay for read capture logic, in clock cycles.",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "cdns,tshsl-ns",
+            "value": {
+                "_t": "list",
+                "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "cdns,tsd2d-ns",
+            "value": {
+                "_t": "list",
+                "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "cdns,tchsh-ns",
+            "value": {
+                "_t": "list",
+                "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out).",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32-array",
+            "key": "cdns,tslch-ns",
+            "value": {
+                "_t": "list",
+                "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "fsl,spi-cs-sck-delay",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "description": "Delay in nanoseconds between activating chip select and the start of clock signal, at the start of a transfer.",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "fsl,spi-sck-cs-delay",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "description": "Delay in nanoseconds between stopping the clock signal and deactivating chip select, at the end of a transfer.",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "node",
+            "key": "controller-data",
+            "value": {
+                "_t": "node",
+                "properties": [
+                    {
+                        "dt_type": "uint32",
+                        "key": "samsung,spi-feedback-delay",
+                        "value": {
+                            "_t": "scalar",
+                            "cell": {
+                                "_t": "enum",
+                                "enum": [
+                                    "0n",
+                                    "1n",
+                                    "2n",
+                                    "3n"
+                                ],
+                                "enum_type": "number"
+                            },
+                            "default": "0n",
+                            "description": "The sampling phase shift to be applied on the miso line (to account\nfor any lag in the miso line). Valid values:\n - 0: No phase shift.\n - 1: 90 degree phase shift sampling.\n - 2: 180 degree phase shift sampling.\n - 3: 270 degree phase shift sampling.\n",
+                            "typeSize": 32
+                        }
+                    },
+                    {
+                        "dt_type": "string",
+                        "key": "status",
+                        "value": {
+                            "_t": "list",
+                            "item": {
+                                "_t": "enum",
+                                "enum": [
+                                    "okay",
+                                    "disabled",
+                                    "reserved",
+                                    "fail",
+                                    "fail-needs-probe"
+                                ],
+                                "enum_type": "string"
+                            },
+                            "maxItems": 1,
+                            "minItems": 1
+                        }
+                    },
+                    {
+                        "dt_type": "string-array",
+                        "key": "pinctrl-names",
+                        "value": {
+                            "_t": "list",
+                            "item": {
+                                "_t": "string"
+                            },
+                            "minItems": 1,
+                            "unique": true
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "nvidia,tx-clk-tap-delay",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "31n",
+                    "minimum": "0n"
+                },
+                "description": "Delays the clock going out to device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "nvidia,rx-clk-tap-delay",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "255n",
+                    "minimum": "0n"
+                },
+                "description": "Delays the clock coming in from the device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
+                "typeSize": 32
+            }
+        }
+    ],
+    "property_patterns": [
+        {
+            "description": "",
+            "dt_type": "phandle-array",
+            "pattern": "^pinctrl-[0-9]+$",
+            "value": {
+                "_t": "matrix",
+                "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
+                    }
+                ]
+            }
+        }
+    ],
+    "required_properties": [
+        "compatible",
+        "reg",
+        "interrupts",
+        "interrupt-names",
+        "vddio-supply",
+        "vsupply-supply"
+    ],
+    "title": "Analog Devices ADXL380/382 3-Axis Digital Accelerometer"
+}

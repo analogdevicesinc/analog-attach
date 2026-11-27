@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="aa-token" content="%AA_TOKEN%">
+<title>Analog Attach</title>
+<link rel="icon" href="core/logo.png">
+<link rel="stylesheet" href="core/core.css">
+<link rel="stylesheet" href="core/chat.css">
+</head>
+<body>
+<!-- The core's (core/app.mjs): the header, the setup, the console with its command line, and the
+     chat with the assistant. <main> is the part of the project's ecosystem
+     (ecosystems/<backend>/controller.mjs), mounted by the core. -->
+<header>
+	<div class="brand"><img src="core/logo.png" alt="" class="logo"><div><div class="brand-name">Analog Attach</div><div class="brand-sub">powered by ADI DataX&trade;</div></div></div>
+	<span id="project" class="chip mono" title="The project folder: where .analog-attach/ and the workfile live; another project is another analog-attach gui, started in its folder"></span>
+	<span id="board" class="chip">…</span>
+	<span id="status" class="chip">…</span>
+	<div class="spacer"></div>
+	<span id="header-actions"></span>
+	<button id="setup-button" title="The project setup: ecosystem and settings">Project Setup</button>
+	<button id="refresh" class="ghost" title="Reload everything">↻</button>
+	<button id="preferences" class="ghost icon-button" title="Preferences: how Analog Attach looks and behaves"></button>
+</header>
+
+<main id="main"></main>
+<section id="setup" class="content" hidden></section>
+
+<footer id="footer">
+	<div class="console-resize" id="console-resize" title="Drag to resize the console; double-click to reset it"></div>
+	<div class="console-bar">
+		<strong>Console</strong>
+		<div class="spacer"></div>
+		<span id="console-actions"></span>
+		<span id="console-bar-core"></span>
+		<button id="clear-console">Clear Console</button>
+		<button id="toggle-console">Hide Console</button>
+	</div>
+	<div id="console"></div>
+	<form class="command-line" id="command-line" autocomplete="off">
+		<span class="prompt">$ analog-attach</span>
+		<input id="command" spellcheck="false" placeholder="a command, as on a terminal: list devices adxl · read · validate   (↑ ↓ history)">
+	</form>
+</footer>
+<div id="toast" class="toast"></div>
+
+<script type="module" src="core/app.mjs"></script>
+</body>
+</html>

@@ -1,0 +1,1454 @@
+import { INodeBuilderBase, NodeBuilder } from "./build/NodeBuilder.js";
+import { PropertyBuilder } from "./build/PropertyBuilder.js";
+
+import {
+	DTLabel,
+	DTNode,
+	DTPath,
+	get_full_node_name,
+	DTProperty,
+	is_dt_flag,
+	DTO,
+	parse_dto,
+	print_dto,
+	format_parse_error
+} from "./syntax/index.js";
+
+import { Result } from "../result.js";
+import { DeviceTree, Stream, walk_nodes } from "./DeviceTree.js";
+import { type LocatedNode, type NodeTarget, normalize_target, patch_node, parent_path as access_parent_path } from "./nodes/Access.js";
+import { rename_references, unique_label } from "./nodes/Labels.js";
+import { print_full_dts, print_property, type FullDtsBlock } from "./syntax/Printer.js";
+
+export type FoundNodeResult = {
+	node: DTNode;
+	path: string;
+	node_path: string;
+	parent_node: DTNode | undefined;
+	fragment_root_path: string;
+	is_in_base: boolean;
+};
+
+/** A fragment with an `__overlay__`, its position among the fragments and where its target resolves to. */
+export type AppliedFragment = {
+	fragment: DTNode;
+	index: number;
+	path: string;
+};
+
+/** The path `relative` names below the node at `root`. */
+function path_below(root: string, relative: string[]): string {
+	if (relative.length === 0) { return root; }
+	return `${root === "/" ? "" : root}/${relative.join("/")}`;
+}
+
+export class DeviceTreeOverlay {
+
+	private overlay: DTO;
+	private readonly base_dts: DeviceTree | undefined;
+	/** The fragments, their targets and the order they apply in, looked up once while `unchanged` runs. */
+	private lookups: { fragments?: DTNode[]; applied?: AppliedFragment[]; roots: Map<DTNode, string | undefined> } | undefined;
+
+	private constructor(overlay: DTO, base_dts: DeviceTree | undefined) {
+		this.overlay = overlay;
+		this.base_dts = base_dts;
+	}
+
+	static new_from_string(content: string, base_dts?: DeviceTree): DeviceTreeOverlay | string {
+		try {
+			const dto = parse_dto(content);
+
+			if (Result.is_err(dto)) {
+				return `Failed to parse overlay: ${format_parse_error(dto.error)}`;
+			}
+
+			return new DeviceTreeOverlay(dto.value.dto, base_dts);
+		} catch (error) {
+			return error instanceof Error ? error.message : "Failed to parse overlay!";
+		}
+	}
+
+	static new_empty(base_dts?: DeviceTree): DeviceTreeOverlay {
+		return new DeviceTreeOverlay(
+			{
+				root: {
+					name: "/",
+					unit_addr: undefined,
+					labels: [],
+					children: [],
+					properties: [],
+				},
+			},
+			base_dts,
+		);
+	}
+
+	public get_base_dts(): DeviceTree | undefined {
+		return this.base_dts;
+	}
+
+	/**
+	 * Run `read` with the fragments and their targets looked up once, not on
+	 * every call: a walk of the whole tree that asks for each node's children
+	 * (`effective_children`) is then linear in the tree, not in the tree times
+	 * the fragments times the base. `read` must not change the overlay or its
+	 * base. Nested calls share the outer one's lookups.
+	 */
+	public unchanged<T>(read: () => T): T {
+		if (this.lookups !== undefined) { return read(); }
+		this.lookups = { roots: new Map() };
+		try {
+			return read();
+		} finally {
+			this.lookups = undefined;
+		}
+	}
+
+	public add_fragment(
+		target: NodeTarget,
+		nodes: INodeBuilderBase | undefined,
+		properties: DTProperty | DTProperty[] | undefined
+	): boolean {
+		const existing = this.find_fragment(target);
+
+		if (existing !== undefined) {
+			const overlay_node = existing.children.find(c => c.name === "__overlay__");
+			if (overlay_node === undefined) {
+				return false;
+			}
+
+			if (nodes !== undefined) {
+				overlay_node.children.push(nodes.build());
+			}
+
+			if (properties !== undefined) {
+				// A later fragment for the same node may already set it, and its value is the one applied.
+				const root = this.get_fragment_root_path(existing);
+				const properties_ = Array.isArray(properties) ? properties : [properties];
+				for (const property of properties_) {
+					const holder = (root === undefined ? undefined : this.property_node(root, property.name)) ?? overlay_node;
+					const index = holder.properties.findIndex(p => p.name === property.name);
+					if (index === -1) {
+						holder.properties.push(property);
+					} else {
+						holder.properties[index] = property;
+					}
+				}
+			}
+
+			return true;
+		}
+
+		if (this.base_dts !== undefined && !this.base_dts.node_exists(target)) {
+			return false;
+		}
+
+		this.create_fragment(target, nodes, properties);
+
+		return true;
+	}
+
+	/**
+	 * The overlay node that writes to the node at absolute `path`: the existing
+	 * overlay node, or the `__overlay__` of a fragment targeting the base node
+	 * (reused or created, by label when the base node has one).
+	 */
+	public ensure_node(path: string): DTNode | undefined {
+		const found = this.find_node(path);
+		if (found !== undefined) { return found.node; }
+
+		const located = this.base_dts?.locate(path);
+		if (this.base_dts !== undefined && located === undefined) { return undefined; }
+
+		const label = located?.node.labels[0];
+		const target: DTLabel | DTPath = label === undefined
+			? { kind: "path", labels: [], path: located?.path ?? path }
+			: { kind: "label", labels: [], name: label };
+		if (!this.add_fragment(target, undefined, undefined)) { return undefined; }
+		return this.find_node(target)?.node;
+	}
+
+	/**
+	 * The first fragment with an `__overlay__` for the node `target` resolves
+	 * to, whatever label or path its own target names (`&i2c_arm` and `&i2c1`
+	 * are one node). Without a resolved node, the one whose target is written
+	 * the same way.
+	 */
+	private find_fragment(target: NodeTarget): DTNode | undefined {
+		const normalized = normalize_target(target);
+		const path = normalized.kind === "label" ? this.label_path(normalized.name, new Set()) : normalized.path;
+		if (path !== undefined) {
+			const for_node = this.get_fragments().find(fragment =>
+				fragment.children.some(c => c.name === "__overlay__") && this.get_fragment_root_path(fragment) === path);
+			if (for_node !== undefined) { return for_node; }
+		}
+
+		for (const fragment of this.get_fragments()) {
+			if (normalized.kind === "label") {
+				const property = fragment.properties.find(p => p.name === "target");
+				if (property === undefined || is_dt_flag(property.value)) {
+					continue;
+				}
+				const matches = property.value.some(v =>
+					v.kind === "array" && v.elements.some(element => element.kind === "label" && element.name === normalized.name)
+				);
+				if (matches) {
+					return fragment;
+				}
+			} else if (normalized.kind === "path") {
+				const target_path_property = fragment.properties.find(p => p.name === "target-path");
+				if (target_path_property !== undefined && !is_dt_flag(target_path_property.value)) {
+					const matches = target_path_property.value.some(v => v.kind === "string" && v.value === normalized.path);
+					if (matches) { return fragment; }
+				}
+
+				const target_property = fragment.properties.find(p => p.name === "target");
+				if (target_property !== undefined && !is_dt_flag(target_property.value)) {
+					const matches = target_property.value.some(v =>
+						v.kind === "array" && v.elements.some(element => element.kind === "path" && element.path === normalized.path)
+					);
+					if (matches) { return fragment; }
+				}
+			}
+		}
+
+		return undefined;
+	}
+
+	private next_fragment_unit_addr(): number {
+		let max = -1;
+		for (const fragment of this.get_fragments()) {
+			if (fragment.unit_addr === undefined) { continue; }
+			const n = Number.parseInt(fragment.unit_addr, 10);
+			if (!Number.isNaN(n) && n > max) { max = n; }
+		}
+		return max + 1;
+	}
+
+	private create_fragment(
+		target: NodeTarget,
+		node: INodeBuilderBase | undefined,
+		properties: DTProperty | DTProperty[] | undefined
+	): DTNode {
+		const normalized = normalize_target(target);
+
+		const targetProperty = normalized.kind === "label"
+			? PropertyBuilder.build_cell_array()
+				.with_cells(PropertyBuilder.label(normalized.name))
+				.with_name("target")
+				.build()
+			: PropertyBuilder.build_string()
+				.with_value(normalized.path)
+				.with_name("target-path")
+				.build();
+
+		const overlayNode = NodeBuilder.new()
+			.with_name("__overlay__")
+			.with_children(node)
+			.with_properties(properties);
+
+		const fragment = NodeBuilder.new()
+			.with_name("fragment")
+			.with_unit_address(this.next_fragment_unit_addr().toString())
+			.with_properties(targetProperty)
+			.with_children(overlayNode)
+			.build();
+
+		this.overlay.root.children.push(fragment);
+		return fragment;
+	}
+
+	public remove_node(target: NodeTarget): boolean {
+		const found = this.find_node(target);
+		if (found === undefined || found.parent_node === undefined) { return false; }
+
+		const node_name = get_full_node_name(found.node);
+		found.parent_node.children = found.parent_node.children.filter(c => get_full_node_name(c) !== node_name);
+
+		this.cleanup_empty_fragments();
+		return true;
+	}
+
+	/** Remove the property from every overlay node for the target's node, so no fragment still sets it. */
+	public remove_property(target: NodeTarget, property: string): boolean {
+		const found = this.find_node(target);
+		if (found === undefined) { return false; }
+
+		let removed = false;
+		for (const node of this.overlay_nodes_at(found.node_path)) {
+			const index = node.properties.findIndex(p => p.name === property);
+			if (index === -1) { continue; }
+			node.properties.splice(index, 1);
+			removed = true;
+		}
+		if (!removed) { return false; }
+
+		this.cleanup_empty_fragments();
+		return true;
+	}
+
+	private cleanup_empty_fragments(): void {
+		this.overlay.root.children = this.overlay.root.children.filter(child => {
+			if (child.name !== "fragment") { return true; }
+			const overlay_node = child.children.find(c => c.name === "__overlay__");
+			if (overlay_node === undefined) { return true; }
+			return overlay_node.children.length > 0 || overlay_node.properties.length > 0;
+		});
+		this.renumber_fragments();
+	}
+
+	/**
+	 * The absolute path a fragment applies to. A label target is looked up in
+	 * the overlay first, as dtc does: a label on another fragment's body, or on
+	 * a node in one, names where that body ends up (`i2cbus: __overlay__` in a
+	 * fragment for `&i2c_arm` makes `&i2cbus` the I2C bus). Then in the base.
+	 */
+	public get_fragment_root_path(fragment: DTNode): string | undefined {
+		const roots = this.lookups?.roots;
+		if (roots === undefined) { return this.fragment_root_path(fragment, new Set()); }
+		if (!roots.has(fragment)) { roots.set(fragment, this.fragment_root_path(fragment, new Set())); }
+		return roots.get(fragment);
+	}
+
+	private fragment_root_path(fragment: DTNode, visited: Set<DTNode>): string | undefined {
+		// label-targeted: target = <&label>
+		const target_property = fragment.properties.find(p => p.name === "target");
+
+		if (target_property !== undefined && !is_dt_flag(target_property.value)) {
+			for (const v of target_property.value) {
+				if (v.kind !== "array") { continue; }
+
+				for (const element of v.elements) {
+					if (element.kind === "label") {
+						const name = element.name.startsWith("&") ? element.name.slice(1) : element.name;
+
+						return this.label_path(name, new Set([...visited, fragment]));
+					}
+
+					if (element.kind === "path") {
+						if (this.base_dts !== undefined && this.base_dts.node_exists(element.path)) {
+							return element.path;
+						}
+						return undefined;
+					}
+				}
+			}
+		}
+
+		// path-targeted: target-path = "/abs/path"
+		const target_path_property = fragment.properties.find(p => p.name === "target-path");
+
+		if (target_path_property !== undefined && !is_dt_flag(target_path_property.value)) {
+			for (const v of target_path_property.value) {
+				if (v.kind === "string") { return v.value; }
+			}
+		}
+
+		return undefined;
+	}
+
+	/** Where a fragment target's label points: the overlay's own label first, as in dtc, then the base's. */
+	private label_path(name: string, visited: Set<DTNode>): string | undefined {
+		const local = this.overlay_label_path(name, visited);
+		if (local === undefined) { return this.base_dts?.locate(name)?.path; }
+		return local.root === undefined ? undefined : path_below(local.root, local.relative);
+	}
+
+	/**
+	 * Where a label on a fragment body, or on a node in one, ends up once the
+	 * overlay is applied: its fragment's target (`root`, undefined when it
+	 * can't be placed) and the path below it. Fragments in `visited` are
+	 * skipped, so targets that name each other don't loop.
+	 */
+	private overlay_label_path(name: string, visited: Set<DTNode>): { root: string | undefined; relative: string[] } | undefined {
+		const find = (node: DTNode): string[] | undefined => {
+			if (node.labels.includes(name)) { return []; }
+			for (const child of node.children) {
+				const below = find(child);
+				if (below !== undefined) { return [get_full_node_name(child), ...below]; }
+			}
+			return undefined;
+		};
+
+		for (const fragment of this.get_fragments()) {
+			if (visited.has(fragment)) { continue; }
+			const body = fragment.children.find(c => c.name === "__overlay__" || c.name === "__dormant__");
+			const relative = body === undefined ? undefined : find(body);
+			if (relative === undefined) { continue; }
+
+			return { root: this.fragment_root_path(fragment, new Set([...visited, fragment])), relative };
+		}
+		return undefined;
+	}
+
+	private renumber_fragments(): void {
+		let index = 0;
+
+		for (const fragment of this.get_fragments()) {
+			fragment.unit_addr = index.toString();
+			index++;
+		}
+	}
+
+	public as_stream(): Stream<LocatedNode> {
+		return new Stream(walk_nodes(this.overlay.root, "/"));
+	}
+
+	public get_fragments(): DTNode[] {
+		if (this.lookups !== undefined) {
+			this.lookups.fragments ??= this.find_fragments();
+			return [...this.lookups.fragments];
+		}
+		return this.find_fragments();
+	}
+
+	private find_fragments(): DTNode[] {
+		return this.as_stream()
+			.filter(({ node }) => node.name === "fragment")
+			.toArray()
+			.map(({ node }) => node);
+	}
+
+	/**
+	 * The overlay node for `target`. A path names the node at its place under a
+	 * fragment (a fragment whose target can't be placed counts from `/`); a
+	 * label is looked up where it ends up once the overlay is applied, the
+	 * overlay's own labels first, at any depth, then the base's.
+	 */
+	public find_node(target: NodeTarget): FoundNodeResult | undefined {
+		const t = normalize_target(target);
+		if (t.kind === "label") {
+			const path = this.label_node_path(t.name);
+			return path === undefined ? undefined : this.find_node({ kind: "path", labels: [], path });
+		}
+		const path = t.path;
+
+		for (const fragment of this.get_fragments()) {
+			const overlay_node = fragment.children.find(c => c.name === "__overlay__");
+			if (overlay_node === undefined) { continue; }
+
+			const root_path = this.get_fragment_root_path(fragment) ?? "";
+
+			if (path === root_path) {
+				const is_in_base = this.base_dts?.node_exists(t) ?? false;
+
+				return {
+					node: overlay_node,
+					path: path,
+					node_path: path,
+					parent_node: undefined,
+					fragment_root_path: root_path,
+					is_in_base,
+				};
+			}
+
+			const normalized_root = root_path === "/" ? "" : root_path;
+			if (!path.startsWith(normalized_root + "/")) { continue; }
+
+			const relative_path = path.slice(normalized_root.length + 1);
+			const segments = relative_path.split("/").filter(s => s.length > 0);
+			if (segments.length === 0) { continue; }
+
+			const result = this.find_node_in_fragment(fragment, segments);
+			if (result === undefined) { continue; }
+
+			const is_in_base = this.base_dts?.node_exists(t) ?? false;
+			const abs_node_path = `${normalized_root}/${result.actual_segments.join("/")}`;
+
+			return {
+				node: result.node,
+				path: path,
+				node_path: abs_node_path,
+				parent_node: result.parent_node,
+				fragment_root_path: root_path,
+				is_in_base,
+			};
+		}
+
+		return undefined;
+	}
+
+	/** `label_path`, but a label in a fragment whose target can't be placed counts from `/`, as a path does in `find_node`. */
+	private label_node_path(name: string): string | undefined {
+		const local = this.overlay_label_path(name, new Set());
+		if (local === undefined) { return this.base_dts?.locate(name)?.path; }
+		if (local.root === undefined && local.relative.length === 0) { return undefined; }
+		return path_below(local.root ?? "", local.relative);
+	}
+
+	private find_node_in_fragment(
+		fragment: DTNode,
+		segments: string[],
+	): { node: DTNode; parent_node: DTNode | undefined; actual_segments: string[] } | undefined {
+		if (segments.length === 0) { return undefined; }
+		const overlay_node = fragment.children.find(c => c.name === "__overlay__");
+		if (overlay_node === undefined) { return undefined; }
+
+		let current: DTNode = overlay_node;
+		let parent: DTNode | undefined;
+		const actual_segments: string[] = [];
+
+		for (const segment of segments) {
+			const seg = segment!;
+			const child = current.children.find(c =>
+				get_full_node_name(c) === seg
+				|| c.labels.includes(seg)
+				|| (c.name === seg && c.unit_addr === undefined)
+			);
+			if (child === undefined) { return undefined; }
+			actual_segments.push(get_full_node_name(child));
+			parent = current;
+			current = child;
+		}
+
+		return { node: current, parent_node: parent, actual_segments };
+	}
+
+	public delete_all(): void {
+		this.overlay.root.children = [];
+	}
+
+	/** Remove a direct child of the overlay root by full name (e.g. `__overrides__`, `fragment@2`). */
+	public remove_root_node(name: string): boolean {
+		const index = this.overlay.root.children.findIndex(child => get_full_node_name(child) === name);
+		if (index === -1) { return false; }
+		this.overlay.root.children.splice(index, 1);
+		return true;
+	}
+
+	/**
+	 * Merge base and overlay children of the node at `parent_path`.
+	 * An overlay child with the same full name as a base child patches it.
+	 */
+	public effective_children(parent_path: string): Map<string, DTNode> {
+		const children = new Map<string, DTNode>();
+
+		for (const child of this.base_dts?.node_at(parent_path)?.children ?? []) {
+			children.set(get_full_node_name(child), child);
+		}
+
+		for (const { fragment } of this.placed_fragments()) {
+			const overlay_node = fragment.children.find(c => c.name === "__overlay__");
+			if (overlay_node === undefined) { continue; }
+			const root = this.get_fragment_root_path(fragment);
+			if (root === undefined) { continue; }
+
+			let cursor: DTNode | undefined;
+			if (root === parent_path) {
+				cursor = overlay_node;
+			} else if (parent_path.startsWith(root + "/") || (root === "/" && parent_path.startsWith("/"))) {
+				const relative = root === "/" ? parent_path.slice(1) : parent_path.slice(root.length + 1);
+				let node: DTNode | undefined = overlay_node;
+				for (const segment of relative.split("/")) {
+					if (node === undefined) { break; }
+					node = node.children.find(c => get_full_node_name(c) === segment);
+				}
+				cursor = node;
+			} else if ((access_parent_path(root) ?? "/") === parent_path) {
+				const sibling_name = root.slice(root.lastIndexOf("/") + 1);
+				const existing = children.get(sibling_name);
+				children.set(sibling_name, existing === undefined
+					? overlay_node
+					: patch_node(existing, overlay_node));
+				continue;
+			}
+			if (cursor === undefined) { continue; }
+
+			for (const child of cursor.children) {
+				const child_name = get_full_node_name(child);
+				const existing = children.get(child_name);
+				children.set(child_name, existing === undefined ? child : patch_node(existing, child));
+			}
+		}
+
+		return children;
+	}
+
+	/**
+	 * Build the effective node at `path`: for `/`, the root with properties from
+	 * all fragments targeting `/`; for other paths, the base node patched by overlay props.
+	 */
+	public effective_node(path: string): DTNode | undefined {
+		const base_node = this.base_dts?.node_at(path);
+
+		const overlay_nodes = this.overlay_nodes_at(path);
+		if (overlay_nodes.length === 0 && base_node === undefined) { return undefined; }
+
+		const properties = [...(base_node?.properties ?? [])];
+		for (const property of this.overlay_properties(path)) {
+			const index = properties.findIndex(p => p.name === property.name);
+			if (index === -1) { properties.push(property); } else { properties[index] = property; }
+		}
+
+		return {
+			name: base_node?.name ?? overlay_nodes[0]?.name ?? path.split("/").at(-1) ?? "",
+			unit_addr: base_node?.unit_addr ?? overlay_nodes[0]?.unit_addr,
+			labels: [...(base_node?.labels ?? []), ...overlay_nodes.flatMap(node => node.labels)],
+			properties,
+			children: [...this.effective_children(path).values()],
+		};
+	}
+
+	/**
+	 * The overlay's nodes for the node at absolute `path`, in the order the
+	 * fragments apply in (`application_order`): the `__overlay__` of each
+	 * fragment targeting it, and the node at its place under a fragment
+	 * targeting an ancestor. A fragment whose target can't be placed counts from `/`, as in
+	 * `find_node`.
+	 */
+	public overlay_nodes_at(path: string): DTNode[] {
+		const nodes: DTNode[] = [];
+		for (const fragment of this.application_order()) {
+			const body = fragment.children.find(c => c.name === "__overlay__");
+			if (body === undefined) { continue; }
+			const root = this.get_fragment_root_path(fragment) ?? "";
+			if (root === path) { nodes.push(body); continue; }
+
+			const prefix = root.endsWith("/") ? root : `${root}/`;
+			if (!path.startsWith(prefix)) { continue; }
+			let node: DTNode | undefined = body;
+			for (const segment of path.slice(prefix.length).split("/")) {
+				node = node?.children.find(c => get_full_node_name(c) === segment);
+			}
+			if (node !== undefined) { nodes.push(node); }
+		}
+		return nodes;
+	}
+
+	/** The properties the overlay sets on the node at `path`: over all its overlay nodes, a later one's value wins. */
+	public overlay_properties(path: string): DTProperty[] {
+		const properties: DTProperty[] = [];
+		for (const node of this.overlay_nodes_at(path)) {
+			for (const property of node.properties) {
+				const index = properties.findIndex(p => p.name === property.name);
+				if (index === -1) { properties.push(property); } else { properties[index] = property; }
+			}
+		}
+		return properties;
+	}
+
+	/** The overlay node whose value of `property` applies to the node at `path`: the last one that sets it. */
+	public property_node(path: string, property: string): DTNode | undefined {
+		const nodes = this.overlay_nodes_at(path);
+		for (let index = nodes.length - 1; index >= 0; index--) {
+			const node = nodes[index];
+			if (node?.properties.some(p => p.name === property) === true) { return node; }
+		}
+		return undefined;
+	}
+
+	/**
+	 * The base tree with the overlay applied, as one tree: every node as
+	 * `effective_node` builds it, so the overlay's nodes, properties and labels
+	 * are in it. Undefined without a base.
+	 */
+	public merged_tree(): DeviceTree | undefined {
+		if (this.base_dts === undefined) { return undefined; }
+		const build = (path: string): DTNode | undefined => {
+			const node = this.effective_node(path);
+			if (node === undefined) { return undefined; }
+			const children = [...this.effective_children(path).keys()].flatMap(name => {
+				const child = build(path === "/" ? `/${name}` : `${path}/${name}`);
+				return child === undefined ? [] : [child];
+			});
+			return { ...node, children };
+		};
+		const root = this.unchanged(() => build("/"));
+		return root === undefined ? undefined : DeviceTree.new_from_root(root);
+	}
+
+	/**
+	 * Collect every label in the base tree and the overlay, returning a map from
+	 * label name to absolute path. Overlay labels override base labels. A
+	 * fragment's body counts whether it is `__overlay__` or `__dormant__` (one
+	 * `__overrides__` may switch on), and a label on the body itself names the
+	 * fragment's target, as dtc's symbols do once the overlay is applied.
+	 */
+	public all_labels(): Map<string, string> {
+		const labels = new Map<string, string>();
+		const collect = (node: DTNode, path: string): void => {
+			for (const label of node.labels) {
+				labels.set(label, path);
+			}
+			for (const child of node.children) {
+				const child_name = get_full_node_name(child);
+				const child_path = path === "/" ? `/${child_name}` : `${path}/${child_name}`;
+				collect(child, child_path);
+			}
+		};
+
+		const base_root = this.base_dts?.node_at("/");
+		if (base_root !== undefined) { collect(base_root, "/"); }
+
+		for (const fragment of this.get_fragments()) {
+			const body = fragment.children.find(c => c.name === "__overlay__" || c.name === "__dormant__");
+			if (body === undefined) { continue; }
+			collect(body, this.get_fragment_root_path(fragment) ?? "");
+		}
+
+		return labels;
+	}
+
+	/**
+	 * The labels a new node can't take: `all_labels`, plus the labels on
+	 * fragment nodes (`busfrag: fragment@100`), which name the fragment itself
+	 * and are mapped to its path in the overlay file.
+	 */
+	public taken_labels(): Map<string, string> {
+		const labels = this.all_labels();
+		for (const fragment of this.get_fragments()) {
+			for (const label of fragment.labels) {
+				if (!labels.has(label)) { labels.set(label, `/${get_full_node_name(fragment)}`); }
+			}
+		}
+		return labels;
+	}
+
+	public print(options?: import("./syntax/Printer.js").DtoPrintOptions): string {
+		return print_dto(this.overlay, undefined, options);
+	}
+
+	/**
+	 * A fragment's target path as the loader reads it: one that isn't absolute
+	 * (`spi0/spidev@0`, a `target-path`) begins with an alias of the base, as
+	 * libfdt's `fdt_path_offset` and the kernel's `of_find_node_by_path` take
+	 * it. Undefined when the base has no such alias.
+	 */
+	private loader_path(path: string | undefined): string | undefined {
+		if (path === undefined || path.startsWith("/") || this.base_dts === undefined) { return path; }
+		const [alias = "", ...rest] = path.split("/");
+		const root = this.base_dts.alias_path(alias);
+		return root === undefined ? undefined : path_below(root, rest.filter(segment => segment.length > 0));
+	}
+
+	/** `applied_fragments().applied`, looked up once while `unchanged` runs. */
+	private placed_fragments(): AppliedFragment[] {
+		if (this.lookups !== undefined) {
+			this.lookups.applied ??= this.applied_fragments().applied;
+			return this.lookups.applied;
+		}
+		return this.applied_fragments().applied;
+	}
+
+	/**
+	 * Every fragment in the order the merged view applies them: those of
+	 * `applied_fragments` in its order, then the others (no `__overlay__`, or
+	 * unplaced) in file order.
+	 */
+	private application_order(): DTNode[] {
+		const applied = this.placed_fragments().map(entry => entry.fragment);
+		const placed = new Set(applied);
+		return [...applied, ...this.get_fragments().filter(fragment => !placed.has(fragment))];
+	}
+
+	/**
+	 * The fragments with an `__overlay__` in the order they apply: file order,
+	 * except that one whose target isn't there yet (a base node, or a node a
+	 * body applied before it adds) waits, and comes right after the fragment
+	 * that adds its node, the waiting ones in file order. Its properties then
+	 * replace that fragment's, as the Raspberry Pi loader merges a fragment
+	 * aimed at the overlay's own node. `unplaced` names, in file order, the
+	 * fragments whose target resolves to no node and those still waiting
+	 * after the last one (their node is only in a `__dormant__` body).
+	 */
+	public applied_fragments(): { applied: AppliedFragment[]; unplaced: string[] } {
+		const fragments = this.get_fragments();
+		const applied: AppliedFragment[] = [];
+		const added = new Set<string>();
+		const base = this.base_dts;
+		const is_there = (path: string): boolean => base === undefined || added.has(path) || base.node_exists(path);
+		const apply = (entry: AppliedFragment): void => {
+			applied.push(entry);
+			const body = entry.fragment.children.find(c => c.name === "__overlay__");
+			if (body === undefined) { return; }
+			for (const { path } of walk_nodes(body, entry.path)) { added.add(path); }
+		};
+		const unresolved = new Set<number>();
+		const waiting: AppliedFragment[] = [];
+		for (const [index, fragment] of fragments.entries()) {
+			if (!fragment.children.some(c => c.name === "__overlay__")) { continue; }
+			const path = this.loader_path(this.get_fragment_root_path(fragment));
+			if (path === undefined) {
+				unresolved.add(index);
+				continue;
+			}
+			if (!is_there(path)) {
+				waiting.push({ fragment, index, path });
+				continue;
+			}
+			apply({ fragment, index, path });
+			for (let next = waiting.findIndex(entry => is_there(entry.path)); next !== -1; next = waiting.findIndex(entry => is_there(entry.path))) {
+				const [placed] = waiting.splice(next, 1);
+				if (placed !== undefined) { apply(placed); }
+			}
+		}
+		const left = new Set([...unresolved, ...waiting.map(entry => entry.index)]);
+		const unplaced = fragments.filter((_, index) => left.has(index)).map(fragment => get_full_node_name(fragment));
+		return { applied, unplaced };
+	}
+
+	/**
+	 * The base with the overlay applied, as a full devicetree that includes
+	 * the base file `include` (`print_full_dts`): one block per fragment with
+	 * an `__overlay__`, in the order of `applied_fragments`. A fragment for a
+	 * base label keeps it (`&spi0`); any other is written by the path its
+	 * target resolves to. `__dormant__` bodies and the root's other nodes
+	 * (`__overrides__`) are left out, as the kernel's overlay apply leaves
+	 * them. A label of the overlay that the base has on another node is
+	 * written `<label>_<n>` (`full_renames`), with the overlay's references to
+	 * it, in copies of the bodies. An error names the fragments
+	 * `applied_fragments` can't place.
+	 */
+	public print_full(include: string): Result<string, string[]> {
+		const { applied, unplaced } = this.applied_fragments();
+		if (unplaced.length > 0) { return Result.Err(unplaced); }
+		const renames = this.full_renames(applied);
+		const blocks: FullDtsBlock[] = [];
+		for (const { fragment, path } of applied) {
+			const written = fragment.children.find(c => c.name === "__overlay__");
+			if (written === undefined) { continue; }
+			const body = renames.size === 0 ? written : renamed_copy(written, renames);
+			const label = fragment_target_label(fragment);
+			const by_path = path === "/" && body.labels.length === 0 ? "/" : `&{${path}}`;
+			const reference = label !== undefined && this.base_dts?.locate(label)?.path === path ? `&${label}` : by_path;
+			blocks.push({ reference, body });
+		}
+		return Result.Ok(print_full_dts(include, blocks));
+	}
+
+	/**
+	 * The new name of each label the applied bodies define (on a body, or a
+	 * node in one) that the base has on another node: dtc rejects a label on
+	 * two nodes of one devicetree. A label on the node the base labels stays.
+	 */
+	private full_renames(applied: readonly AppliedFragment[]): Map<string, string> {
+		const renames = new Map<string, string>();
+		const base = this.base_dts;
+		if (base === undefined) { return renames; }
+		const taken = this.all_labels();
+		for (const { fragment, path: root } of applied) {
+			const body = fragment.children.find(c => c.name === "__overlay__");
+			if (body === undefined) { continue; }
+			for (const { node, path } of walk_nodes(body, root)) {
+				for (const label of node.labels) {
+					if (renames.has(label)) { continue; }
+					const owner = base.locate(label)?.path;
+					if (owner === undefined || owner === path) { continue; }
+					const name = unique_label(label, taken);
+					taken.set(name, path);
+					renames.set(label, name);
+				}
+			}
+		}
+		return renames;
+	}
+}
+
+/** A copy of a body with the labels in `renames` renamed, on its nodes and in its references. */
+function renamed_copy(body: DTNode, renames: ReadonlyMap<string, string>): DTNode {
+	const copy = structuredClone(body);
+	for (const { node } of walk_nodes(copy, "")) {
+		node.labels = node.labels.map(label => renames.get(label) ?? label);
+	}
+	rename_references(copy, new Map(renames));
+	return copy;
+}
+
+/** The label a fragment's `target = <&label>` names, if it names one. */
+function fragment_target_label(fragment: DTNode): string | undefined {
+	const target = fragment.properties.find(p => p.name === "target");
+	if (target === undefined || is_dt_flag(target.value)) { return undefined; }
+	for (const value of target.value) {
+		if (value.kind !== "array") { continue; }
+		const element = value.elements.find(candidate => candidate.kind === "label");
+		if (element !== undefined) { return element.name.startsWith("&") ? element.name.slice(1) : element.name; }
+	}
+	return undefined;
+}
+
+if (import.meta.vitest !== undefined) {
+
+	const { test, expect } = import.meta.vitest;
+
+	const base_dts_source = `/dts-v1/;
+/ {
+    soc {
+        spi0: spi@7e204000 {
+        };
+    };
+};`;
+
+	const overlay_with_imu = `/dts-v1/;
+/plugin/;
+
+&spi0 {
+    imu1: adi,ad7124-8@0 {
+        compatible = "adi,ad7124-8";
+    };
+};`;
+
+	test("find_node - finds overlay-added node by label", () => {
+		const base = DeviceTree.new_from_string(base_dts_source);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const result = overlay.find_node("imu1");
+		expect(result).toBeDefined();
+		expect(result?.is_in_base).toBe(false);
+	});
+
+	test("find_node - returns undefined for unknown label", () => {
+		const base = DeviceTree.new_from_string(base_dts_source);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		expect(overlay.find_node("nonexistent")).toBeUndefined();
+	});
+
+	test("find_node - finds a label below a node the overlay adds, and in a fragment whose target can't be placed", () => {
+		const base = DeviceTree.new_from_string(base_dts_source);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n&spi0 { adc: adc@0 { chan: channel@0 { reg = <0>; }; }; };\n&nowhere { lost: dev@1 { sub: sub@2 {}; }; };`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		expect(overlay.find_node("chan")).toMatchObject({ node_path: "/soc/spi@7e204000/adc@0/channel@0", is_in_base: false });
+		expect(overlay.find_node("chan")?.parent_node).toBe(overlay.find_node("adc")?.node);
+		expect(overlay.find_node("sub")?.node_path).toBe("/dev@1/sub@2");
+		expect(overlay.find_node("spi0")).toMatchObject({ node_path: "/soc/spi@7e204000", is_in_base: true });
+	});
+
+	test("print/reparse roundtrip - target element name has no & prefix", () => {
+		const base = DeviceTree.new_from_string(base_dts_source);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+		const printed = overlay.print();
+		const reparsed = DeviceTreeOverlay.new_from_string(printed, base);
+		if (typeof reparsed === "string") { throw new TypeError(`reparse failed: ${reparsed}`); }
+
+		const fragment = reparsed.get_fragments()[0];
+		expect(fragment).toBeDefined();
+		const target = fragment!.properties.find(p => p.name === "target");
+		expect(target).toBeDefined();
+		if (target === undefined || is_dt_flag(target.value)) { throw new Error("bad target"); }
+		const element = target.value[0];
+		if (element === undefined || element.kind !== "array") { throw new Error("bad element"); }
+		const reference = element.elements[0];
+		if (reference === undefined || reference.kind !== "label") { throw new Error("bad ref"); }
+		expect(reference.name).toBe("spi0");
+	});
+
+	test("ensure_node — reuses the overlay node, creates a fragment for a base-only node", () => {
+		const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t\tbus {\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+		expect(overlay.ensure_node("/soc/spi@7e204000/adi,ad7124-8@0")?.labels).toEqual(["imu1"]);
+		expect(overlay.ensure_node("/soc/spi@7e204000")?.name).toBe("__overlay__");
+		expect(overlay.get_fragments()).toHaveLength(1);
+
+		expect(overlay.ensure_node("/soc/bus")?.name).toBe("__overlay__");
+		expect(overlay.print()).toContain(`target-path = "/soc/bus"`);
+		expect(overlay.ensure_node("/soc/missing")).toBeUndefined();
+		expect(overlay.get_fragments()).toHaveLength(2);
+	});
+
+	const overlay_with_path_target = `/dts-v1/;
+/plugin/;
+
+/ {
+    fragment@0 {
+        target = <&{/soc/spi@7e204000}>;
+        __overlay__ {
+            adc@0 {
+                compatible = "adi,ad7124-8";
+                reg = <0>;
+            };
+        };
+    };
+};`;
+
+	test("target = <&{/path}> normalised to target-path", () => {
+		const base = DeviceTree.new_from_string(base_dts_source);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(overlay_with_path_target, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+		const fragment = overlay.get_fragments()[0];
+		expect(fragment).toBeDefined();
+		const tp = fragment!.properties.find(p => p.name === "target-path");
+		expect(tp).toBeDefined();
+		if (tp === undefined || is_dt_flag(tp.value)) { throw new Error("bad tp"); }
+		expect(tp.value[0]).toMatchObject({ kind: "string", value: "/soc/spi@7e204000" });
+	});
+
+	test("find_node resolves node under path-targeted fragment", () => {
+		const base = DeviceTree.new_from_string(base_dts_source);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(overlay_with_path_target, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+		const result = overlay.find_node("/soc/spi@7e204000/adc@0");
+		expect(result).toBeDefined();
+		expect(result?.node_path).toBe("/soc/spi@7e204000/adc@0");
+	});
+
+	test("remove_root_node - drops a root child and keeps root properties and fragments", () => {
+		const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;
+/plugin/;
+/ {
+    compatible = "brcm,bcm2711";
+    __overrides__ { cs_pin = <&imu1>, "reg:0"; };
+};
+${overlay_with_imu.replace("/dts-v1/;\n/plugin/;\n", "")}`);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		expect(overlay.remove_root_node("__overrides__")).toBe(true);
+		expect(overlay.remove_root_node("__overrides__")).toBe(false);
+
+		const printed = overlay.print();
+		expect(printed).not.toContain("__overrides__");
+		expect(printed).toContain(`compatible = "brcm,bcm2711";`);
+		expect(printed).toContain("fragment@0");
+		expect(typeof DeviceTreeOverlay.new_from_string(printed)).not.toBe("string");
+	});
+
+	test("print label mode — label target becomes &spi0 {}", () => {
+		const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\treg = <0>;\n\t};\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const printed = overlay.print({ syntax: "reference" });
+		expect(printed).toContain("&spi0 {");
+		expect(printed).not.toContain("fragment@0");
+		expect(printed).not.toContain("__overlay__");
+		expect(printed).toContain("adc@0");
+	});
+
+	test("print label mode — target-path becomes &{/path}", () => {
+		const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&{/} {\n\tmy-node {\n\t};\n};`);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const printed = overlay.print({ syntax: "reference" });
+		expect(printed).toContain("&{/} {");
+		expect(printed).not.toContain("fragment");
+	});
+
+	test("print label mode — round trip: parse(print(label)) ≡ parse(print(fragment))", () => {
+		const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\treg = <0>;\n\t\tcompatible = "adi,ad7124-8";\n\t};\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+		const fragment_text = overlay.print({ syntax: "fragment" });
+		const label_text = overlay.print({ syntax: "reference" });
+
+		const re_fragment = DeviceTreeOverlay.new_from_string(fragment_text, base);
+		const re_label = DeviceTreeOverlay.new_from_string(label_text, base);
+		if (typeof re_fragment === "string") { throw new TypeError(re_fragment); }
+		if (typeof re_label === "string") { throw new TypeError(re_label); }
+
+		expect(re_label.print({ syntax: "fragment" })).toBe(re_fragment.print({ syntax: "fragment" }));
+	});
+
+	test("print label mode — empty overlay prints / {};", () => {
+		const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n/ {\n};`);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const printed = overlay.print({ syntax: "reference" });
+		expect(printed).toContain("/ {\n};");
+	});
+
+	test("effective_children merges base and overlay children", () => {
+		const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t\t#address-cells = <1>;\n\t\t\t#size-cells = <0>;\n\t\t\tspidev@0 { reg = <0>; };\n\t\t\tspidev@1 { reg = <1>; };\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tspidev@0 { status = "disabled"; };\n\tadc@2 { reg = <2>; };\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+		const children = overlay.effective_children("/soc/spi@7e204000");
+		expect(children.has("spidev@0")).toBe(true);
+		expect(children.has("spidev@1")).toBe(true);
+		expect(children.has("adc@2")).toBe(true);
+		const patched = children.get("spidev@0");
+		expect(patched?.properties.some(p => p.name === "status")).toBe(true);
+		expect(patched?.properties.some(p => p.name === "reg")).toBe(true);
+	});
+
+	test("effective_children — overlay-only parent", () => {
+		const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tchannel@0 { reg = <0>; };\n\t};\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const children = overlay.effective_children("/soc/spi@7e204000/adc@0");
+		expect(children.has("channel@0")).toBe(true);
+	});
+
+	test("all_labels collects from base and overlay", () => {
+		const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc: adc@0 { reg = <0>; };\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const labels = overlay.all_labels();
+		expect(labels.get("spi0")).toBe("/soc/spi@7e204000");
+		expect(labels.get("adc")).toBe("/soc/spi@7e204000/adc@0");
+	});
+
+	test("all_labels — overlay label in second fragment", () => {
+		const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {};\n\t\tspi1: spi@7e205000 {};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc: adc@0 { reg = <0>; };\n};\n&spi1 {\n\tdac: dac@0 { reg = <0>; };\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const labels = overlay.all_labels();
+		expect(labels.get("adc")).toBe("/soc/spi@7e204000/adc@0");
+		expect(labels.get("dac")).toBe("/soc/spi@7e205000/dac@0");
+	});
+
+	const fan_base = `/dts-v1/;\n/ {\n\tsoc {\n\t\ti2c1: i2c@7e804000 {};\n\t};\n};`;
+	const fan_overlay = `/dts-v1/;\n/plugin/;\n/ {\n\tbusfrag: fragment@100 {\n\t\ttarget = <&i2c1>;\n\t\ti2cbus: __overlay__ {\n\t\t\tstatus = "okay";\n\t\t};\n\t};\n\tfragment@0 {\n\t\ttarget = <&i2cbus>;\n\t\t__dormant__ {\n\t\t\temc2301: emc2301@2f { reg = <0x2f>; };\n\t\t};\n\t};\n};`;
+
+	test("all_labels — a label on __overlay__ names the target; __dormant__ bodies count", () => {
+		const base = DeviceTree.new_from_string(fan_base);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(fan_overlay, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const labels = overlay.all_labels();
+		expect(labels.get("i2cbus")).toBe("/soc/i2c@7e804000");
+		expect(labels.get("emc2301")).toBe("/soc/i2c@7e804000/emc2301@2f");
+		expect(labels.has("busfrag")).toBe(false);
+	});
+
+	test("taken_labels — adds the labels on fragment nodes", () => {
+		const base = DeviceTree.new_from_string(fan_base);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(fan_overlay, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const labels = overlay.taken_labels();
+		expect(labels.get("busfrag")).toBe("/fragment@100");
+		expect([...labels.keys()].sort()).toEqual(["busfrag", "emc2301", "i2c1", "i2cbus"]);
+	});
+
+	const overlay_on = (base_source: string, overlay_source: string): DeviceTreeOverlay => {
+		const base = DeviceTree.new_from_string(base_source);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DeviceTreeOverlay.new_from_string(overlay_source, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		return overlay;
+	};
+	const fragment_with = (overlay: DeviceTreeOverlay, unit: string): DTNode => {
+		const fragment = overlay.get_fragments().find(f => f.unit_addr === unit);
+		if (fragment === undefined) { throw new TypeError(`no fragment@${unit}`); }
+		return fragment;
+	};
+
+	test("get_fragment_root_path — a target labelled on another fragment's body, or a node in one", () => {
+		const overlay = overlay_on(fan_base, `/dts-v1/;\n/plugin/;\n/ {\n\tfragment@100 {\n\t\ttarget = <&i2c1>;\n\t\ti2cbus: __overlay__ {\n\t\t\tmux: mux@70 { reg = <0x70>; };\n\t\t};\n\t};\n\tfragment@0 {\n\t\ttarget = <&i2cbus>;\n\t\t__overlay__ {\n\t\t\tadc@48 { reg = <0x48>; };\n\t\t};\n\t};\n\tfragment@1 {\n\t\ttarget = <&mux>;\n\t\t__overlay__ { status = "okay"; };\n\t};\n};`);
+		expect(overlay.get_fragment_root_path(fragment_with(overlay, "0"))).toBe("/soc/i2c@7e804000");
+		expect(overlay.get_fragment_root_path(fragment_with(overlay, "1"))).toBe("/soc/i2c@7e804000/mux@70");
+		expect([...overlay.effective_children("/soc/i2c@7e804000").keys()]).toEqual(["mux@70", "adc@48"]);
+		expect(overlay.find_node("/soc/i2c@7e804000/adc@48")?.is_in_base).toBe(false);
+		expect(overlay.find_node("i2cbus")).toMatchObject({ node_path: "/soc/i2c@7e804000", is_in_base: true });
+	});
+
+	test("get_fragment_root_path — the overlay's label wins over the base's, as in dtc", () => {
+		const overlay = overlay_on(fan_base, `/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 {\n\t\ttarget-path = "/";\n\t\t__overlay__ {\n\t\t\ti2c1: i2c-gpio@1 {};\n\t\t};\n\t};\n\tfragment@1 {\n\t\ttarget = <&i2c1>;\n\t\t__overlay__ { status = "okay"; };\n\t};\n};`);
+		expect(overlay.get_fragment_root_path(fragment_with(overlay, "1"))).toBe("/i2c-gpio@1");
+	});
+
+	const two_labels = `/dts-v1/;\n/ {\n\tsoc {\n\t\ti2c_arm: i2c1: i2c@7e804000 {};\n\t};\n};`;
+	const I2C = "/soc/i2c@7e804000";
+	const frequency = (value: bigint): DTProperty => PropertyBuilder.build_cell_array()
+		.with_cells(value)
+		.with_name("clock-frequency")
+		.build();
+
+	test("add_fragment — reuses the fragment for the node whatever label or path names it", () => {
+		const overlay = overlay_on(two_labels, `/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 {\n\t\ttarget = <&i2c_arm>;\n\t\t__overlay__ { status = "okay"; };\n\t};\n};`);
+		expect(overlay.add_fragment("i2c1", undefined, frequency(100_000n))).toBe(true);
+		expect(overlay.add_fragment({ kind: "path", labels: [], path: I2C }, undefined, frequency(400_000n))).toBe(true);
+		expect(overlay.get_fragments()).toHaveLength(1);
+		expect(overlay.overlay_properties(I2C).map(p => p.name)).toEqual(["status", "clock-frequency"]);
+		expect(overlay.remove_property("i2c1", "clock-frequency")).toBe(true);
+		expect(overlay.overlay_properties(I2C).map(p => p.name)).toEqual(["status"]);
+	});
+
+	const split = `/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 {\n\t\ttarget = <&i2c_arm>;\n\t\t__overlay__ { status = "okay"; clock-frequency = <100000>; };\n\t};\n\tfragment@1 {\n\t\ttarget = <&i2c1>;\n\t\t__overlay__ {\n\t\t\t#address-cells = <1>;\n\t\t\tclock-frequency = <400000>;\n\t\t\tadc@48 { reg = <0x48>; };\n\t\t};\n\t};\n\tfragment@2 {\n\t\ttarget-path = "/";\n\t\t__overlay__ {\n\t\t\tsoc {\n\t\t\t\ti2c@7e804000 { #size-cells = <0>; };\n\t\t\t};\n\t\t};\n\t};\n};`;
+
+	test("overlay_nodes_at — every fragment for the node, in file order; a later value wins", () => {
+		const overlay = overlay_on(two_labels, split);
+		expect(overlay.overlay_nodes_at(I2C)).toHaveLength(3);
+		expect(overlay.overlay_properties(I2C).map(p => p.name)).toEqual(["status", "clock-frequency", "#address-cells", "#size-cells"]);
+		expect(overlay.effective_node(I2C)?.properties.find(p => p.name === "clock-frequency")).toEqual(frequency(400_000n));
+		expect(overlay.property_node(I2C, "clock-frequency")).toBe(overlay.overlay_nodes_at(I2C)[1]);
+		expect(overlay.property_node(I2C, "#size-cells")).toBe(overlay.overlay_nodes_at(I2C)[2]);
+		expect(overlay.property_node(I2C, "nope")).toBeUndefined();
+	});
+
+	test("add_fragment / remove_property — a property goes where its applied value is, and goes from every fragment", () => {
+		const overlay = overlay_on(two_labels, split);
+		overlay.add_fragment("i2c_arm", undefined, frequency(1_000_000n));
+		const [first, second] = overlay.overlay_nodes_at(I2C);
+		expect(first?.properties.find(p => p.name === "clock-frequency")).toEqual(frequency(100_000n));
+		expect(second?.properties.find(p => p.name === "clock-frequency")).toEqual(frequency(1_000_000n));
+		expect(overlay.remove_property("i2c1", "clock-frequency")).toBe(true);
+		expect(overlay.property_node(I2C, "clock-frequency")).toBeUndefined();
+		expect(overlay.remove_property("i2c1", "clock-frequency")).toBe(false);
+	});
+
+	test("get_fragment_root_path — targets that name each other resolve to nothing", () => {
+		const overlay = overlay_on(fan_base, `/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 {\n\t\ttarget = <&b>;\n\t\ta: __overlay__ {};\n\t};\n\tfragment@1 {\n\t\ttarget = <&a>;\n\t\tb: __overlay__ {};\n\t};\n};`);
+		expect(overlay.get_fragment_root_path(fragment_with(overlay, "0"))).toBeUndefined();
+		expect(overlay.get_fragment_root_path(fragment_with(overlay, "1"))).toBeUndefined();
+	});
+
+	test("print_full — the base included, a block per fragment: base labels kept, other targets by path, the root as /", () => {
+		const overlay = overlay_on(fan_base, [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target-path = \"/\"; __overlay__ { vref: regulator { compatible = \"regulator-fixed\"; }; }; };",
+			"\tfragment@1 { target = <&i2c1>; __overlay__ { status = \"okay\"; adc: adc@48 { reg = <0x48>; }; }; };",
+			"\tfragment@2 { target = <&adc>; __overlay__ { vref-supply = <&vref>; }; };",
+			"\tfragment@3 { target-path = \"/soc\"; __overlay__ { ranges; }; };",
+			"};",
+		].join("\n"));
+		const printed = overlay.print_full("../linux/board.dts");
+		expect(printed).toEqual(Result.Ok([
+			"/dts-v1/;",
+			"#include \"../linux/board.dts\"",
+			"",
+			"/ {",
+			"\tvref: regulator {",
+			"\t\tcompatible = \"regulator-fixed\";",
+			"\t};",
+			"};",
+			"",
+			"&i2c1 {",
+			"\tstatus = \"okay\";",
+			"\tadc: adc@48 {",
+			"\t\treg = <0x48>;",
+			"\t};",
+			"};",
+			"",
+			"&{/soc/i2c@7e804000/adc@48} {",
+			"\tvref-supply = <&vref>;",
+			"};",
+			"",
+			"&{/soc} {",
+			"\tranges;",
+			"};",
+			"",
+		].join("\n")));
+	});
+
+	test("print_full — labels on a body go before its reference; __dormant__ bodies and __overrides__ are left out", () => {
+		const overlay = overlay_on(fan_base, fan_overlay.replace("};\n};", "};\n\t__overrides__ { fan = <&busfrag>, \"target:0=\", <&i2c1>; };\n};"));
+		const printed = overlay.print_full("board.dts");
+		expect(printed).toEqual(Result.Ok("/dts-v1/;\n#include \"board.dts\"\n\ni2cbus: &i2c1 {\n\tstatus = \"okay\";\n};\n"));
+
+		const two = overlay_on(fan_base, "/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 { target-path = \"/\"; a: b: __overlay__ { x; }; };\n};");
+		expect(two.print_full("board.dts")).toEqual(Result.Ok("/dts-v1/;\n#include \"board.dts\"\n\na: &{/} {\n\tx;\n};\n\nb: &{/} {\n};\n"));
+	});
+
+	const flag = (name: string): DTProperty => PropertyBuilder.build_flag().set_flag().with_name(name).build();
+
+	test("unchanged — the same children inside as outside; a change after it is seen, also when read threw", () => {
+		const overlay = overlay_on(fan_base, "/dts-v1/;\n/plugin/;\n&i2c1 { a@1 { reg = <1>; }; };\n");
+		const names = (): string[] => [...overlay.effective_children("/soc/i2c@7e804000").keys()];
+		expect(overlay.unchanged(() => names())).toEqual(names());
+
+		overlay.unchanged(() => names());
+		overlay.add_fragment("/soc", undefined, flag("ranges"));
+		expect(overlay.get_fragments()).toHaveLength(2);
+
+		expect(() => overlay.unchanged(() => { names(); throw new Error("read failed"); })).toThrow("read failed");
+		overlay.add_fragment("/", undefined, flag("dma-coherent"));
+		expect(overlay.get_fragments()).toHaveLength(3);
+	});
+
+	test("print_full — the fragments whose target resolves to no node are the error", () => {
+		const overlay = overlay_on(fan_base, "/dts-v1/;\n/plugin/;\n&nope { x; };\n&i2c1 { y; };\n");
+		expect(overlay.print_full("board.dts")).toEqual(Result.Err(["fragment@0"]));
+	});
+
+	const applied_order = (overlay: DeviceTreeOverlay): number[] => overlay.applied_fragments().applied.map(entry => entry.index);
+
+	test("applied_fragments — a fragment on a node a later fragment adds comes right after that fragment", () => {
+		const overlay = overlay_on(fan_base, [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target = <&ts>; __overlay__ { touchscreen-inverted-x; p = <1>; }; };",
+			"\tfragment@1 { target = <&i2c1>; __overlay__ { ts: ts@38 { reg = <0x38>; p = <2>; }; }; };",
+			"};",
+		].join("\n"));
+		const { applied, unplaced } = overlay.applied_fragments();
+		expect(applied.map(entry => [entry.index, entry.path])).toEqual([[1, "/soc/i2c@7e804000"], [0, "/soc/i2c@7e804000/ts@38"]]);
+		expect(unplaced).toEqual([]);
+		expect(overlay.print_full("board.dts")).toEqual(Result.Ok([
+			"/dts-v1/;",
+			"#include \"board.dts\"",
+			"",
+			"&i2c1 {",
+			"\tts: ts@38 {",
+			"\t\treg = <0x38>;",
+			"\t\tp = <2>;",
+			"\t};",
+			"};",
+			"",
+			"&{/soc/i2c@7e804000/ts@38} {",
+			"\ttouchscreen-inverted-x;",
+			"\tp = <1>;",
+			"};",
+			"",
+		].join("\n")));
+	});
+
+	test("applied_fragments — waiting fragments keep their file order, and one may wait on a node another waiting one adds", () => {
+		const two = overlay_on(fan_base, [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target = <&ts>; __overlay__ { a; }; };",
+			"\tfragment@1 { target = <&ts>; __overlay__ { b; }; };",
+			"\tfragment@2 { target = <&i2c1>; __overlay__ { ts: ts@38 { reg = <0x38>; }; }; };",
+			"};",
+		].join("\n"));
+		expect(applied_order(two)).toEqual([2, 0, 1]);
+
+		const chain = overlay_on(fan_base, [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target = <&inner>; __overlay__ { a; }; };",
+			"\tfragment@1 { target = <&ts>; __overlay__ { inner: sub { }; }; };",
+			"\tfragment@2 { target = <&i2c1>; __overlay__ { ts: ts@38 { reg = <0x38>; }; }; };",
+			"};",
+		].join("\n"));
+		expect(applied_order(chain)).toEqual([2, 1, 0]);
+	});
+
+	test("applied_fragments — a target only a __dormant__ body adds is unplaced, with the unresolved ones in file order", () => {
+		const dormant = overlay_on(fan_base, [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target = <&ts>; __overlay__ { a; }; };",
+			"\tfragment@1 { target = <&i2c1>; __dormant__ { ts: ts@38 { reg = <0x38>; }; }; };",
+			"};",
+		].join("\n"));
+		expect(dormant.print_full("board.dts")).toEqual(Result.Err(["fragment@0"]));
+
+		const mixed = overlay_on(fan_base, [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target = <&ts>; __overlay__ { a; }; };",
+			"\tfragment@1 { target = <&nope>; __overlay__ { b; }; };",
+			"\tfragment@2 { target = <&i2c1>; __overlay__ { c; }; };",
+			"\tfragment@3 { target = <&i2c1>; __dormant__ { ts: ts@38 { reg = <0x38>; }; }; };",
+			"};",
+		].join("\n"));
+		expect(mixed.applied_fragments()).toEqual({
+			applied: [expect.objectContaining({ index: 2, path: "/soc/i2c@7e804000" })],
+			unplaced: ["fragment@0", "fragment@1"],
+		});
+	});
+
+	const alias_base = `/dts-v1/;\n/ {\n\taliases {\n\t\tspi0 = &spi0;\n\t\tbypath = &{/soc/spi@1};\n\t\tbystring = "/soc/other@2";\n\t\tlbl = &other;\n\t};\n\tsoc {\n\t\tspi0: spi@1 { x@0 { }; };\n\t\tlbl: spi@3 { x@0 { }; };\n\t\tother: other@2 { x@0 { }; };\n\t};\n};`;
+
+	test("applied_fragments — a target-path that isn't absolute begins with an alias of the base, as the loader reads it", () => {
+		const overlay = overlay_on(alias_base, [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target-path = \"spi0/x@0\"; __overlay__ { a; }; };",
+			"\tfragment@1 { target-path = \"bypath/x@0\"; __overlay__ { b; }; };",
+			"\tfragment@2 { target-path = \"bystring\"; __overlay__ { c; }; };",
+			"\tfragment@3 { target-path = \"lbl/x@0\"; __overlay__ { d; }; };",
+			"\tfragment@4 { target-path = \"nope/x@0\"; __overlay__ { e; }; };",
+			"};",
+		].join("\n"));
+		const { applied, unplaced } = overlay.applied_fragments();
+		expect(applied.map(entry => [entry.index, entry.path])).toEqual([
+			[0, "/soc/spi@1/x@0"], [1, "/soc/spi@1/x@0"], [2, "/soc/other@2"], [3, "/soc/other@2/x@0"],
+		]);
+		expect(unplaced).toEqual(["fragment@4"]);
+	});
+
+	test("print_full — a target-path by alias is written by the absolute path it resolves to", () => {
+		const overlay = overlay_on(alias_base, "/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 { target-path = \"spi0/x@0\"; __overlay__ { status = \"disabled\"; }; };\n};\n");
+		expect(overlay.print_full("board.dts")).toEqual(Result.Ok("/dts-v1/;\n#include \"board.dts\"\n\n&{/soc/spi@1/x@0} {\n\tstatus = \"disabled\";\n};\n"));
+	});
+
+	const waiting_overlay = [
+		"/dts-v1/;", "/plugin/;", "/ {",
+		"\tfragment@0 { target = <&ts>; __overlay__ { p = <1>; sub { r = <1>; }; }; };",
+		"\tfragment@1 { target = <&i2c1>; __overlay__ { ts: ts@38 { reg = <0x38>; p = <2>; sub { r = <2>; }; }; }; };",
+		"};",
+	].join("\n");
+
+	test("merged_tree — a fragment on a node a later fragment adds applies after it, as in print_full", () => {
+		const overlay = overlay_on(fan_base, waiting_overlay);
+		const ts = overlay.merged_tree()?.node_at("/soc/i2c@7e804000/ts@38");
+		expect([ts?.name, ts?.unit_addr, ts?.labels]).toEqual(["ts", "38", ["ts"]]);
+		const printed = overlay.merged_tree()?.print() ?? "";
+		expect(printed).toContain("ts: ts@38 {\n\t\t\t\treg = <0x38>;\n\t\t\t\tp = <1>;\n\t\t\t\tsub {\n\t\t\t\t\tr = <1>;\n\t\t\t\t};\n\t\t\t};");
+		expect(printed).not.toContain("__overlay__");
+	});
+
+	test("effective_node — the waiting fragment's properties win; property_node names its body", () => {
+		const overlay = overlay_on(fan_base, waiting_overlay);
+		const node = overlay.effective_node("/soc/i2c@7e804000/ts@38");
+		expect(node?.name).toBe("ts");
+		expect(node?.properties.map(property => print_property(property, "", 0).trim())).toEqual(["reg = <0x38>;", "p = <1>;"]);
+		expect(overlay.property_node("/soc/i2c@7e804000/ts@38", "p")?.name).toBe("__overlay__");
+		expect(overlay.property_node("/soc/i2c@7e804000/ts@38", "reg")?.name).toBe("ts");
+	});
+
+	test("effective_children — an unplaced fragment adds no node: a target only a __dormant__ body adds, a target-path that names none", () => {
+		const overlay = overlay_on(fan_base, [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target = <&ts>; __overlay__ { p = <1>; }; };",
+			"\tfragment@1 { target = <&i2c1>; __dormant__ { ts: ts@38 { reg = <0x38>; }; }; };",
+			"\tfragment@2 { target-path = \"/nowhere\"; __overlay__ { q; }; };",
+			"};",
+		].join("\n"));
+		expect(overlay.effective_children("/soc/i2c@7e804000").has("ts@38")).toBe(false);
+		expect(overlay.effective_children("/").has("nowhere")).toBe(false);
+		expect(overlay.merged_tree()?.print()).not.toContain("__overlay__");
+	});
+
+	const pins_base = `/dts-v1/;\n/ {\n\tsoc {\n\t\tgpio: gpio@7e200000 {\n\t\t\tuart0_pins: uart0_pins { };\n\t\t};\n\t\tuart0: serial@7e201000 { };\n\t\ti2c1: i2c@7e804000 { };\n\t};\n};`;
+
+	test("print_full — a label the base has on another node is renamed <label>_1, with the overlay's references to it", () => {
+		const overlay = overlay_on(pins_base, [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target = <&gpio>; __overlay__ { uart0_pins: uart0_ovl_pins { brcm,pins = <14 15>; }; }; };",
+			"\tfragment@1 { target = <&uart0>; __overlay__ { pinctrl-0 = <&uart0_pins>; }; };",
+			"};",
+		].join("\n"));
+		expect(overlay.print_full("board.dts")).toEqual(Result.Ok([
+			"/dts-v1/;",
+			"#include \"board.dts\"",
+			"",
+			"&gpio {",
+			"\tuart0_pins_1: uart0_ovl_pins {",
+			"\t\tbrcm,pins = <14 15>;",
+			"\t};",
+			"};",
+			"",
+			"&uart0 {",
+			"\tpinctrl-0 = <&uart0_pins_1>;",
+			"};",
+			"",
+		].join("\n")));
+	});
+
+	test("print_full — a base label the overlay only references, or puts on the node the base labels, is kept", () => {
+		const referenced = overlay_on(pins_base, "/dts-v1/;\n/plugin/;\n&uart0 { pinctrl-0 = <&uart0_pins>; };\n");
+		expect(referenced.print_full("board.dts")).toEqual(Result.Ok("/dts-v1/;\n#include \"board.dts\"\n\n&uart0 {\n\tpinctrl-0 = <&uart0_pins>;\n};\n"));
+
+		const same = overlay_on(pins_base, [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target = <&i2c1>; i2c1: __overlay__ { x; }; };",
+			"\tfragment@1 { target-path = \"/soc\"; __overlay__ { gpio: gpio@7e200000 { y; }; }; };",
+			"};",
+		].join("\n"));
+		expect(same.print_full("board.dts")).toEqual(Result.Ok("/dts-v1/;\n#include \"board.dts\"\n\ni2c1: &i2c1 {\n\tx;\n};\n\n&{/soc} {\n\tgpio: gpio@7e200000 {\n\t\ty;\n\t};\n};\n"));
+	});
+
+	test("print_full — a taken <label>_1 gives <label>_2, on a body too; the overlay itself is unchanged", () => {
+		const overlay = overlay_on(pins_base.replace("uart0: serial", "uart0_pins_1: serial"), [
+			"/dts-v1/;", "/plugin/;", "/ {",
+			"\tfragment@0 { target = <&i2c1>; uart0_pins: __overlay__ { x = <&uart0_pins>; }; };",
+			"};",
+		].join("\n"));
+		const before = overlay.print();
+		expect(overlay.print_full("board.dts")).toEqual(Result.Ok("/dts-v1/;\n#include \"board.dts\"\n\nuart0_pins_2: &i2c1 {\n\tx = <&uart0_pins_2>;\n};\n"));
+		expect(overlay.print()).toBe(before);
+	});
+}

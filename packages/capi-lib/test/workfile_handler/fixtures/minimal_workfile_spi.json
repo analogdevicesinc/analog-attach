@@ -1,0 +1,10 @@
+{
+  "platform": "testsoc",
+  "symbols": {
+    "my_spi": {
+      "$compatible": "test_spi_config",
+      "identifier": 1,
+      "dma_handle": 2
+    }
+  }
+}

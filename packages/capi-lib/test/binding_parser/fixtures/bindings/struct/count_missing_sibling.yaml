@@ -1,0 +1,7 @@
+$type: struct
+$symbol: bad_init_param
+$description: "The count names a field this struct does not have"
+devices:
+  include: "test/element"
+  pointer: true
+  count: nb_devices

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skill.schema.json",
+  "title": "skill response",
+  "description": "Standard output of skill install and skill uninstall in JSON mode (SKILL-030), the list of the backend's skills with no name (SKILL-022), or a refusal (SKILL-001, SKILL-002, SKILL-010, SKILL-040). The front end's: the same for every backend.",
+  "$defs": {
+    "agent": { "enum": ["claude", "codex", "gemini"], "description": "The AI agent (SKILL-040): Claude Code, Codex CLI, Gemini CLI." },
+    "path": { "type": "string", "pattern": "^/", "description": "The skill's directory, absolute: ~/.claude/skills/<name>, ~/.agents/skills/<name> or ~/.gemini/skills/<name>." }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "message", "severity", "path", "agent"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^(Installed skill .+ to|Removed skill .+ from) /.+$" },
+        "severity": { "const": "info" },
+        "path": { "$ref": "#/$defs/path" },
+        "agent": { "$ref": "#/$defs/agent" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "skill install or skill uninstall with --agent all (SKILL-041): each agent it was done for.",
+      "type": "object",
+      "required": ["ok", "message", "severity", "agents"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^(Installed skill .+ to|Removed skill .+ from) /.+$" },
+        "severity": { "const": "info" },
+        "agents": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["agent", "path"],
+            "properties": {
+              "agent": { "$ref": "#/$defs/agent" },
+              "path": { "$ref": "#/$defs/path" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "skill install or skill uninstall with no name (SKILL-022): a skill and an agent per item.",
+      "type": "object",
+      "required": ["ok", "message", "severity", "skills"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^(Skills of the .+ backend: .+|The .+ backend has no skills)$" },
+        "severity": { "const": "info" },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "about", "installed", "path", "agent"],
+            "properties": {
+              "name": { "type": "string" },
+              "about": { "type": "string" },
+              "installed": { "type": "boolean" },
+              "path": { "$ref": "#/$defs/path" },
+              "agent": { "$ref": "#/$defs/agent" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/refusal" }
+  ]
+}

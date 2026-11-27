@@ -1,0 +1,7 @@
+$type: struct
+$symbol: test_spi_extra
+$description: "Platform specific SPI configuration"
+$capability: spi
+dma_channel:
+  type: uint8_t
+  description: "Which DMA channel the controller uses"

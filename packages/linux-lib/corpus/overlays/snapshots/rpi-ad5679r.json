@@ -1,0 +1,67 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "pwm_pins",
+          "brcm,function"
+        ],
+        "message": "pwm_pins: brcm,function: b'\\x00\\x00\\x00\\x02' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "pwm_pins",
+          "brcm,pins"
+        ],
+        "message": "pwm_pins: brcm,pins: b'\\x00\\x00\\x00\\x12' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "ad5679r@0"
+        ],
+        "message": "ad5679r@0 (adi,ad5679r): 'vdd-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/adi,ad5686.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "ad5679r@0"
+        ],
+        "message": "ad5679r@0 (adi,ad5679r): 'vlogic-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/adi,ad5686.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "ad5679r@0"
+        ],
+        "message": "ad5679r@0 (adi,ad5679r): Unevaluated properties are not allowed ('interrupt-parent', 'interrupts', 'pwm-names', 'pwms', 'spi-cpha' were unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/adi,ad5686.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [
+      {
+        "parent_path": "/soc/spi@7e204000",
+        "nodes": [
+          "spidev@0",
+          "ad5679r@0"
+        ],
+        "address": "0x0",
+        "in_overlay": [
+          false,
+          true
+        ]
+      }
+    ],
+    "chip_select_overflows": []
+  }
+}

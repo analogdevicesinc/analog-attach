@@ -1,0 +1,4 @@
+$type: extern
+$symbol: iio_test_device
+$provides: "test/iio_device"
+$header: "drivers/test/iio_test.h"

@@ -1,0 +1,14 @@
+# $switch on the child's own property, writing to the parent's speed.
+$type: struct
+$symbol: child
+child_mode:
+  type: enum
+  values: [a, b]
+$override:
+  - $switch:
+      $on: child_mode
+      $cases:
+        a:
+          $parent:
+            speed:
+              minimum: 100

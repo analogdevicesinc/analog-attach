@@ -1,0 +1,15 @@
+$type: struct
+$symbol: test_struct
+enabled:
+  type: bool
+
+count:
+  type: uint32_t
+
+$override:
+  - $if:
+      enabled:
+        required: true
+    $then:
+      count:
+        default: 0

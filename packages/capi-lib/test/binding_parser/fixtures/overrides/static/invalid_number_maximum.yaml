@@ -1,0 +1,10 @@
+$type: struct
+$symbol: test_struct
+value:
+  type: uint8_t
+  minimum: 0
+  maximum: 100
+
+$override:
+  - value:
+      maximum: 200

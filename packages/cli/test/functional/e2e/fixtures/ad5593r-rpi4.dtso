@@ -1,0 +1,25 @@
+/dts-v1/;
+/plugin/;
+/ {
+	fragment@0 {
+		target = <&i2c_arm>;
+		__overlay__ {
+			ad5593r: adi,ad5593r@10 {
+				compatible = "adi,ad5593r";
+				reg = <0x10>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				vref-supply = <&vdd_3v3_reg>;
+				channel@0 {
+					reg = <0>;
+					adi,mode = <1>;
+				};
+				channel@3 {
+					reg = <3>;
+					adi,mode = <2>;
+					adi,off-state = <0>;
+				};
+			};
+		};
+	};
+};

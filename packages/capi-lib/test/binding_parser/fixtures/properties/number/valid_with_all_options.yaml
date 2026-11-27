@@ -1,0 +1,6 @@
+type: uint32_t
+description: "A fully configured number property"
+required: true
+default: 42
+minimum: 0
+maximum: 1000

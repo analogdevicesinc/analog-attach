@@ -1,0 +1,6 @@
+type: union
+members:
+  - first_key:
+      include: "first.yaml"
+    second_key:
+      include: "second.yaml"

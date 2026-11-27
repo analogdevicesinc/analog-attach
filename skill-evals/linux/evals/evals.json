@@ -1,0 +1,188 @@
+{
+  "skill_name": "analog-attach-linux",
+  "evals": [
+    {
+      "id": "ad7124-spi0-cs1",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "In my analog-attach project at /workspace/rpi4 (a Raspberry Pi 4), add an AD7124-8 ADC to the overlay. It is on SPI0, chip select 1; nothing else uses that chip select, so the spidev there can go. Its RDY/DOUT interrupt is wired to GPIO 25, falling edge. Channel 0 measures AIN0 against AIN1, differential. Make sure the overlay validates.",
+      "expected_output": "The project's overlay adds an AD7124-8 on SPI0 at chip select 1 with its interrupt on GPIO 25, falling edge, and channel 0 measuring AIN0/AIN1; the spidev on chip select 1 is disabled, SPI0 is enabled, and the overlay validates with no errors and no conflicts.",
+      "assertions": [
+        "The overlay has an adi,ad7124-8 node under SPI0 with reg 1",
+        "The ADC's interrupt is GPIO 25 of the gpio controller, falling edge",
+        "Channel 0 has diff-channels 0 1",
+        "The spidev on chip select 1 is disabled and SPI0 is enabled",
+        "validate reports no errors",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "adxl345-i2c1",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "Add an ADXL345 accelerometer to my Raspberry Pi 4 overlay (the analog-attach project in /workspace/rpi4). It is on I2C1 at address 0x53, and its INT1 pin is wired to GPIO 4, rising edge.",
+      "expected_output": "The project's overlay adds an ADXL345 on I2C1 at address 0x53 with its interrupt on GPIO 4, rising edge, enables I2C1, and validates with no errors.",
+      "assertions": [
+        "The overlay has an adi,adxl345 node under I2C1 with reg 0x53",
+        "The accelerometer's interrupt is GPIO 4 of the gpio controller, rising edge",
+        "I2C1 is enabled",
+        "validate reports no errors",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "adxl345-spi0-cs0",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "My ADXL345 is wired to SPI0, chip select 0, of my Raspberry Pi 4 (analog-attach project in /workspace/rpi4). It runs in SPI mode 3 at up to 5 MHz, and INT1 is on GPIO 17, rising edge. It replaces whatever the board had on CS0. Add it to the overlay.",
+      "expected_output": "The project's overlay adds an ADXL345 on SPI0 at chip select 0 in SPI mode 3 at 5 MHz with its interrupt on GPIO 17, rising edge; the spidev on chip select 0 is disabled, SPI0 is enabled, and the overlay validates with no errors and no conflicts.",
+      "assertions": [
+        "The overlay has an adi,adxl345 node under SPI0 with reg 0",
+        "The node has spi-cpol, spi-cpha and spi-max-frequency 5000000",
+        "The accelerometer's interrupt is GPIO 17, rising edge",
+        "The spidev on chip select 0 is disabled and SPI0 is enabled",
+        "validate reports no errors",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "hmc425a-gpios",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "Add an HMC425A digital step attenuator to my Raspberry Pi 4 overlay (analog-attach project in /workspace/rpi4). Its control inputs V1 to V6 are driven by GPIOs 5, 6, 13, 19, 26 and 21, in that order, all active high.",
+      "expected_output": "The project's overlay adds an HMC425A whose ctrl-gpios are GPIOs 5, 6, 13, 19, 26 and 21 of the gpio controller, in that order, active high, and validates with no errors.",
+      "assertions": [
+        "The overlay has an adi,hmc425a node",
+        "Its ctrl-gpios list six rows on the gpio controller: lines 5, 6, 13, 19, 26 and 21, active high",
+        "validate reports no errors",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "setup-fresh",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "Set up a new analog-attach project in /workspace/fresh for a Raspberry Pi 4 Model B running the 32-bit Kuiper. The kernel source is in /opt/linux. Name the overlay rpi4.dtso.",
+      "expected_output": "/workspace/fresh is an analog-attach project on the linux backend, with /opt/linux as its kernel tree, the Raspberry Pi 4 Model B's 32-bit (arch/arm) devicetree as its base, and rpi4.dtso created as its overlay, ready for adding devices.",
+      "assertions": [
+        "The project's backend is linux and its kernel tree /opt/linux",
+        "Its base devicetree is arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts, the 32-bit one the request names (the tree has an arch/arm64 one too)",
+        "Its workfile is /workspace/fresh/rpi4.dtso, and the file exists",
+        "Commands that need the binding caches work in the project",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "import-ad7124-overlay",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "I have an AD7124-8 on a Raspberry Pi 4 with all of its inputs used as differential pairs. The kernel tree in /opt/linux already has a Raspberry Pi overlay for exactly that. Start my analog-attach project in /workspace/rpi4 from that overlay instead of writing one.",
+      "expected_output": "The project's configured overlay is the kernel tree's rpi-ad7124-8-all-diff overlay: an AD7124-8 on SPI0 with eight differential channels, AIN0/AIN1 to AIN14/AIN15.",
+      "assertions": [
+        "The configured workfile adds an adi,ad7124-8 node under SPI0",
+        "Its eight channels have diff-channels 0 1, 2 3, … 14 15",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "fix-validation",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "analog-attach validate reports errors on the overlay of my project in /workspace/rpi4-broken. Fix them. For reference: the AD7124-8's interrupt is on GPIO 25, falling edge, and channel 0 measures AIN2 against AIN3 with the ADC's internal reference.",
+      "expected_output": "The AD7124-8 has its interrupt on GPIO 25, falling edge, channel 0 measures AIN2/AIN3 and selects no external reference (so the internal one is used), and validate reports no errors.",
+      "assertions": [
+        "The ADC's interrupt is GPIO 25 of the gpio controller, falling edge",
+        "Channel 0 has diff-channels 2 3",
+        "Channel 0 has no adi,reference-select (the internal reference)",
+        "validate reports no errors",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "refin1-regulator",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "In my analog-attach project in /workspace/rpi4-adc, the AD7124-8's REFIN1 input is fed by an external 2.5 V voltage reference that is always on. Describe that reference in the overlay and connect it to the ADC.",
+      "expected_output": "The overlay has a fixed 2.5 V regulator for the reference, and the ADC's refin1-supply names it; the overlay validates with no errors.",
+      "assertions": [
+        "The overlay has a regulator-fixed node with minimum and maximum 2500000 microvolts",
+        "The ADC's refin1-supply names that regulator",
+        "validate reports no errors",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "rewire-cs0",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "I moved my AD7124-8 from chip select 1 to chip select 0 of SPI0. Update the overlay of my analog-attach project in /workspace/rpi4-adc to match; the ADC replaces what the board had on CS0.",
+      "expected_output": "The AD7124-8 is on SPI0 at chip select 0, the spidev on chip select 0 is disabled, and the overlay validates with no errors and no chip-select conflicts.",
+      "assertions": [
+        "The ADC node under SPI0 has reg 0",
+        "The spidev on chip select 0 is disabled",
+        "validate reports no errors and no conflicts",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "build-overlay",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "Compile the overlay of my analog-attach project in /workspace/rpi4-adc so I can copy the .dtbo to my Raspberry Pi.",
+      "expected_output": "The project's overlay is compiled to build/overlay.dtbo in the project, a devicetree overlay that applies to the Raspberry Pi 4 base and adds the AD7124-8.",
+      "assertions": [
+        "/workspace/rpi4-adc/build/overlay.dtbo exists",
+        "It applies to the base devicetree and adds the adi,ad7124-8 node on SPI0"
+      ]
+    },
+    {
+      "id": "deploy-settings",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "My Raspberry Pi isn't on the default Kuiper settings: it is at 192.168.2.10 and the user is pi. Set up my analog-attach project in /workspace/rpi4-adc to deploy there, but don't deploy now: I'll run the deploy myself and give the password then.",
+      "expected_output": "The project's deploy settings name the board at 192.168.2.10 with user pi, and the board's password is still a secret given at deploy time, not stored in the project.",
+      "assertions": [
+        "The project variable BOARD_IP is 192.168.2.10",
+        "The project variable BOARD_USER is pi",
+        "BOARD_PASSWORD is still declared as a secret, with no value stored",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "ask-wiring",
+      "expected_skill": "analog-attach-linux",
+      "expected_script": null,
+      "files": [],
+      "prompt": "Add an AD7124-8 ADC to the overlay of my analog-attach project in /workspace/rpi4.",
+      "expected_output": "The agent doesn't guess where the ADC is wired: it asks the user which SPI bus and chip select it is on and where its interrupt goes, and adds nothing to the overlay until it knows.",
+      "assertions": [
+        "The agent's final message asks the user how the ADC is wired (the SPI bus, chip select or interrupt line)",
+        "The overlay has no adi,ad7124-8 node placed on a guessed bus",
+        "The overlay is not built (no .dtbo or .dtb in the project outside .analog-attach/): the request didn't ask for a build"
+      ]
+    },
+    {
+      "id": "negative-count-dts",
+      "expected_skill": null,
+      "expected_script": null,
+      "files": [],
+      "prompt": "How many of the .dts files directly in /opt/linux/arch/arm/boot/dts/broadcom have bcm2711 in their file name? Write just the number to /workspace/output/count.txt.",
+      "expected_output": "/workspace/output/count.txt holds the number of .dts files in that folder whose name contains bcm2711, and no project is changed.",
+      "assertions": [
+        "count.txt holds the right number",
+        "The overlay of /workspace/rpi4 is unchanged"
+      ]
+    }
+  ]
+}

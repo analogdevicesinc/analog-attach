@@ -1,0 +1,480 @@
+import type { IncludeProperty, OverrideReference, OverridePredicate, Property, Rule } from "../ruleset_parser/types";
+import type { Workfile } from "../workfile_handler/types";
+import type { CollectedRule, ConnectionGraph, ReferenceKind, SymbolReference } from "./types";
+import { load_resolved_ruleset } from "../resolver/resolver";
+
+// A `pointer: true` include stores only an address, so it is not an ordering
+// constraint; anything else embeds the referenced struct by value and is.
+function kind_of(pointer: boolean | undefined): ReferenceKind {
+	return pointer === true ? "pointer" : "value";
+}
+
+// An include whose target is an enum stores an enum value, not a symbol name, so it
+// makes no edges and must not be renamed. `include_type` can never name an enum
+// ruleset's *values*, only its kind, so it is never one of these.
+function is_enum_include(include: IncludeProperty): boolean {
+	if (include.include === undefined) {
+		return false;
+	}
+
+	const resolved = load_resolved_ruleset(include.include);
+	return resolved.ok && resolved.value._t === "RulesetEnum";
+}
+
+// A reference is either a whole node ("accel_iio") or one readonly member of one
+// ("accel_iio.iio_dev"). The graph only ever knows about nodes, so the edge — and the
+// ordering it forces — belongs to the owner either way.
+function owner_of(value: string): string {
+	const dot = value.indexOf(".");
+	return dot === -1 ? value : value.slice(0, dot);
+}
+
+// Rename the owner half of a reference, leaving the member half alone.
+function rewrite_reference(value: string, old_name: string, new_name: string): string {
+	const dot = value.indexOf(".");
+	if (dot === -1) {
+		return value === old_name ? new_name : value;
+	}
+
+	return value.slice(0, dot) === old_name ? `${new_name}${value.slice(dot)}` : value;
+}
+
+export function get_symbol_references(property: Property): SymbolReference[] {
+	switch (property._t) {
+		case "IncludeProperty": {
+			if (typeof property.value === "string") {
+				return [{ name: owner_of(property.value), kind: kind_of(property.pointer) }];
+			}
+			return [];
+		}
+		case "UnionProperty": {
+			const value = property.value as Record<string, string | null> | undefined;
+			if (!value) {
+				return [];
+			}
+			// Each member carries its own `pointer` flag (codegen already emits
+			// `{ .member = &ref }` vs `{ .member = ref }` from it), so classify per
+			// member rather than per union. No schema sets it on a member today, so
+			// every union reference is currently a value edge. A member chosen with no
+			// value yet (`update <node> <union> <member>`) references nothing.
+			return Object.entries(value)
+				.filter((entry): entry is [string, string] => typeof entry[1] === "string")
+				.map(([member_name, reference]) => ({
+					name: owner_of(reference),
+					kind: kind_of(property.members.find(m => m.name === member_name)?.pointer),
+				}));
+		}
+		case "ArrayProperty": {
+			if (property.element._t === "IncludeProperty" && Array.isArray(property.value)) {
+				// Check if the include points to an enum - enum values are not symbol references
+				if (is_enum_include(property.element)) {
+					return [];
+				}
+				// Every element shares the element declaration, so one kind for all of
+				// them: an array of pointer includes (i3c's `devs`) is a pointer edge,
+				// an array of embedded structs (ad7124's `setups`) is a value edge.
+				const kind = kind_of(property.element.pointer);
+				return (property.value as string[]).map(name => ({ name: owner_of(name), kind }));
+			}
+			return [];
+		}
+		case "PlatformExtraProperty": {
+			// Emitted as `&extra` (it is `void *` in C), so strictly a pointer. Kept as a
+			// value edge on purpose: platform structs never reference anything back, so
+			// they cannot form a cycle, and relaxing them would reshuffle the struct
+			// order in every existing project's common_data.c for no gain.
+			if (typeof property.value === "string") {
+				return [{ name: property.value, kind: "value" }];
+			}
+			return [];
+		}
+		case "DriverInitParameterProperty":
+		case "DriverOpsProperty": {
+			// The driver's init_param (`void *extra`) and ops table (an extern), by name. A
+			// value edge for the same reason as platform_extra: neither points back.
+			if (typeof property.value === "string") {
+				return [{ name: owner_of(property.value), kind: "value" }];
+			}
+			return [];
+		}
+		default: {
+			return [];
+		}
+	}
+}
+
+export function get_connected_symbols(property: Property): string[] {
+	return get_symbol_references(property).map(reference => reference.name);
+}
+
+// Rewrite every reference to `old_name` across all symbols to `new_name`. Mutates
+// property values in place, mirroring get_connected_symbols' knowledge of which
+// property shapes hold symbol references. Shapes with no references fall through.
+export function rename_symbol_references(workfile: Workfile, old_name: string, new_name: string): void {
+	for (const ruleset of Object.values(workfile.symbols)) {
+		// Only struct and descriptor nodes carry properties that can reference symbols.
+		if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
+			continue;
+		}
+		for (const property of ruleset.properties) {
+			switch (property._t) {
+				case "IncludeProperty":
+				case "PlatformExtraProperty": {
+					if (typeof property.value === "string") {
+						property.value = rewrite_reference(property.value, old_name, new_name);
+					}
+					break;
+				}
+				case "UnionProperty": {
+					const value = property.value as Record<string, string | null> | undefined;
+					if (value) {
+						for (const [member, target] of Object.entries(value)) {
+							if (typeof target === "string") {
+								value[member] = rewrite_reference(target, old_name, new_name);
+							}
+						}
+					}
+					break;
+				}
+				case "ArrayProperty": {
+					if (property.element._t === "IncludeProperty" && Array.isArray(property.value)) {
+						// Enum-backed includes hold enum values, not symbol references.
+						if (is_enum_include(property.element)) {
+							break;
+						}
+						property.value = (property.value as string[]).map(v => rewrite_reference(v, old_name, new_name));
+					}
+					break;
+				}
+				default:
+			}
+		}
+	}
+}
+
+export function create_connections_graph(workfile: Workfile): ConnectionGraph {
+	const graph: ConnectionGraph = new Map();
+
+	for (const symbol_name of Object.keys(workfile.symbols)) {
+		graph.set(symbol_name, []);
+	}
+
+	for (const [symbol_name, ruleset] of Object.entries(workfile.symbols)) {
+		// Descriptor nodes also carry properties (their `$init_param` include, plus their own members),
+		// so the descriptor -> $init_param edge is part of the graph.
+		if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
+			continue;
+		}
+
+		for (const property of ruleset.properties) {
+			for (const child of get_symbol_references(property)) {
+				const existing = graph.get(symbol_name) ?? [];
+				// A symbol referenced twice from the same parent is one edge. Keep the
+				// stronger kind: a value reference anywhere means the definition really
+				// is needed first, whatever the other reference does.
+				const duplicate = existing.find(reference => reference.name === child.name);
+				if (duplicate) {
+					if (child.kind === "value") {
+						duplicate.kind = "value";
+					}
+				} else {
+					existing.push(child);
+				}
+				graph.set(symbol_name, existing);
+			}
+		}
+	}
+
+	return graph;
+}
+
+export function child_names(graph: ConnectionGraph, symbol_name: string): string[] {
+	return (graph.get(symbol_name) ?? []).map(reference => reference.name);
+}
+
+export function value_children(graph: ConnectionGraph, symbol_name: string): string[] {
+	return (graph.get(symbol_name) ?? [])
+		.filter(reference => reference.kind === "value")
+		.map(reference => reference.name);
+}
+
+// Dependency-first order, plus any value-reference cycles that made a complete order
+// impossible. `cycles` empty means `order` covers every symbol; otherwise `order` holds
+// only what could be placed and the caller decides how to report the rest.
+// Each cycle lists its members in loop order, so `["a", "b"]` means a -> b -> a.
+export interface TopoResult {
+	order: string[];
+	cycles: string[][];
+}
+
+export function topo_sorted_symbols(workfile: Workfile): TopoResult {
+	const graph = create_connections_graph(workfile);
+	const dependencies = new Map<string, string[]>();
+	for (const name of graph.keys()) {
+		dependencies.set(name, value_children(graph, name));
+	}
+
+	const in_degree = new Map<string, number>();
+	for (const [parent, children] of dependencies) {
+		in_degree.set(parent, children.length);
+	}
+
+	const queue: string[] = [];
+	for (const [name, degree] of in_degree) {
+		if (degree === 0) {
+			queue.push(name);
+		}
+	}
+
+	const sorted: string[] = [];
+	while (queue.length > 0) {
+		const name = queue.shift();
+		if (name === undefined) {
+			continue;
+		}
+		sorted.push(name);
+
+		for (const [parent, children] of dependencies) {
+			if (children.includes(name)) {
+				const new_degree = (in_degree.get(parent) ?? 1) - 1;
+				in_degree.set(parent, new_degree);
+				if (new_degree === 0) {
+					queue.push(parent);
+				}
+			}
+		}
+	}
+
+	// Kahn's stops as soon as nothing has in-degree zero, so the leftovers are the cycle
+	// members PLUS everything that (transitively) depends on one — a descriptor merely
+	// pointing at a cycle member is left over too, though it sits on no loop. Trace the
+	// actual loops out of the leftovers rather than blaming the whole set.
+	const stuck = [...graph.keys()].filter(name => !sorted.includes(name));
+
+	return { order: sorted, cycles: stuck.length > 0 ? trace_cycles(stuck, dependencies) : [] };
+}
+
+// The loops hidden inside a stalled Kahn's leftover set.
+//
+// Every leftover has at least one value child that is also a leftover — that unresolved
+// dependency is exactly why it never reached in-degree zero. So following children
+// within the set can never dead-end; it must eventually revisit a symbol, and that
+// revisit is where the loop closes. Whatever preceded it on the walk was a lead-in tail
+// (the innocent descriptor) and gets sliced off.
+function trace_cycles(stuck: string[], dependencies: Map<string, string[]>): string[][] {
+	const remaining = new Set(stuck);
+	const cycles: string[][] = [];
+
+	while (remaining.size > 0) {
+		const path: string[] = [];
+		const position = new Map<string, number>();
+		let current: string | undefined = [...remaining][0];
+
+		while (current !== undefined && !position.has(current)) {
+			position.set(current, path.length);
+			path.push(current);
+			current = (dependencies.get(current) ?? []).find(child => remaining.has(child));
+		}
+
+		if (current === undefined) {
+			// Unreachable given the invariant above, but a graph built by a future caller
+			// could break it. Drop the dead-ended walk instead of looping forever.
+			for (const name of path) {
+				remaining.delete(name);
+			}
+			continue;
+		}
+
+		const cycle = path.slice(position.get(current));
+		cycles.push(cycle);
+		// Retire the whole walk: its tail is not on a loop, and its members are now
+		// reported. Anything still stuck on a DIFFERENT cycle stays in `remaining`.
+		for (const name of path) {
+			remaining.delete(name);
+		}
+	}
+
+	return cycles;
+}
+
+// "a -> b -> a", the shape a reader can follow edge by edge.
+export function describe_cycle(cycle: string[]): string {
+	return [...cycle, cycle[0]].join(" -> ");
+}
+
+// Rebuild `workfile.symbols` in topological (dependency-first) order, in place.
+// JS objects preserve insertion order, so after this every `Object.entries(symbols)`
+// — in codegen templates and elsewhere — walks symbols with each referenced struct
+// ahead of its referrer. Codegen relies on this instead of sorting inside templates.
+export function reorder_symbols_topologically(workfile: Workfile): void {
+	const { order, cycles } = topo_sorted_symbols(workfile);
+	// Codegen runs after validation, which reports cycles as ValidationErrors, so this
+	// should be unreachable. Kept as a throw because a partial order would silently emit
+	// C with structs used before they are defined.
+	if (cycles.length > 0) {
+		throw new Error(`Dependency cycle detected: ${cycles.map(c => describe_cycle(c)).join("; ")}`);
+	}
+
+	const reordered: Workfile["symbols"] = {};
+	for (const name of order) {
+		const symbol = workfile.symbols[name];
+		if (symbol !== undefined) {
+			reordered[name] = symbol;
+		}
+	}
+	// eslint-disable-next-line no-param-reassign -- reordering the workfile in place is this function's job
+	workfile.symbols = reordered;
+}
+
+// Any kind of reference counts: a symbol only pointed at is still in use.
+export function is_referenced_by_others(symbol_name: string, graph: ConnectionGraph): boolean {
+	for (const children of graph.values()) {
+		if (children.some(reference => reference.name === symbol_name)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// The first symbol that includes `symbol_name` (decision: assume single parent).
+// A rule declared on X that references `parent` reads from / writes to this symbol.
+// NOTE: mutually-referencing symbols (i3c bus <-> device) are each other's includer,
+// so "first" is whichever comes first in workfile order. See P3 in the i3c work: a real
+// answer needs an override-scoping rule that does not exist yet.
+function find_includer(symbol_name: string, graph: ConnectionGraph): string | undefined {
+	for (const [candidate, children] of graph.entries()) {
+		if (children.some(reference => reference.name === symbol_name)) {
+			return candidate;
+		}
+	}
+	return undefined;
+}
+
+// Walk `via` from the node declaring the rule to the node on the other end, as the workfile
+// currently has it: `["comm_init", "spi_dev"]` reads that union property, then the member,
+// and the value there is a symbol name. Undefined when the member is unset - the path leads
+// nowhere yet, so there is nothing to constrain.
+function resolve_include_path(owner_symbol: string, via: string[], workfile: Workfile): string | undefined {
+	const [property_name, member_name] = via;
+	if (property_name === undefined) {
+		return undefined;
+	}
+
+	const owner = workfile.symbols[owner_symbol];
+	if (owner?._t !== "RulesetStruct") {
+		return undefined;
+	}
+
+	const value = owner.properties.find(property => property.name === property_name)?.value;
+	// One step is a plain include (`spi_dev: {$node: ...}`): its value is the node's name.
+	if (member_name === undefined) {
+		return typeof value === "string" ? owner_of(value) : undefined;
+	}
+	if (typeof value !== "object" || value === null) {
+		return undefined;
+	}
+
+	const member = (value as Record<string, unknown>)[member_name];
+	return typeof member === "string" ? member : undefined;
+}
+
+function predicate_references(predicate: OverridePredicate): OverrideReference[] {
+	switch (predicate._t) {
+		case "PredicateAlways": {
+			return [];
+		}
+		case "PredicateAnd": {
+			return predicate.predicates.flatMap(nested => predicate_references(nested));
+		}
+		case "PredicateNot": {
+			// Without this, an include reference inside `$any_of` would never resolve and
+			// the rule could never fire.
+			return predicate_references(predicate.predicate);
+		}
+		default: {
+			return [predicate.reference];
+		}
+	}
+}
+
+// Every `include` reference in a rule, resolved to the symbol it currently points at.
+function resolve_rule_includes(rule: Rule, owner_symbol: string, workfile: Workfile): Record<string, string> {
+	const resolved: Record<string, string> = {};
+
+	for (const reference of [...predicate_references(rule.when), ...rule.effects.map(effect => effect.reference)]) {
+		if (reference.node !== "include") {
+			continue;
+		}
+
+		const key = reference.via.join(".");
+		if (key in resolved) {
+			continue;
+		}
+
+		const symbol = resolve_include_path(owner_symbol, reference.via, workfile);
+		if (symbol !== undefined) {
+			resolved[key] = symbol;
+		}
+	}
+
+	return resolved;
+}
+
+// Collect every rule that can affect `symbol_name`, with its refs pre-resolved to
+// concrete symbol names. A rule declared on symbol D has self = D and parent =
+// D's includer; it affects `symbol_name` when `symbol_name` is D itself (self
+// effects) or D's includer (parent effects). We therefore gather rules from two
+// sources:
+//   1. `symbol_name`'s own rules   — self = symbol_name, parent = its includer
+//   2. each child's rules          — self = child,       parent = symbol_name
+//   3. its includer's rules        — self = includer, when an `include` ref in them
+//                                    resolves to `symbol_name`
+// resolving every ref once here (decision: resolve at collection time) so
+// apply_overrides never re-decides scope. Source 3 is the mirror of source 2: a child
+// reaches up with $parent, a parent reaches down by naming the member that leads here.
+export function collect_child_overrides(symbol_name: string, workfile: Workfile, graph: ConnectionGraph): CollectedRule[] {
+	const collected: CollectedRule[] = [];
+
+	const self = workfile.symbols[symbol_name];
+	if (self?._t === "RulesetStruct" && self.rules) {
+		const parent_symbol = find_includer(symbol_name, graph);
+		for (const rule of self.rules) {
+			collected.push({ rule, self_symbol: symbol_name, parent_symbol });
+		}
+	}
+
+	for (const child_name of child_names(graph, symbol_name)) {
+		const child = workfile.symbols[child_name];
+		if (child?._t !== "RulesetStruct" || !child.rules) {
+			continue;
+		}
+
+		for (const rule of child.rules) {
+			collected.push({ rule, self_symbol: child_name, parent_symbol: symbol_name });
+		}
+	}
+
+	const includer = find_includer(symbol_name, graph);
+	const includer_symbol = includer === undefined ? undefined : workfile.symbols[includer];
+	if (includer !== undefined && includer_symbol?._t === "RulesetStruct" && includer_symbol.rules) {
+		for (const rule of includer_symbol.rules) {
+			const include_symbols = resolve_rule_includes(rule, includer, workfile);
+
+			// Only when the rule actually reaches this node. The same rule is collected
+			// again when the includer itself is validated, where its self-scoped effects
+			// apply and these include-scoped ones resolve to a different symbol.
+			if (!Object.values(include_symbols).includes(symbol_name)) {
+				continue;
+			}
+
+			collected.push({
+				rule,
+				self_symbol: includer,
+				parent_symbol: find_includer(includer, graph),
+				include_symbols,
+			});
+		}
+	}
+
+	return collected;
+}

@@ -1,0 +1,860 @@
+// The data behind value suggestions and property descriptions: the binding of a
+// node, the values on offer for a property, what a property's type allows, the
+// names a node's patterns expand to. `read`, the add interview and the `list`
+// kinds share them; what each `list` kind finds is in data.ts.
+
+import {
+	AttachEnumType,
+	list_cell,
+	matrix_cell,
+	DeviceTree,
+	DeviceTreeOverlay,
+	clock_pick,
+	clock_row_cells,
+	gpio_pick,
+	IntelligenceStack,
+	node_data_json,
+	expand_pattern,
+	pinned_value,
+	get_full_node_name,
+	placement_from_overlay,
+	type AttachType,
+	type Cell,
+	type DTNode,
+	type List,
+	type PatternPropertyRule,
+	type PropertyPatternRule,
+	type ValueSuggestion,
+} from "linux-lib";
+
+import type { ErrorType } from "../../../../interface/error-types";
+import type { Bindings } from "../../config/workspace";
+import type { ConfigResult } from "../../config/settings";
+import { format_suggestion, build_raw_property, cell_bits, shape_hint, parse_value } from "../../property-value";
+import { node_children, parse_property_reference, resolve_node_identifier, resolve_write_target, type WriteTarget } from "../../utilities";
+import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
+import { format_dt_type } from "../../protocol/binding-to-description";
+import { find_property_definition, narrowed_binding, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
+import { check_value } from "../../value-check";
+import type { Suggestion, Types } from "../../protocol/types";
+
+export function to_suggestion(suggestion: ValueSuggestion): Suggestion {
+	const display = suggestion.note !== undefined && !suggestion.display.includes(suggestion.note)
+		? `${suggestion.display} (${suggestion.note})`
+		: suggestion.display;
+	return {
+		value: format_suggestion(suggestion),
+		display_string: display,
+		...(suggestion.note === undefined ? {} : { note: suggestion.note }),
+	};
+}
+
+/** The node a property command targets, and its binding (or why there is none). */
+export interface TargetBinding {
+	target: WriteTarget;
+	binding: NodeBinding | { error: string };
+}
+
+export async function resolve_target_binding(
+	node_identifier: string,
+	overlay: DeviceTreeOverlay,
+	base_dt: DeviceTree,
+	bindings: ConfigResult<Bindings>,
+): Promise<TargetBinding> {
+	const target = resolve_write_target(node_identifier, overlay, base_dt);
+	const { binding_node, binding_parent, parent_name, parent_compatibles, parent_full_name } = target;
+	if (!bindings.ok) {
+		return { target, binding: { error: bindings.errors.map(error => error.message).join("; ") } };
+	}
+	if (binding_node === undefined) {
+		return { target, binding: { error: "node not found for binding resolution" } };
+	}
+	// Phandle enums are filled from the tree with the overlay applied, so they name its nodes too.
+	const context = overlay.merged_tree() ?? base_dt;
+	return {
+		target,
+		binding: await resolve_node_binding(
+			binding_node, binding_parent, parent_name, context, bindings.value, undefined,
+			{ compatibles: parent_compatibles, full_name: parent_full_name },
+		),
+	};
+}
+
+/**
+ * The values the intelligence stack offers for a property, checked against
+ * the binding when there is one. Undefined suggestions mean the node wasn't found.
+ */
+export function value_suggestions(
+	{ target, binding }: TargetBinding,
+	overlay: DeviceTreeOverlay,
+	base_dt: DeviceTree,
+	node_identifier: string,
+	property_name: string,
+): { ok: true; values: ValueSuggestion[]; suggestions: Suggestion[] } | { ok: false } {
+	const placement = placement_from_overlay(overlay, resolve_node_identifier(node_identifier, overlay));
+	if (placement === undefined) { return { ok: false }; }
+
+	// The properties and required list the node's own data selects (an if/then branch can add or forbid).
+	const resolved = "error" in binding ? undefined : (target.binding_node === undefined ? binding : narrowed_binding(binding, target.binding_node));
+	// Pass the node's real data so the intelligence stack can resolve phandle
+	// references (e.g. interrupt-parent → controller → #interrupt-cells).
+	let data = "{}";
+	if (target.binding_node !== undefined && resolved !== undefined) {
+		data = node_data_json(target.binding_node, resolved.properties, overlay.merged_tree() ?? base_dt);
+	}
+
+	// A property named by a pattern is offered to the stack under its own name.
+	const pattern_definition = resolved === undefined ? undefined : find_property_definition(resolved, resolved.properties, property_name);
+	const properties = resolved === undefined ? [] : [
+		...resolved.properties,
+		...(pattern_definition?.pattern === undefined ? [] : [{ key: pattern_definition.key, value: pattern_definition.value }]),
+	];
+	const stack = IntelligenceStack.default();
+	// The overlay's own nodes (a regulator it adds, a controller it enables) are candidates too.
+	const values = stack.suggest_values(property_name, {
+		devicetree: overlay.merged_tree() ?? base_dt,
+		data,
+		placement,
+		...(resolved === undefined ? {} : { binding: { required_properties: resolved.required_properties, properties } }),
+	});
+
+	// A clock or supply the overlay adds (its own regulator) is most likely the
+	// one meant, so it goes first. The interrupt parent keeps the inherited one first.
+	if (property_name === "clocks" || property_name.endsWith("-supply")) {
+		const labels = overlay.all_labels();
+		const added = (value: ValueSuggestion): boolean => {
+			const cell = value.rows[0]?.[0];
+			if (cell === undefined || typeof cell === "bigint" || !("label" in cell)) { return false; }
+			return !base_dt.node_exists(cell.label) && labels.has(cell.label);
+		};
+		values.sort((a, b) => Number(added(b)) - Number(added(a)));
+	}
+
+	// Binding check: annotate suggestions in place, via the note field.
+	if (target.binding_node !== undefined && resolved !== undefined) {
+		annotate_suggestions(values, property_name, target.binding_node, resolved, base_dt, overlay);
+	}
+
+	return { ok: true, values, suggestions: values.map(value => to_suggestion(value)) };
+}
+
+export function annotate_suggestions(
+	suggestions: ValueSuggestion[],
+	property_name: string,
+	binding_node: DTNode,
+	binding: NodeBinding,
+	base_dt: DeviceTree,
+	overlay: DeviceTreeOverlay,
+): void {
+	const origin_desc = binding.origin.kind === "compatible"
+		? `${binding.origin.compatible} binding`
+		: `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
+
+	const is_label = (name: string): boolean => {
+		if (base_dt.node_exists(name)) { return true; }
+		return overlay.find_node(name) !== undefined;
+	};
+
+	const unnarrowed = find_property_definition(binding, binding.properties, property_name);
+	const tree = overlay.merged_tree() ?? base_dt;
+	for (const suggestion of suggestions) {
+		const formatted = format_suggestion(suggestion);
+		const preview_node = structuredClone(binding_node);
+
+		// Build the property from the suggestion value and place it on the preview node
+		const built = build_raw_property(formatted, property_name, shape_hint(unnarrowed), is_label, cell_bits(unnarrowed));
+		if (built !== null && built !== undefined && !("error" in built)) {
+			const existing_index = preview_node.properties.findIndex(p => p.name === property_name);
+			if (existing_index === -1) {
+				preview_node.properties.push(built);
+			} else {
+				preview_node.properties[existing_index] = built;
+			}
+		}
+
+		// Narrow and populate the binding with the preview node to get the definition
+		const result = binding.narrow_and_populate(preview_node);
+		if (result === undefined) { continue; }
+
+		const definition = find_property_definition(binding, result.properties, property_name);
+		if (definition === undefined) {
+			suggestion.note = combine_notes(suggestion.note, `not defined by ${origin_desc}; validate may reject it`);
+			continue;
+		}
+
+		if (definition.value._t === "unknown" || definition.value._t === "node") {
+			continue;
+		}
+
+		// A clock provider is the first step of an entry: the cells its #clock-cells asks for come after it, not a count it misses.
+		if (property_name === "clocks" && (clock_row_cells(tree, formatted) ?? 0) > 0) { continue; }
+
+		// Strings are checked as they are: their text can hold commas (`adi,ad7124-4`), which parse_value reads as rows.
+		const { strings } = suggestion;
+		const parsed = strings === undefined ? parse_value(formatted) : (strings.length === 1 ? strings[0]! : strings);
+		const check = check_value(parsed, property_name, definition);
+		if (check !== true) {
+			suggestion.note = combine_notes(suggestion.note, check);
+		}
+	}
+
+}
+
+export function combine_notes(existing: string | undefined, addition: string): string {
+	if (existing === undefined) { return addition; }
+	return `${existing}; ${addition}`;
+}
+
+/**
+ * A property pattern of the binding as a suggestion: the regex as the value,
+ * and a display with the names it matches and those already set, e.g.
+ * "adi,bypass-attenuator-in0 … adi,bypass-attenuator-in4 (pattern
+ * ^adi,bypass-attenuator-in[0-4]$; set: adi,bypass-attenuator-in1)".
+ */
+export function describe_property_pattern(rule: PropertyPatternRule, node: DTNode): Suggestion {
+	const pattern = new RegExp(rule.pattern);
+	const set = node.properties.map(p => p.name).filter(name => pattern.test(name));
+	const names = pattern_names(rule.pattern);
+	const details = [names === undefined ? "pattern" : `pattern ${rule.pattern}`, ...(set.length > 0 ? [`set: ${set.join(", ")}`] : [])];
+	return { value: rule.pattern, display_string: `${names ?? rule.pattern} (${details.join("; ")})` };
+}
+
+/**
+ * A child-node pattern of the binding as a suggestion: the regex as the value,
+ * and a display with the names it matches and the children already present,
+ * e.g. "channel@0 … channel@15 (child node ^channel@([0-9]|1[0-5])$; present: channel@0)".
+ */
+export function describe_child_nodes(rule: PatternPropertyRule, node: DTNode): Suggestion {
+	const pattern = new RegExp(rule.pattern);
+	const present = node.children.map(child => get_full_node_name(child)).filter(name => pattern.test(name));
+	const details = [
+		`child node ${rule.pattern}`,
+		`present: ${present.length > 0 ? present.join(", ") : "none"}`,
+	];
+	return { value: rule.pattern, display_string: `${pattern_names(rule.pattern) ?? rule.pattern} (${details.join("; ")})` };
+}
+
+/** The names a pattern matches, short: "a, b", "first … last", or "stem…". Undefined when nothing is fixed. */
+export function pattern_names(pattern: string): string | undefined {
+	if (!pattern.startsWith("^")) { return undefined; }
+	const expansion = expand_pattern(pattern);
+	if ("stem" in expansion) { return expansion.stem === "" ? undefined : `${expansion.stem}…`; }
+	const { names } = expansion;
+	return names.length <= 3 ? names.join(", ") : `${names[0]} … ${names.at(-1)}`;
+}
+
+/**
+ * Completion candidates for a binding pattern: the names it matches that
+ * aren't taken, or its stem as a partial candidate. Unanchored patterns match
+ * inside any name, so they offer nothing.
+ */
+export function pattern_candidates(pattern: string, taken: Set<string>, kind: "pattern" | "child node"): Suggestion[] {
+	if (!pattern.startsWith("^")) { return []; }
+	const expansion = expand_pattern(pattern);
+	if ("stem" in expansion) {
+		return expansion.stem === "" ? [] : [{ value: expansion.stem, display_string: `${expansion.stem}… (${kind} ${pattern})`, partial: true }];
+	}
+	return expansion.names.filter(name => !taken.has(name)).map(name => ({ value: name, display_string: `${name} (${kind})` }));
+}
+
+/** The node as the base tree and the overlay together have it (update writes base nodes too); undefined when neither has it. */
+export function effective_target_node(identifier: string, overlay: DeviceTreeOverlay, base_dt: DeviceTree): DTNode | undefined {
+	const reference = resolve_node_identifier(identifier, overlay);
+	const node_path = overlay.find_node(reference)?.node_path ?? base_dt.locate(reference)?.path;
+	return node_path === undefined ? undefined : overlay.effective_node(node_path);
+}
+
+/** The properties and children of a node, from the base tree and the overlay merged; undefined when neither has it. */
+export function navigate_node(identifier: string, overlay: DeviceTreeOverlay, base_dt: DeviceTree): { properties: string[]; children: string[] } | undefined {
+	const node = effective_target_node(identifier, overlay, base_dt);
+	const children = node_children(base_dt, overlay, identifier);
+	if (node === undefined || children === undefined) { return; }
+	return { properties: node.properties.map(p => p.name), children };
+}
+
+/**
+ * What the property positional offers, in two groups: what the node has (its
+ * children and set properties), then what it could have (the binding's unset
+ * properties and the names its patterns allow). Without a binding, only the first.
+ */
+export function navigate_candidates(node: { properties: string[]; children: string[] }, binding?: NodeBinding): Suggestion[] {
+	const children: Suggestion[] = node.children.map(child => ({ value: child, group: "set" }));
+	if (binding === undefined) { return [...children, ...node.properties.map(name => ({ value: name, group: "set" }))]; }
+
+	const required = new Set(binding.required_properties);
+	const existing_keys = new Set(node.properties);
+	const named = binding.properties.map(p => ({
+		value: p.key,
+		...(required.has(p.key) ? { display_string: `${p.key} (required)` } : {}),
+		group: existing_keys.has(p.key) ? "set" : "not set",
+	}));
+	// Names the binding's patterns allow: properties not set yet, child nodes not present yet.
+	const taken_properties = new Set([...existing_keys, ...binding.properties.map(p => p.key)]);
+	const present = new Set(node.children);
+	const allowed = [
+		...binding.property_patterns.flatMap(rule => pattern_candidates(rule.pattern, taken_properties, "pattern")),
+		...binding.child_nodes.flatMap(rule => pattern_candidates(rule.pattern, present, "child node")),
+	].map(suggestion => ({ ...suggestion, group: "not set" }));
+	// Set properties the binding doesn't name, or names by a pattern (status, adi,bypass-attenuator-in1).
+	const named_keys = new Set(binding.properties.map(p => p.key));
+	const unnamed = node.properties.filter(name => !named_keys.has(name)).map(name => ({ value: name, group: "set" }));
+	return [
+		...children,
+		...named.filter(s => s.group === "set"),
+		...unnamed,
+		...named.filter(s => s.group === "not set"),
+		...allowed,
+	];
+}
+
+/** The rows of a specifier list asked phandle first: a `*-gpios`' controller, a `clocks`' provider. */
+export type SpecifierRows = { kind: "gpio" | "clock"; min_rows: number; max_rows?: number };
+
+/** What a node's binding says about one of its properties. */
+export interface PropertyInfo {
+	type: Types;
+	/** Its type in dt-schema's words, with the binding's constraints (`format_dt_type`). */
+	dt_type: string;
+	description: string | undefined;
+	required: boolean;
+	/** The binding YAML the definition comes from. */
+	binding_path: string;
+	constraints: { const?: unknown; default?: unknown; minimum?: number | bigint; maximum?: number | bigint };
+	/** The only value the binding allows, as `update` takes it (`""` for a flag it requires): `pinned_of`. */
+	pinned?: string;
+	/** For a phandle, the labels of the nodes it can name, enabled or not: candidates, not a constraint. */
+	phandle_options?: string[];
+	/**
+	 * For a `*-gpios` property with no controller yet (`gpio_pick`), or `clocks` with no provider (`clock_pick`), the
+	 * rows (the phandle, then the cells it asks for) its type takes: `max_rows` is open when the binding sets no upper
+	 * bound.
+	 */
+	specifier_rows?: SpecifierRows;
+}
+
+export function property_info(
+	binding: NodeBinding,
+	binding_node: DTNode,
+	property_name: string,
+): { ok: true; info: PropertyInfo } | { ok: false; message: string; type: ErrorType } {
+	const result = binding.narrow_and_populate(binding_node);
+	if (result === undefined) {
+		const message = binding.origin.kind === "compatible"
+			? `Failed to narrow binding for ${binding.origin.compatible}`
+			: `Failed to validate against pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
+		return { ok: false, message, type: "definition-error" };
+	}
+
+	const property_definition = find_property_definition(binding, result.properties, property_name);
+	if (property_definition === undefined) {
+		const origin_desc = binding.origin.kind === "compatible"
+			? `${binding.origin.compatible} binding`
+			: `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
+		return { ok: false, message: `Property ${property_name} not found in ${origin_desc}`, type: "not-found" };
+	}
+
+	const constraints = type_constraints(property_definition.value);
+	// A gpio property with no controller yet, clocks with no provider: those are its options, whatever the rows its type has.
+	const gpio = gpio_pick(property_definition);
+	const clock = clock_pick(property_definition);
+	const pick = gpio === undefined
+		? (clock === undefined ? undefined : { kind: "clock" as const, phandles: clock.providers, min_rows: clock.min_rows, max_rows: clock.max_rows })
+		: { kind: "gpio" as const, phandles: gpio.controllers, min_rows: gpio.min_rows, max_rows: gpio.max_rows };
+	const phandle_options = pick?.phandles ?? constraints.phandle_options;
+	const required = result.required_properties.includes(property_name);
+	const pinned = pinned_of(property_definition.value, required);
+	return {
+		ok: true,
+		info: {
+			type: attach_type_to_protocol_type(property_definition.value),
+			dt_type: format_dt_type(property_definition.dt_type, property_definition.value),
+			description: property_definition.value.description,
+			required,
+			binding_path: binding.binding_path,
+			constraints: {
+				...(constraints.const === undefined ? {} : { const: constraints.const }),
+				...(constraints.default === undefined ? {} : { default: constraints.default }),
+				...(constraints.minimum === undefined ? {} : { minimum: constraints.minimum }),
+				...(constraints.maximum === undefined ? {} : { maximum: constraints.maximum }),
+			},
+			...(pinned === undefined ? {} : { pinned }),
+			...(phandle_options === undefined ? {} : { phandle_options }),
+			...(pick === undefined ? {} : { specifier_rows: { kind: pick.kind, min_rows: pick.min_rows, ...(pick.max_rows === undefined ? {} : { max_rows: pick.max_rows }) } }),
+		},
+	};
+}
+
+/**
+ * The one cell every value of a property is: a scalar's, a list's single `item`, a one-cell matrix's when it is an enum
+ * (`-microvolt`). The number cell of a one-cell matrix (`reg`) only holds its type's range.
+ */
+function property_cell(type: AttachType): Cell | undefined {
+	switch (type._t) {
+		case "scalar": { return type.cell; }
+		case "list": { return list_cell(type); }
+		case "matrix": {
+			const cell = matrix_cell(type);
+			return cell?._t === "enum" ? cell : undefined;
+		}
+		default: { return undefined; }
+	}
+}
+
+/**
+ * The value the binding pins a property to, as `update` takes it and `list value` lists it: a
+ * `const` or a one-option enum (`1`, `mclk`), `""` for a flag the binding requires. Undefined when
+ * the binding leaves a choice.
+ */
+export function pinned_of(type: AttachType, required: boolean): string | undefined {
+	const pinned = pinned_value(type, required);
+	return pinned === undefined ? undefined : format_suggestion(pinned);
+}
+
+/** What a binding says about the values of a property: a const, a default, a range, the nodes a phandle can name. */
+export function type_constraints(type: AttachType): { const?: bigint | string; default?: bigint | string; minimum?: bigint; maximum?: bigint; phandle_options?: string[] } {
+	const cell = property_cell(type);
+	if (cell === undefined || cell._t === "string" || cell._t === "any") { return {}; }
+	const own_default = type._t === "scalar" ? type.default : cell.default;
+	if (cell._t === "number") {
+		return {
+			...(own_default === undefined ? {} : { default: own_default }),
+			...(cell.minimum === undefined ? {} : { minimum: cell.minimum }),
+			...(cell.maximum === undefined ? {} : { maximum: cell.maximum }),
+		};
+	}
+	// A phandle enum's default is the value currently set (a preselect), not the binding's.
+	if (cell.enum_type === AttachEnumType.PHANDLE) { return { phandle_options: cell.enum.map(String) }; }
+	// A scalar whose only option is its default is a const.
+	if (type._t === "scalar" && cell.enum.length === 1 && cell.enum[0] === own_default) { return { const: own_default }; }
+	return own_default === undefined ? {} : { default: own_default };
+}
+
+/** `2`, `1..4`, `2..`; nothing when the binding only says "one or more". */
+export function count_range(min = 0, max?: number): string {
+	if (max === undefined) { return min <= 1 ? "" : `${min}..`; }
+	return min === max ? String(max) : `${min}..${max}`;
+}
+
+export function format_type(type: Types): string {
+	switch (type.kind) {
+		case "number": {
+			return "number";
+		}
+		case "string": {
+			return "string";
+		}
+		case "bool": {
+			return "bool";
+		}
+		case "enum": {
+			return `enum(${type.options.map(o => String(o.display_string ?? o.value)).join(" | ")})`;
+		}
+		case "array": {
+			return `${format_type(type.items)}[${count_range(type.min_items, type.max_items)}]`;
+		}
+		case "tuple": {
+			return `(${type.items.map(element => format_type(element)).join(", ")})`;
+		}
+	}
+}
+
+if (import.meta.vitest) {
+	const { test, expect, describe } = import.meta.vitest;
+	const { DeviceTree: DT, DeviceTreeOverlay: DTO } = await import("linux-lib");
+
+	const navigate_trees = (overlay_source: string): { base: DeviceTree; overlay: DeviceTreeOverlay } => {
+		const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t\tcompatible = "brcm,bcm2835-spi";\n\t\t\tstatus = "disabled";\n\t\t\tspidev0: spidev@0 {\n\t\t\t\treg = <0>;\n\t\t\t};\n\t\t};\n\t\tgpio: gpio@7e200000 {\n\t\t\tcompatible = "brcm,bcm2711-gpio";\n\t\t\tpin_a {\n\t\t\t};\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DTO.new_from_string(overlay_source, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		return { base, overlay };
+	};
+
+	test("navigate_node — a base node the overlay doesn't touch: its base properties and children", () => {
+		const { base, overlay } = navigate_trees(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tstatus = "okay";\n};`);
+		expect(navigate_node("gpio", overlay, base)).toEqual({ properties: ["compatible"], children: ["pin_a"] });
+	});
+
+	test("navigate_node — a base node the overlay changes: base and overlay merged", () => {
+		const { base, overlay } = navigate_trees(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tstatus = "okay";\n\tcs-gpios = <&gpio 8 1>;\n\tadc@1 {\n\t\treg = <1>;\n\t};\n};`);
+		expect(navigate_node("spi0", overlay, base)).toEqual({ properties: ["compatible", "status", "cs-gpios"], children: ["spidev@0", "adc@1"] });
+		expect(navigate_node("spi0/adc@1", overlay, base)).toEqual({ properties: ["reg"], children: [] });
+		expect(navigate_node("nope", overlay, base)).toBeUndefined();
+	});
+
+	test("navigate_candidates — what is there (children, set properties), then what is not (unset properties, pattern names)", () => {
+		const binding: NodeBinding = {
+			properties: [
+				{ key: "compatible", value: { _t: "unknown", description: "" } },
+				{ key: "cs-gpios", value: { _t: "unknown", description: "" } },
+				{ key: "num-cs", value: { _t: "unknown", description: "" } },
+			],
+			required_properties: ["compatible"],
+			child_nodes: [],
+			property_patterns: [],
+			binding_path: "/linux/spi/brcm,bcm2835-spi.yaml",
+			origin: { kind: "compatible", compatible: "brcm,bcm2835-spi" },
+			narrow_and_populate: () => ({ properties: [], required_properties: [] }),
+		};
+		expect(navigate_candidates({ properties: ["compatible", "cs-gpios"], children: ["spidev@0"] }, binding)).toEqual([
+			{ value: "spidev@0", group: "set" },
+			{ value: "compatible", display_string: "compatible (required)", group: "set" },
+			{ value: "cs-gpios", group: "set" },
+			{ value: "num-cs", group: "not set" },
+		]);
+		// What the binding doesn't name, or names by a pattern, is still set.
+		expect(navigate_candidates({ properties: ["compatible", "status", "adi,bypass-attenuator-in1"], children: [] }, {
+			...binding,
+			property_patterns: [{ pattern: "^adi,bypass-attenuator-in[0-2]$", description: "", value: { _t: "unknown", description: "" } }],
+		})).toEqual([
+			{ value: "compatible", display_string: "compatible (required)", group: "set" },
+			{ value: "status", group: "set" },
+			{ value: "adi,bypass-attenuator-in1", group: "set" },
+			{ value: "cs-gpios", group: "not set" },
+			{ value: "num-cs", group: "not set" },
+			{ value: "adi,bypass-attenuator-in0", display_string: "adi,bypass-attenuator-in0 (pattern)", group: "not set" },
+			{ value: "adi,bypass-attenuator-in2", display_string: "adi,bypass-attenuator-in2 (pattern)", group: "not set" },
+		]);
+		expect(navigate_candidates({ properties: [], children: [] }, { ...binding, required_properties: ["num-cs"] }).at(-1))
+			.toEqual({ value: "num-cs", display_string: "num-cs (required)", group: "not set" });
+		expect(navigate_candidates({ properties: ["compatible", "status"], children: ["spidev@0"] }))
+			.toEqual([{ value: "spidev@0", group: "set" }, { value: "compatible", group: "set" }, { value: "status", group: "set" }]);
+	});
+
+	test("property_info — a pattern property's type and description; an empty default is left out", () => {
+		const value: AttachType = { _t: "list", item: { _t: "enum", enum: ["pwm2", "smbalert#"], enum_type: AttachEnumType.STRING }, minItems: 1, maxItems: 1, description: "Pin 5 function" };
+		const binding: NodeBinding = {
+			properties: [],
+			required_properties: [],
+			child_nodes: [],
+			property_patterns: [{ pattern: "^adi,pin(5|10)-function$", description: "", value }],
+			binding_path: "/linux/hwmon/adt7475.yaml",
+			origin: { kind: "compatible", compatible: "adi,adt7475" },
+			narrow_and_populate: () => ({ properties: [], required_properties: [] }),
+		};
+		const result = property_info(binding, { name: "hwmon", labels: [], properties: [], children: [] } as unknown as DTNode, "adi,pin5-function");
+		expect(result.ok && result.info.description).toBe("Pin 5 function");
+		expect(result.ok && result.info.constraints).toEqual({});
+		expect(result.ok && result.info.phandle_options).toBeUndefined();
+	});
+
+	test("property_info — required follows the list after narrowing", () => {
+		const value: AttachType = { _t: "flag", description: "" };
+		const binding: NodeBinding = {
+			properties: [{ key: "spi-cpol", value }],
+			required_properties: ["compatible", "reg"],
+			child_nodes: [],
+			property_patterns: [],
+			binding_path: "/linux/iio/dac/adi,ad5592r.yaml",
+			origin: { kind: "compatible", compatible: "adi,ad5592r" },
+			narrow_and_populate: () => ({ properties: [{ key: "spi-cpol", value }], required_properties: ["compatible", "reg", "spi-cpol"] }),
+		};
+		const result = property_info(binding, { name: "dac", labels: [], properties: [], children: [] } as unknown as DTNode, "spi-cpol");
+		expect(result.ok && result.info.required).toBe(true);
+	});
+
+	test("property_info — a phandle enum's options are the nodes it can name, not a constraint", () => {
+		const value: AttachType = { _t: "list", item: { _t: "enum", enum: ["gpio", "gicv2", "aon_intr"], default: "gpio", enum_type: AttachEnumType.PHANDLE }, minItems: 1, maxItems: 1, description: "" };
+		const binding: NodeBinding = {
+			properties: [{ key: "interrupt-parent", value }],
+			required_properties: [],
+			child_nodes: [],
+			property_patterns: [],
+			binding_path: "/linux/iio/adc/adi,ad7124.yaml",
+			origin: { kind: "compatible", compatible: "adi,ad7124-8" },
+			narrow_and_populate: () => ({ properties: [{ key: "interrupt-parent", value }], required_properties: [] }),
+		};
+		const result = property_info(binding, { name: "adc", labels: [], properties: [], children: [] } as unknown as DTNode, "interrupt-parent");
+		expect(result.ok && result.info.phandle_options).toEqual(["gpio", "gicv2", "aon_intr"]);
+	});
+
+	test("property_info — a gpio property with no controller carries the rows its type has, and the controllers", () => {
+		const row: List = { _t: "list", item: [{ _t: "enum", enum: ["gpio", "expgpio"], enum_type: AttachEnumType.PHANDLE }], minItems: 1, maxItems: 1 };
+		const value: AttachType = { _t: "matrix", rows: [row], minItems: 6, maxItems: 6, description: "" };
+		const properties = [{ key: "ctrl-gpios", value }];
+		const binding: NodeBinding = {
+			properties,
+			required_properties: ["ctrl-gpios"],
+			child_nodes: [],
+			property_patterns: [],
+			binding_path: "/linux/iio/amplifiers/adi,hmc425a.yaml",
+			origin: { kind: "compatible", compatible: "adi,hmc425a" },
+			narrow_and_populate: () => ({ properties, required_properties: ["ctrl-gpios"] }),
+		};
+		const result = property_info(binding, { name: "att", labels: [], properties: [], children: [] } as unknown as DTNode, "ctrl-gpios");
+		expect(result.ok && result.info.specifier_rows).toEqual({ kind: "gpio", min_rows: 6, max_rows: 6 });
+		expect(result.ok && result.info.phandle_options).toEqual(["gpio", "expgpio"]);
+	});
+
+	test("property_info — clocks with no provider carry the rows their type has, and the providers", () => {
+		const row: List = { _t: "list", item: [{ _t: "enum", enum: ["clocks", "clk_osc"], enum_type: AttachEnumType.PHANDLE }], minItems: 1, maxItems: 1 };
+		const value: AttachType = { _t: "matrix", rows: [row], minItems: 1, maxItems: 2, description: "" };
+		const properties = [{ key: "clocks", value }];
+		const binding: NodeBinding = {
+			properties,
+			required_properties: ["clocks"],
+			child_nodes: [],
+			property_patterns: [],
+			binding_path: "/linux/iio/adc/st,stm32-adc.yaml",
+			origin: { kind: "compatible", compatible: "st,stm32h7-adc-core" },
+			narrow_and_populate: () => ({ properties, required_properties: ["clocks"] }),
+		};
+		const info = (definition: AttachType) => {
+			const result = property_info({ ...binding, narrow_and_populate: () => ({ properties: [{ key: "clocks", value: definition }], required_properties: [] }) }, { name: "adc", labels: [], properties: [], children: [] } as unknown as DTNode, "clocks");
+			return result.ok ? result.info : undefined;
+		};
+		expect(info(value)?.specifier_rows).toEqual({ kind: "clock", min_rows: 1, max_rows: 2 });
+		expect(info(value)?.phandle_options).toEqual(["clocks", "clk_osc"]);
+		// A provider chosen (the enum's default): the rows are its cells, nothing is left to pick.
+		const chosen: AttachType = { ...value, rows: [{ ...row, item: [{ _t: "enum", enum: ["clocks", "clk_osc"], default: "clocks", enum_type: AttachEnumType.PHANDLE }, { _t: "number" }], minItems: 2, maxItems: 2 }] };
+		expect(info(chosen)?.specifier_rows).toBeUndefined();
+	});
+
+	test("value_suggestions — a regulator the overlay adds is a supply candidate, listed first", () => {
+		const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tvdd_3v3_reg: fixedregulator_3v3 {\n\t\tcompatible = "regulator-fixed";\n\t\tregulator-min-microvolt = <3300000>;\n\t};\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t\tcompatible = "brcm,bcm2835-spi";\n\t\t\t#address-cells = <1>;\n\t\t\t#size-cells = <0>;\n\t\t};\n\t};\n};`);
+		if (typeof base === "string") { throw new TypeError(base); }
+		const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n&{/} {\n\tvref: fixedregulator@0 {\n\t\tcompatible = "regulator-fixed";\n\t\tregulator-min-microvolt = <2500000>;\n\t};\n};\n&spi0 {\n\tadc@0 {\n\t\tcompatible = "adi,ad7124-8";\n\t\treg = <0>;\n\t};\n};`, base);
+		if (typeof overlay === "string") { throw new TypeError(overlay); }
+		const target: TargetBinding = { target: resolve_write_target("spi0/adc@0", overlay, base), binding: { error: "no bindings" } };
+		const result = value_suggestions(target, overlay, base, "spi0/adc@0", "refin1-supply");
+		expect(result.ok && result.suggestions.map(s => s.value)).toEqual(["vref", "vdd_3v3_reg"]);
+	});
+
+	// A binding whose if/then requires `spi-cpol` once the node says it is an ad5592r; the unconditional lists don't have it.
+	const branch_binding = (): NodeBinding => ({
+		properties: [{ key: "compatible", value: { _t: "unknown" } }, { key: "spi-cpol", value: { _t: "flag" } }, { key: "spi-cpha", value: { _t: "flag" } }],
+		required_properties: ["compatible"],
+		child_nodes: [],
+		property_patterns: [],
+		binding_path: "/linux/iio/dac/adi,ad5592r.yaml",
+		origin: { kind: "compatible", compatible: "adi,ad5592r" },
+		narrow_and_populate: () => ({
+			properties: [{ key: "compatible", value: { _t: "unknown" } }, { key: "spi-cpol", value: { _t: "flag" } }],
+			required_properties: ["compatible", "spi-cpol"],
+		}),
+	});
+
+	test("value_suggestions — a flag the narrowed binding requires is offered, pinned", () => {
+		const { base, overlay } = navigate_trees(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tdac@0 {\n\t\tcompatible = "adi,ad5592r";\n\t\treg = <0>;\n\t};\n};`);
+		const target: TargetBinding = { target: resolve_write_target("spi0/dac@0", overlay, base), binding: branch_binding() };
+		const result = value_suggestions(target, overlay, base, "spi0/dac@0", "spi-cpol");
+		expect(result.ok && result.values.map(value => value.flag)).toContain(true);
+	});
+
+	test("list property / navigate_candidates — the narrowed binding: a required property is marked, a forbidden one is gone", () => {
+		const node = { name: "dac", labels: [], properties: [{ name: "compatible", value: [] }], children: [] } as unknown as DTNode;
+		const applicable = narrowed_binding(branch_binding(), node);
+		expect(applicable.required_properties).toEqual(["compatible", "spi-cpol"]);
+		expect(applicable.properties.map(p => p.key)).toEqual(["compatible", "spi-cpol"]);
+		expect(navigate_candidates({ properties: ["compatible"], children: [] }, applicable)).toEqual([
+			{ value: "compatible", display_string: "compatible (required)", group: "set" },
+			{ value: "spi-cpol", display_string: "spi-cpol (required)", group: "not set" },
+		]);
+	});
+
+	test("describe_property_pattern — the names it expands to, the regex, and the names already set", () => {
+		const node = { name: "hwmon", labels: [], properties: [{ name: "adi,bypass-attenuator-in1", value: [] }, { name: "reg", value: [] }], children: [] } as unknown as DTNode;
+		const rule = { pattern: "^adi,bypass-attenuator-in[0-4]$", description: "", value: { _t: "unknown" } as const };
+		expect(describe_property_pattern(rule, node)).toEqual({
+			value: "^adi,bypass-attenuator-in[0-4]$",
+			display_string: "adi,bypass-attenuator-in0 … adi,bypass-attenuator-in4 (pattern ^adi,bypass-attenuator-in[0-4]$; set: adi,bypass-attenuator-in1)",
+		});
+		expect(describe_property_pattern({ ...rule, pattern: "^adi,pin(5|10)-function$" }, { ...node, properties: [] }).display_string)
+			.toBe("adi,pin5-function, adi,pin10-function (pattern ^adi,pin(5|10)-function$)");
+		expect(describe_property_pattern({ ...rule, pattern: ".*-supply$" }, node).display_string).toBe(".*-supply$ (pattern)");
+	});
+
+	test("describe_child_nodes — the names, or the stem, in place of the regex", () => {
+		const channel = { name: "channel", unit_addr: "0", labels: [], properties: [], children: [] };
+		const node = { name: "adc", labels: [], properties: [], children: [channel] } as unknown as DTNode;
+		const rule = { pattern: "^channel@([0-9]|1[0-5])$", description: "", properties: [], required: [] };
+		expect(describe_child_nodes(rule, node).display_string).toBe("channel@0 … channel@15 (child node ^channel@([0-9]|1[0-5])$; present: channel@0)");
+		expect(describe_child_nodes({ ...rule, pattern: "^fan-[0-9]+$" }, node).display_string).toBe("fan-… (child node ^fan-[0-9]+$; present: none)");
+	});
+
+	test("pattern_candidates — names not taken yet, or the stem as a partial candidate", () => {
+		expect(pattern_candidates("^channel@[0-3]$", new Set(["channel@1"]), "child node")).toEqual([
+			{ value: "channel@0", display_string: "channel@0 (child node)" },
+			{ value: "channel@2", display_string: "channel@2 (child node)" },
+			{ value: "channel@3", display_string: "channel@3 (child node)" },
+		]);
+		expect(pattern_candidates("^fan-[0-9]+$", new Set(), "child node")).toEqual([{ value: "fan-", display_string: "fan-… (child node ^fan-[0-9]+$)", partial: true }]);
+		// Unanchored patterns match inside any name; no fixed text gives nothing to type.
+		expect(pattern_candidates("-supply$", new Set(), "pattern")).toEqual([]);
+		expect(pattern_candidates("^.*-supply$", new Set(), "pattern")).toEqual([]);
+	});
+	type VS = import("linux-lib").ValueSuggestion;
+
+	// ── to_suggestion ──────────────────────────────────────────────────
+
+	test("to_suggestion — carries note and appends it to display once", () => {
+		const suggestion: VS = { rows: [[19n, { macro: "IRQ_TYPE_EDGE_FALLING" }]], display: "19 IRQ_TYPE_EDGE_FALLING", source: "test", note: "needs interrupt-parent" };
+		const result = to_suggestion(suggestion);
+		expect(result.note).toBe("needs interrupt-parent");
+		expect(result.display_string).toBe("19 IRQ_TYPE_EDGE_FALLING (needs interrupt-parent)");
+	});
+
+	test("to_suggestion — does not duplicate note already in display", () => {
+		const suggestion: VS = { rows: [[0n]], display: "0 — in use by spidev@0 (in use by spidev@0)", source: "test", note: "in use by spidev@0" };
+		const result = to_suggestion(suggestion);
+		expect(result.note).toBe("in use by spidev@0");
+		expect(result.display_string).not.toContain("(in use by spidev@0) (in use by spidev@0)");
+	});
+
+	test("to_suggestion — no note means no note field", () => {
+		const suggestion: VS = { rows: [[1n]], display: "1", source: "test" };
+		const result = to_suggestion(suggestion);
+		expect(result.note).toBeUndefined();
+		expect(result.display_string).toBe("1");
+	});
+
+	// ── to_suggestion with multi-cell rows ─────────────────────────────
+
+	test("to_suggestion — matrix rows produce comma-separated --with value", () => {
+		const suggestion: VS = {
+			rows: [[{ label: "gpio" }, 8n, { macro: "GPIO_ACTIVE_LOW" }], [{ label: "gpio" }, 7n, { macro: "GPIO_ACTIVE_LOW" }]],
+			display: "2 chip selects — GPIO8, GPIO7",
+			source: "test",
+		};
+		const result = to_suggestion(suggestion);
+		expect(result.value).toBe("gpio 8 GPIO_ACTIVE_LOW,gpio 7 GPIO_ACTIVE_LOW");
+		expect(result.display_string).toBe("2 chip selects — GPIO8, GPIO7");
+	});
+
+	test("to_suggestion — single-row label+number+macro formats as space-separated value", () => {
+		const suggestion: VS = {
+			rows: [[{ label: "gpio" }, 19n, { macro: "IRQ_TYPE_EDGE_FALLING" }]],
+			display: "gpio 19 IRQ_TYPE_EDGE_FALLING",
+			source: "test",
+		};
+		const result = to_suggestion(suggestion);
+		expect(result.value).toBe("gpio 19 IRQ_TYPE_EDGE_FALLING");
+	});
+
+	test("to_suggestion — single-cell reg", () => {
+		const suggestion: VS = { rows: [[2n]], display: "2", source: "test" };
+		const result = to_suggestion(suggestion);
+		expect(result.value).toBe("2");
+	});
+
+	// ── parse_property_reference ────────────────────────────────────────
+
+	describe("parse_property_reference", () => {
+		test("single segment with slash separates node and property", () => {
+			expect(parse_property_reference(["mynode/status"])).toStrictEqual({
+				node_identifier: "mynode",
+				property_name: "status",
+			});
+		});
+
+		test("multi-segment path splits at last slash", () => {
+			expect(parse_property_reference(["spi0", "adc@0", "reg"])).toStrictEqual({
+				node_identifier: "spi0/adc@0",
+				property_name: "reg",
+			});
+		});
+
+		test("root-relative path", () => {
+			expect(parse_property_reference(["/soc/spi@7e204000/adc@0/interrupts"])).toStrictEqual({
+				node_identifier: "/soc/spi@7e204000/adc@0",
+				property_name: "interrupts",
+			});
+		});
+
+		test("returns undefined for empty input", () => {
+			expect(parse_property_reference([])).toBeUndefined();
+		});
+
+		test("returns undefined when no slash is present (no property name)", () => {
+			expect(parse_property_reference(["status"])).toBeUndefined();
+		});
+	});
+
+	// ── format_type ────────────────────────────────────────────────────
+
+	describe("format_type", () => {
+		test("number", () => {
+			expect(format_type({ kind: "number", subtype: "int" })).toBe("number");
+		});
+
+		test("string", () => {
+			expect(format_type({ kind: "string" })).toBe("string");
+		});
+
+		test("bool", () => {
+			expect(format_type({ kind: "bool" })).toBe("bool");
+		});
+
+		test("enum with string options", () => {
+			expect(format_type({ kind: "enum", options: [{ value: "okay" }, { value: "disabled" }] }))
+				.toBe("enum(okay | disabled)");
+		});
+
+		test("enum with display_string options", () => {
+			expect(format_type({ kind: "enum", options: [{ value: 0, display_string: "IRQ_TYPE_NONE" }] }))
+				.toBe("enum(IRQ_TYPE_NONE)");
+		});
+
+		test("array of numbers", () => {
+			expect(format_type({ kind: "array", items: { kind: "number", subtype: "int" } }))
+				.toBe("number[]");
+		});
+
+		test("array with the binding's item counts", () => {
+			const number = { kind: "number", subtype: "int" } as const;
+			expect(format_type({ kind: "array", items: number, min_items: 2, max_items: 2 })).toBe("number[2]");
+			expect(format_type({ kind: "array", items: number, min_items: 1, max_items: 4 })).toBe("number[1..4]");
+			expect(format_type({ kind: "array", items: number, min_items: 2 })).toBe("number[2..]");
+			expect(format_type({ kind: "array", items: number, min_items: 1 })).toBe("number[]");
+			expect(format_type({ kind: "array", items: number, min_items: 0, max_items: 3 })).toBe("number[0..3]");
+			expect(format_type({ kind: "array", items: { kind: "array", items: number, min_items: 2, max_items: 2 } })).toBe("number[2][]");
+		});
+
+		test("tuple", () => {
+			expect(format_type({
+				kind: "tuple",
+				items: [
+					{ kind: "number", subtype: "int" },
+					{ kind: "enum", options: [{ value: "IRQ_TYPE_EDGE_FALLING" }] },
+				],
+			})).toBe("(number, enum(IRQ_TYPE_EDGE_FALLING))");
+		});
+
+		test("nested array of enums", () => {
+			expect(format_type({
+				kind: "array",
+				items: { kind: "enum", options: [{ value: 0 }, { value: 1 }] },
+			})).toBe("enum(0 | 1)[]");
+		});
+	});
+
+	// ── combine_notes ──────────────────────────────────────────────────
+
+	describe("combine_notes", () => {
+		test("appends to existing note with semicolon", () => {
+			expect(combine_notes("in use by spidev@0", "binding rejects it")).toBe("in use by spidev@0; binding rejects it");
+		});
+
+		test("returns addition when no existing note", () => {
+			expect(combine_notes(undefined, "not defined by binding")).toBe("not defined by binding");
+		});
+	});
+
+	const one_cell = (cell: Cell): AttachType => ({ _t: "matrix", minItems: 1, maxItems: 1, rows: [{ _t: "list", item: cell, minItems: 1, maxItems: 1 }] });
+	test("type_constraints — a one-cell matrix gives the default of its enum, not its number's type range", () => {
+		// ad7949's adi,internal-ref-microvolt
+		expect(type_constraints(one_cell({ _t: "enum", enum: [2_500_000n, 4_096_000n], enum_type: AttachEnumType.NUMBER, default: 4_096_000n })))
+			.toStrictEqual({ default: 4_096_000n });
+		// a reg of one address
+		expect(type_constraints(one_cell({ _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn }))).toStrictEqual({});
+	});
+
+	test("pinned_of — a const, a one-string list and a required flag as update takes them; a choice or an optional flag none", () => {
+		const one_of = (values: (bigint | string)[], enum_type = AttachEnumType.NUMBER): Cell => ({ _t: "enum", enum: values, enum_type });
+		expect(pinned_of({ _t: "scalar", cell: one_of([1n]) }, true)).toBe("1");
+		expect(pinned_of({ _t: "list", item: one_of(["mclk"], AttachEnumType.STRING), minItems: 1, maxItems: 1 }, false)).toBe("mclk");
+		expect(pinned_of({ _t: "flag" }, true)).toBe("");
+		expect(pinned_of({ _t: "flag" }, false)).toBeUndefined();
+		expect(pinned_of({ _t: "scalar", cell: one_of([0n, 1n]) }, true)).toBeUndefined();
+	});
+}

@@ -1,0 +1,752 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common.schema.json",
+  "title": "CommonResponse",
+  "description": "The fields of a response (COM-040, COM-050), and the base shapes the command schemas build on (src/interface/backend-responses.ts). Every response has the three fields; read gives them alongside the node or property (READ-012). A refusal is exactly this object, with ok false, severity error and its error_type (COM-051); a success with severity warn carries one too, validate's excepted. The base shapes are open, so that a backend's subtype can add fields (overview 2.1).",
+  "type": "object",
+  "required": [
+    "ok",
+    "message",
+    "severity"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "description": "true: the command did what was asked. false: it refused."
+    },
+    "message": {
+      "type": "string",
+      "description": "One-line human-readable summary."
+    },
+    "severity": {
+      "$ref": "#/$defs/severity",
+      "description": "error for a refusal; info or warn for a success (warn where the command's chapter says so, COM-050)."
+    },
+    "error_type": {
+      "$ref": "#/$defs/error-type",
+      "description": "Which kind of error or warning it is (COM-051): on a refusal and on a warn success. Optional where the backend is linux, until it sets it."
+    }
+  },
+  "$defs": {
+    "severity": {
+      "enum": [
+        "info",
+        "warn",
+        "error"
+      ]
+    },
+    "common": {
+      "description": "CommonResponse: the three fields, open to more.",
+      "type": "object",
+      "required": [
+        "ok",
+        "message",
+        "severity"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "error_type": {
+          "$ref": "#/$defs/error-type",
+          "description": "On a refusal and on a success whose severity is warn, validate's excepted (COM-051); not on an info success."
+        }
+      }
+    },
+    "done": {
+      "description": "A success with nothing but the three fields.",
+      "type": "object",
+      "required": [
+        "ok",
+        "message",
+        "severity"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warn"
+          ]
+        },
+        "error_type": {
+          "$ref": "#/$defs/error-type"
+        }
+      },
+      "additionalProperties": false
+    },
+    "refusal": {
+      "description": "A refusal (COM-040).",
+      "type": "object",
+      "required": [
+        "ok",
+        "message",
+        "severity",
+        "error_type"
+      ],
+      "properties": {
+        "ok": {
+          "const": false
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "const": "error"
+        },
+        "error_type": {
+          "$ref": "#/$defs/error-type"
+        }
+      },
+      "additionalProperties": false
+    },
+    "config-refusal": {
+      "description": "Where the backend is linux: the refusal of a command whose workspace doesn't load (02-common.md COM-071). message is the problems' messages joined by '; '.",
+      "type": "object",
+      "required": [
+        "ok",
+        "message",
+        "severity",
+        "error_type",
+        "errors",
+        "hints"
+      ],
+      "properties": {
+        "ok": {
+          "const": false
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "const": "error"
+        },
+        "error_type": {
+          "description": "The first error's (COM-051).",
+          "$ref": "#/$defs/error-type"
+        },
+        "errors": {
+          "description": "One entry per problem, in the order they were found.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "field",
+              "kind",
+              "error_type",
+              "message"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "The setting at fault (linux, devicetree, workfile, overlay-syntax, build-dir, ...), the resource: compat-index, validation.json, dtc, dt-schema, aa_build.sh, aa_deploy.sh, or where the backend is linux an executable variable (AA_PREPROCESS_COMMAND, COM-093) or a secret variable's name (DEPLOY-042)."
+              },
+              "kind": {
+                "enum": [
+                  "missing",
+                  "invalid",
+                  "unknown"
+                ]
+              },
+              "error_type": {
+                "$ref": "#/$defs/error-type"
+              },
+              "message": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string",
+                "description": "What the setting is."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "hints": {
+          "description": "What to do about the errors, each once, the setup hints of several fields merged into one (02-common.md §8.1).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "node-path": {
+      "description": "A node path as segments without the root (overview 3.5): /soc/spi@7e204000 is [\"soc\", \"spi@7e204000\"], / is [].",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "suggestion": {
+      "description": "Suggestion: a value ready to pass to update, or a name ready for the command line.",
+      "type": "object",
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "The value tokens as update takes them (GRM-070)."
+        },
+        "display_string": {
+          "type": "string",
+          "description": "What to show instead of the value."
+        },
+        "note": {
+          "type": "string",
+          "description": "A remark on the value: the overlay mark of a phandle option (disabled, enabled, enabled by the overlay), or why the binding may reject the value ('not defined by <binding>; validate may reject it', or a value check's message such as 'Property spi-cpol is a flag and can be set to appear with 'true' or disappear with 'false''). Several are joined with '; '."
+        },
+        "partial": {
+          "type": "boolean",
+          "description": "The start of a name to type on (a pattern's stem)."
+        },
+        "group": {
+          "type": "string",
+          "description": "Completion group: set, not set."
+        }
+      },
+      "additionalProperties": false
+    },
+    "property-suggestions": {
+      "description": "PropertySuggestions: the suggested values, and the providers the user can add instead.",
+      "type": "object",
+      "required": [
+        "values"
+      ],
+      "properties": {
+        "values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/suggestion"
+          }
+        },
+        "can_create": {
+          "description": "Where the backend is linux: absent when there are none. Where it is noos: always there, [] when there are none.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/suggestion"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "property-value": {
+      "description": "PropertyValue (READ-050): null, a string (&label for a reference), a number, true for a flag, or an array of these.",
+      "anyOf": [
+        {
+          "type": [
+            "null",
+            "string",
+            "number",
+            "boolean"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/property-value"
+          }
+        }
+      ]
+    },
+    "property-type": {
+      "description": "PropertyType. read infers it from the value (READ-050); list property gives the binding's.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "subtype"
+          ],
+          "properties": {
+            "kind": {
+              "const": "number"
+            },
+            "subtype": {
+              "enum": [
+                "int",
+                "float"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "string",
+                "bool"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "options"
+          ],
+          "properties": {
+            "kind": {
+              "const": "enum"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "value"
+                ],
+                "properties": {
+                  "value": {
+                    "type": [
+                      "string",
+                      "number"
+                    ],
+                    "description": "The option as list value gives it and update takes it. For an option that is a whole list (list), its values joined by a space: a string because the option is a list of values, not because the property is a string (LIST-079)."
+                  },
+                  "list": {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    },
+                    "minItems": 1,
+                    "description": "Only when the option is a whole list of values written all at once (a compatible with its fallbacks, data-lanes' <1 2>): the list itself, its numbers as numbers (LIST-079)."
+                  },
+                  "display_string": {
+                    "type": "string",
+                    "description": "How the option is shown. A whole list is written as the devicetree writes it: <1 2> for numbers, \"a\", \"b\" for strings."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "items"
+          ],
+          "properties": {
+            "kind": {
+              "const": "array"
+            },
+            "items": {
+              "$ref": "#/$defs/property-type"
+            },
+            "min_items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "items"
+          ],
+          "properties": {
+            "kind": {
+              "const": "tuple"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/property-type"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "property": {
+      "description": "Property: one property of a node.",
+      "type": "object",
+      "required": [
+        "kind",
+        "key",
+        "type",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "const": "property"
+        },
+        "key": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/property-type"
+        },
+        "value": {
+          "$ref": "#/$defs/property-value"
+        }
+      }
+    },
+    "node": {
+      "description": "Node: a node as read shows it. origin is the backend's word for where the node lives.",
+      "type": "object",
+      "required": [
+        "kind",
+        "key",
+        "properties",
+        "children",
+        "origin"
+      ],
+      "properties": {
+        "kind": {
+          "const": "node"
+        },
+        "key": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/property"
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "origin": {
+          "type": "string"
+        },
+        "alias": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "read-property": {
+      "description": "ReadProperty: one property read on its own.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/property"
+        }
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "The binding's description."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the definition requires a value."
+        },
+        "source": {
+          "type": "string",
+          "description": "Where the value comes from, in the backend's words: linux base or overlay, noos user or bootstrap."
+        },
+        "constraints": {
+          "description": "What the definition says the value may be, when it says.",
+          "type": "object",
+          "properties": {
+            "default": {
+              "description": "The value used when none is set."
+            },
+            "minimum": {
+              "type": "number"
+            },
+            "maximum": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "definition": {
+          "type": "string",
+          "description": "What defines the property, in the backend's words: linux the binding file, noos the schema's property type."
+        },
+        "suggestions": {
+          "$ref": "#/$defs/property-suggestions"
+        }
+      }
+    },
+    "missing-property": {
+      "description": "MissingProperty: a required property the node lacks. Open, so that a backend can add fields (noos: node).",
+      "type": "object",
+      "required": [
+        "property",
+        "suggestions"
+      ],
+      "properties": {
+        "property": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "description": "The binding's description."
+        },
+        "suggestions": {
+          "description": "list value's values (which may carry a note from the binding, e.g. a required flag's explanation), then the other candidates, each marked by its note: disabled, enabled, enabled by the overlay (ADD-110).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/suggestion"
+          }
+        }
+      }
+    },
+    "property-description": {
+      "description": "PropertyDescription: what the binding says about a property.",
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "display",
+        "required"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/property-type"
+        },
+        "display": {
+          "type": "string",
+          "description": "The type as printed: number[2], enum(a | b) (LIST-054)."
+        },
+        "dt_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the backend is linux, always there (linux-property-description): dt-schema's type with what the binding constrains it to, one string: uint32, uint32-array · 2 to 4 items, phandle-array · 1 row of 3 cells, string · one of 3, flag; untyped where the binding gives none (LIST-057)."
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "set": {
+          "type": "boolean",
+          "description": "Whether the node has it (list property <path> <property>)."
+        },
+        "default": {
+          "$ref": "#/$defs/property-value"
+        },
+        "pinned": {
+          "type": "string",
+          "description": "The only value the definition allows, as update takes it and list value lists it: a const or a one-option enum (1, mclk), the empty string for a flag it requires (LIST-036, LIST-054)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "linux-property-description": {
+      "description": "PropertyDescription where the backend is linux: the shared one, with dt_type (LIST-057).",
+      "allOf": [
+        {
+          "$ref": "#/$defs/property-description"
+        }
+      ],
+      "required": [
+        "dt_type"
+      ]
+    },
+    "device": {
+      "description": "Device: one entry of list devices.",
+      "type": "object",
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "What add takes: a compatible where the backend is linux; an eval board, a driver or a schema where it is noos."
+        },
+        "tag": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "device-description": {
+      "description": "DeviceDescription: one device in full.",
+      "type": "object",
+      "required": [
+        "key",
+        "properties"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/property-description"
+          }
+        }
+      }
+    },
+    "validation-finding": {
+      "description": "ValidationFinding: one error or warning of validate.",
+      "type": "object",
+      "required": [
+        "kind",
+        "path",
+        "message",
+        "error_type"
+      ],
+      "properties": {
+        "kind": {
+          "const": "generic"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Where the finding is; [] for the workfile as a whole."
+        },
+        "message": {
+          "type": "string"
+        },
+        "error_type": {
+          "$ref": "#/$defs/error-type"
+        }
+      },
+      "additionalProperties": false
+    },
+    "unresolved-entry": {
+      "description": "Linux: a reference in the workfile that names no node of the merged tree (ADD-091, IMPORT-030).",
+      "type": "object",
+      "required": [
+        "path",
+        "property",
+        "reference"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/node-path"
+        },
+        "property": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string",
+          "pattern": "^&",
+          "description": "As written: &label or &{/path}."
+        }
+      },
+      "additionalProperties": false
+    },
+    "suggest-response": {
+      "description": "SuggestResponse: values or names to offer.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/common"
+        }
+      ],
+      "required": [
+        "suggestions"
+      ],
+      "properties": {
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/suggestion"
+          }
+        }
+      }
+    },
+    "error-type": {
+      "description": "The error types (GEN-17, COM-051): the fixed list, the same in every ecosystem (src/interface/error-types.ts).",
+      "enum": [
+        "unknown-command",
+        "unknown-flag",
+        "missing-argument",
+        "invalid-argument",
+        "conflicting-flags",
+        "missing-setting",
+        "unknown-setting",
+        "invalid-setting",
+        "settings-unreadable",
+        "invalid-source",
+        "cache-missing",
+        "cache-stale",
+        "tool-missing",
+        "tool-failed",
+        "install-incomplete",
+        "workfile-missing",
+        "workfile-exists",
+        "parse-error",
+        "workfile-invalid",
+        "write-failed",
+        "not-found",
+        "unknown-device-type",
+        "unknown-choice",
+        "ambiguous",
+        "name-taken",
+        "invalid-name",
+        "invalid-value",
+        "read-only",
+        "edit-refused",
+        "needs-force",
+        "unchecked",
+        "missing-required",
+        "out-of-range",
+        "bad-reference",
+        "rule-violation",
+        "resource-conflict",
+        "dependency-cycle",
+        "unresolved",
+        "not-generated",
+        "output-missing",
+        "generate-failed",
+        "definition-error",
+        "cancelled",
+        "internal-error"
+      ]
+    }
+  }
+}

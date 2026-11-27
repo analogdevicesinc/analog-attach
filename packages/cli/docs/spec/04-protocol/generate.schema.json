@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "generate.schema.json",
+  "title": "generate response",
+  "description": "Where the backend is noos: standard output of generate in JSON mode (GENERATE-040), or a refusal. A CommonResponse; the command is the no-OS backend's own (overview 2.1).",
+  "oneOf": [
+    {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],
+      "properties": {
+        "message": {
+          "type": "string",
+          "pattern": "^Generated '.+' in /.* \\(board: .+, templates: .+, [0-9]+ files?\\)$",
+          "description": "Generated '<name>' in <directory> (board: <board>, templates: <set>, <n> files) (GENERATE-040)."
+        },
+        "severity": { "const": "info" }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/refusal" }
+  ]
+}

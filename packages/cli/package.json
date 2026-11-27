@@ -1,0 +1,84 @@
+{
+  "name": "@analog-attach/cli",
+  "author": "AnalogDevices",
+  "description": "Configure Linux device tree overlays and no-OS projects for peripherals",
+  "license": "Apache-2.0",
+  "type": "module",
+  "version": "0.2.0",
+  "files": [
+    "dist",
+    "!dist/test-server.js",
+    "bundled",
+    "skills"
+  ],
+  "bin": {
+    "analog-attach": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p src/tsconfig.json && tsup --silent && rm -rf bundled && mkdir -p bundled/linux bundled/noos bundled/gui && cp scripts/dt-mk-schema.py scripts/dt-validate-worker.py bundled/linux/ && cp -r ../capi-lib/src/codegen/templates bundled/noos/templates && cp -r ../gui/src/index.html ../gui/src/core ../gui/src/ecosystems bundled/gui/ && rm -rf skills && cp -r ../../skills skills",
+    "build:binary": "node scripts/build-binary.mjs",
+    "dev-link": "yarn build && chmod +x dist/cli.js && mkdir -p \"$HOME/.local/bin\" && ln -sf \"$(pwd)/dist/cli.js\" \"$HOME/.local/bin/analog-attach\" && echo \"analog-attach linked to $HOME/.local/bin/analog-attach\"",
+    "dev-unlink": "rm -f \"$HOME/.local/bin/analog-attach\" && echo \"Removed $HOME/.local/bin/analog-attach\"",
+    "clean": "rm -rf dist dist-binary tsconfig.tsbuildinfo node_modules",
+    "lint": "eslint src",
+    "test": "vitest",
+    "test:functional": "test/functional/run.sh",
+    "coverage": "vitest run --coverage"
+  },
+  "tsup": {
+    "entry": [
+      "src/bin/cli.ts",
+      "src/bin/test-server.ts"
+    ],
+    "format": [
+      "esm"
+    ],
+    "tsconfig": "src/tsconfig.json",
+    "clean": true,
+    "splitting": true,
+    "noExternal": [
+      "@analog-attach/gui",
+      "linux-lib",
+      "capi-lib"
+    ],
+    "external": [
+      "yaml",
+      "eta"
+    ],
+    "define": {
+      "import.meta.vitest": "undefined"
+    },
+    "treeshake": true,
+    "removeNodeProtocol": false
+  },
+  "dependencies": {
+    "@inquirer/core": "^12.0.5",
+    "@inquirer/prompts": "8.7.3",
+    "@stricli/core": "^1.1.0",
+    "eta": "^4.6.0",
+    "yaml": "^2.8.3"
+  },
+  "devDependencies": {
+    "@analog-attach/gui": "workspace:*",
+    "@stylistic/eslint-plugin": "^6.0.1",
+    "@types/node": "22.x",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
+    "@typescript-eslint/parser": "^8.72.1",
+    "@vitest/coverage-v8": "^5.1.0",
+    "ajv": "^8.17.1",
+    "bats": "1.13.0",
+    "bats-assert": "2.2.4",
+    "bats-support": "0.3.0",
+    "capi-lib": "workspace:*",
+    "eslint": "^10.14.0",
+    "eslint-plugin-unicorn": "^79.0.0",
+    "linux-lib": "workspace:*",
+    "tsup": "^9.0.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.7",
+    "vitest": "^5.1.0"
+  }
+}

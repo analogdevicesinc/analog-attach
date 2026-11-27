@@ -1,0 +1,4 @@
+type: raw
+default: "NULL"
+description: "User context pointer"
+required: true

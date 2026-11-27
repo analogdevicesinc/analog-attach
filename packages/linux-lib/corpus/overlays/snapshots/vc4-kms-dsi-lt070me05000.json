@@ -1,0 +1,55 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "lt070me05000@0"
+        ],
+        "message": "lt070me05000@0 (jdi,lt070me05000): 'iovcc-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/display/panel/jdi,lt070me05000.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "lt070me05000@0"
+        ],
+        "message": "lt070me05000@0 (jdi,lt070me05000): 'vddp-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/display/panel/jdi,lt070me05000.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "lt070me05000_pins",
+          "brcm,function"
+        ],
+        "message": "lt070me05000_pins: brcm,function: b'\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "lt070me05000_pins",
+          "brcm,pins"
+        ],
+        "message": "lt070me05000_pins: brcm,pins: b'\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\x05\\x00\\x00\\x00\\x11' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "lt070me05000_pins",
+          "brcm,pull"
+        ],
+        "message": "lt070me05000_pins: brcm,pull: b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

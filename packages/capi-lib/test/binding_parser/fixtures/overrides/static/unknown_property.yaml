@@ -1,0 +1,8 @@
+$type: struct
+$symbol: test_struct
+value:
+  type: uint8_t
+
+$override:
+  - unknown_prop:
+      default: 0

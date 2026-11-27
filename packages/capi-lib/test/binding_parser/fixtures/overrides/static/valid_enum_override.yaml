@@ -1,0 +1,10 @@
+$type: struct
+$symbol: test_struct
+mode:
+  type: enum
+  values: [MODE_A, MODE_B, MODE_C]
+
+$override:
+  - mode:
+      default: MODE_B
+      required: true

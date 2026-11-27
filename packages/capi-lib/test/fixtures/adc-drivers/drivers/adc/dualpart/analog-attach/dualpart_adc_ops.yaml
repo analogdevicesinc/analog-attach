@@ -1,0 +1,5 @@
+$type: extern
+$symbol: dualpart_adc_ops
+$provides: test_adc_ops
+$header: dualpart.h
+$description: "The ADC side's ops table"

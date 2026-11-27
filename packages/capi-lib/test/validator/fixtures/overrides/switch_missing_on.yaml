@@ -1,0 +1,11 @@
+# $on names a parent property that does not exist — the switch matches nothing.
+$type: struct
+$symbol: child
+$override:
+  $parent:
+    - $switch:
+        $on: nonexistent
+        $cases:
+          fast:
+            speed:
+              minimum: 100

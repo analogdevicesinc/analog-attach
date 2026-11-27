@@ -1,0 +1,6 @@
+$type: enum
+$symbol: status_enum
+values:
+  STATUS_OK: "Operation succeeded"
+  STATUS_ERROR: "Operation failed"
+  STATUS_PENDING: "Operation in progress"

@@ -1,0 +1,3 @@
+include: "path/to/element.yaml"
+count: nb_elements
+description: "A by-value member cannot have a count"

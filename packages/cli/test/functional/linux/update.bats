@@ -1,0 +1,834 @@
+# update where the backend is linux: an AD7124-8 (channel child nodes) on spi0 of the RPi 4.
+
+# bats file_tags=eco:linux
+
+# Preconditions: a linux project on the Linux tree with the RPi 4 base devicetree, no workfile
+# yet. with_adc makes an overlay with an AD7124-8 on spi0 (label ad7124_8); with_channel adds
+# its child channel@0.
+setup() {
+	load ../helpers
+	new_project linux
+}
+
+# `with_adc`: the workfile with an AD7124-8 on spi0, adi,ad7124-8@2 labelled ad7124_8.
+with_adc() {
+	with_overlay
+	aa add adi,ad7124-8 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad7124-8 failed"
+}
+
+# `with_channel`: with_adc, and its child channel@0.
+with_channel() {
+	with_adc
+	aa update ad7124_8 channel@0 >/dev/null 2>&1 || fail "update ad7124_8 channel@0 failed"
+}
+
+# Description: update with a property and a value sets that property on the node.
+# Steps:
+#   1. Make the overlay with the AD7124-8 (with_adc).
+#   2. Run update ad7124_8 spi-max-frequency 1000000, with --json.
+#   3. Check it succeeds (.ok true) and the message says spi-max-frequency was set on ad7124_8.
+#   4. Check the overlay has spi-max-frequency = <1000000>.
+# bats test_tags=req:UPDATE-01, id:L0307
+@test "update sets a property to the value given" {
+	with_adc
+	run_json update ad7124_8 spi-max-frequency 1000000
+	assert_success
+	assert_json '.ok' true
+	assert_json '.message' 'Set spi-max-frequency on ad7124_8'
+	run cat "$WORKFILE"
+	assert_output --partial 'spi-max-frequency = <1000000>;'
+}
+
+# Description: updating a property that is already set replaces its value where it is, keeping
+# one copy of it and the order of the properties.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and set spi-max-frequency 1000000, then rdy-gpios.
+#   2. Run update ad7124_8 spi-max-frequency 2000000.
+#   3. Check it succeeds.
+#   4. Check the overlay has spi-max-frequency once, now <2000000>, still followed by rdy-gpios.
+# bats test_tags=req:UPDATE-01, id:L0308
+@test "update replaces a value in place" {
+	with_adc
+	aa update ad7124_8 spi-max-frequency 1000000 >/dev/null
+	aa update ad7124_8 rdy-gpios gpio 25 0 >/dev/null
+	run aa update ad7124_8 spi-max-frequency 2000000
+	assert_success
+	run grep -c spi-max-frequency "$WORKFILE"
+	assert_output 1
+	run grep -A1 spi-max-frequency "$WORKFILE"
+	assert_output --partial 'spi-max-frequency = <2000000>;'
+	assert_output --partial 'rdy-gpios'
+}
+
+# Description: updating a node of the base devicetree writes the change into the overlay, aimed
+# at that node, and leaves the base file as it was.
+# Steps:
+#   1. Create the overlay with init and take a checksum of the base devicetree.
+#   2. Run update spi0 status okay.
+#   3. Check it succeeds and says status was set on spi0.
+#   4. Check the overlay targets &spi0 with status = "okay".
+#   5. Check the base devicetree's checksum is unchanged.
+# bats test_tags=req:UPDATE-01, id:L0309
+@test "update of a base node writes the value into the overlay, not the base" {
+	with_overlay
+	local before
+	before="$(cksum <"$LINUX_BASE")"
+	run aa update spi0 status okay
+	assert_success
+	assert_output --partial 'Set status on spi0'
+	run cat "$WORKFILE"
+	assert_output --partial 'target = <&spi0>;'
+	assert_output --partial 'status = "okay";'
+	[ "$(cksum <"$LINUX_BASE")" = "$before" ] || fail "the base changed"
+}
+
+# Description: a value word that is neither a number, a known macro nor a label is refused, and
+# the workfile is left alone.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and snapshot it.
+#   2. Run update ad7124_8 interrupts foo, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message saying 'foo' is not a number, macro
+#      or label.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-02, id:L0310
+@test "update refuses a word that is not a number, a macro or a label" {
+	with_adc
+	snapshot
+	run_json update ad7124_8 interrupts foo
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' "'foo' is not a number, a known macro, or a label in the base tree/overlay"
+	assert_unchanged
+}
+
+# Description: a property named by a binding pattern that doesn't type it takes the type of the
+# selected pattern its name falls under (spec LIST-055): the AD4695's "^in(?:[13579]|1[135])-supply$"
+# says nothing of the value, dt-core's .*-supply$ makes in1-supply a phandle, so its cells must resolve
+# (spec UPDATE-032) rather than be written as a string.
+# Steps:
+#   1. Make the overlay with an AD4695 on spi0, and snapshot it.
+#   2. Run update on its in1-supply with foo, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message saying 'foo' is not a number, macro or label.
+#   4. Check the workfile is unchanged.
+#   5. Run update on its in1-supply with the label sd_vcc_reg, and check the overlay has
+#      in1-supply = <&sd_vcc_reg>.
+# bats test_tags=req:UPDATE-02, id:L0365
+@test "update types a supply that the binding's pattern leaves untyped as a phandle" {
+	with_overlay
+	aa add adi,ad4695 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad4695 failed"
+	snapshot
+	run_json update ad4695 in1-supply foo
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' "'foo' is not a number, a known macro, or a label in the base tree/overlay"
+	assert_unchanged
+	aa update ad4695 in1-supply sd_vcc_reg >/dev/null 2>&1
+	run cat "$WORKFILE"
+	assert_output --partial 'in1-supply = <&sd_vcc_reg>;'
+}
+
+# Description: giving a value to a property that is a flag in the binding is refused.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.
+#   2. Run update ad7124_8/channel@0 bipolar 1, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message saying bipolar is a flag.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-02, id:L0311
+@test "update refuses a value for a flag" {
+	with_channel
+	snapshot
+	run_json update ad7124_8/channel@0 bipolar 1
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message | startswith("bipolar is a flag")' true
+	assert_unchanged
+}
+
+# `assert_warned <property>`: the last run_json accepted the edit with a warning: exit 0, ok true,
+# severity warn, and the warning on standard error naming the property.
+assert_warned() {
+	assert_success
+	assert_json '.ok' true
+	assert_json '.severity' warn
+	[[ "$stderr" == *"$1"* ]] || fail "no warning about $1 on standard error: $stderr"
+}
+
+# Description: setting a property the node's binding does not define is accepted, with a warning.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 nosuch-prop 5, with --json.
+#   3. Check the overlay has nosuch-prop = <5>.
+#   4. Check it succeeds (exit 0, .ok true) with severity warn, and standard error names
+#      nosuch-prop.
+# bats test_tags=req:UPDATE-02, id:L0312
+@test "update warns about a property the binding does not have, and writes it" {
+	with_adc
+	run_json update ad7124_8 nosuch-prop 5
+	grep -q 'nosuch-prop = <5>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	assert_warned nosuch-prop
+}
+
+# Description: a value outside the options of an enum property is accepted, with a warning.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0.
+#   2. Run update ad7124_8/channel@0 adi,reference-select 2 (not one of 0, 1, 3), with --json.
+#   3. Check the overlay has adi,reference-select = <2>.
+#   4. Check it succeeds (exit 0, .ok true) with severity warn, and standard error names
+#      adi,reference-select.
+# bats test_tags=req:UPDATE-02, id:L0313
+@test "update warns about a value that is not one of an enum's options, and writes it" {
+	with_channel
+	run_json update ad7124_8/channel@0 adi,reference-select 2
+	grep -q 'adi,reference-select = <2>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	assert_warned adi,reference-select
+}
+
+# Description: a number above the binding's maximum is accepted, with a warning.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0.
+#   2. Run update ad7124_8/channel@0 reg 20 (the maximum is 15), with --json.
+#   3. Check the overlay has the channel as channel@20, with reg = <20>.
+#   4. Check it succeeds (exit 0, .ok true) with severity warn, and standard error names reg.
+# bats test_tags=req:UPDATE-02, id:L0314
+@test "update warns about a number above the maximum, and writes it" {
+	with_channel
+	run_json update ad7124_8/channel@0 reg 20
+	grep -A1 'channel@20 {' "$WORKFILE" | grep -q 'reg = <20>;' || fail "not written: $(cat "$WORKFILE")"
+	assert_warned reg
+}
+
+# Description: an array with more values than the binding allows is accepted, with a warning.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0.
+#   2. Run update ad7124_8/channel@0 diff-channels 1 2 3 (it takes 2), with --json.
+#   3. Check it succeeds (exit 0, .ok true) with severity warn, and standard error names
+#      diff-channels.
+#   4. Check the overlay has diff-channels = <1 2 3>.
+# bats test_tags=req:UPDATE-02, id:L0315
+@test "update warns about an array longer than its size, and writes it" {
+	with_channel
+	run_json update ad7124_8/channel@0 diff-channels 1 2 3
+	assert_warned diff-channels
+	grep -q 'diff-channels = <1 2 3>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+}
+
+# Description: a value the binding offers as one whole list (adi,ad5758's adi,range-microamp, one
+# <min max> pair of six) is checked as that list: an option is written with no warning, and a
+# pair that is no option is written with the one warning naming the options.
+# Steps:
+#   1. Make the overlay, add an adi,ad5758 on spi0 and set adi,dc-dc-mode 1 (the branch that
+#      allows adi,range-microamp).
+#   2. Run update ad5758 adi,range-microamp 0 20000, with --json.
+#   3. Check it succeeds with severity info, no warning on standard error, and the overlay has
+#      adi,range-microamp = <0 20000>.
+#   4. Run update ad5758 adi,range-microamp 1 2, with --json.
+#   5. Check it succeeds with severity warn, standard error is the one warning that 1 2 is not
+#      one of the options, and the overlay has adi,range-microamp = <1 2>.
+# bats test_tags=req:UPDATE-02, id:L0366
+@test "update checks a whole-list option as one value" {
+	with_overlay
+	aa add adi,ad5758 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad5758 failed"
+	aa update ad5758 adi,dc-dc-mode 1 >/dev/null 2>&1 || fail "update adi,dc-dc-mode failed"
+	run_json update ad5758 adi,range-microamp 0 20000
+	assert_success
+	assert_json '.severity' info
+	[[ "$stderr" != *"warning:"* ]] || fail "warned: $stderr"
+	grep -q 'adi,range-microamp = <0 20000>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	run_json update ad5758 adi,range-microamp 1 2
+	assert_warned adi,range-microamp
+	[[ "$stderr" == "warning: adi,range-microamp takes one of 0 20000 | 0 24000 | 4 24000 | -20000 20000 | -24000 24000 | -1000 22000, got 1 2" ]] \
+		|| fail "expected the one value warning: $stderr"
+	grep -q 'adi,range-microamp = <1 2>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+}
+
+# Description: a negative number, which update writes as an expression ((-20000)), is checked by
+# the number it gives: an option with a negative is written with no warning, and a pair with a
+# negative that is no option gets the warning.
+# Steps:
+#   1. Make the overlay, add an adi,ad5758 on spi0 and set adi,dc-dc-mode 1.
+#   2. Run update ad5758 adi,range-microamp -20000 20000, with --json.
+#   3. Check it succeeds with severity info, no warning on standard error, and the overlay has
+#      adi,range-microamp = <(-20000) 20000>.
+#   4. Run update ad5758 adi,range-microamp -1 2, with --json.
+#   5. Check it succeeds with severity warn and standard error is the one warning that -1 2 is not
+#      one of the options.
+# bats test_tags=req:UPDATE-02, id:L0368
+@test "update checks a negative number by its value" {
+	with_overlay
+	aa add adi,ad5758 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad5758 failed"
+	aa update ad5758 adi,dc-dc-mode 1 >/dev/null 2>&1 || fail "update adi,dc-dc-mode failed"
+	run_json update ad5758 adi,range-microamp -20000 20000
+	assert_success
+	assert_json '.severity' info
+	[[ "$stderr" != *"warning:"* ]] || fail "warned: $stderr"
+	grep -q 'adi,range-microamp = <(-20000) 20000>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	run_json update ad5758 adi,range-microamp -1 2
+	assert_warned adi,range-microamp
+	[[ "$stderr" == "warning: adi,range-microamp takes one of 0 20000 | 0 24000 | 4 24000 | -20000 20000 | -24000 24000 | -1000 22000, got -1 2" ]] \
+		|| fail "expected the one value warning: $stderr"
+}
+
+# Description: a negative number in a cell that allows none (spi-max-frequency, a uint32) is
+# written, as dtc stores it wrapped, with a warning that names the negative and what is stored.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 spi-max-frequency -1, with --json.
+#   3. Check it succeeds with severity warn and error_type out-of-range, standard error is the one
+#      warning that spi-max-frequency is unsigned, got -1 (stored as 4294967295), and the overlay
+#      has spi-max-frequency = <(-1)>.
+#   4. Run update ad7124_8 spi-max-frequency 0xffffffff, with --json; check it succeeds with
+#      severity info and no warning.
+# bats test_tags=req:UPDATE-02, id:L0378
+@test "update warns about a negative number in an unsigned cell" {
+	with_adc
+	run_json update ad7124_8 spi-max-frequency -1
+	assert_warned spi-max-frequency
+	assert_json '.error_type' out-of-range
+	[[ "$stderr" == "warning: spi-max-frequency is unsigned, got -1 (stored as 4294967295)" ]] \
+		|| fail "expected the one unsigned warning: $stderr"
+	grep -q 'spi-max-frequency = <(-1)>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	run_json update ad7124_8 spi-max-frequency 0xffffffff
+	assert_success
+	assert_json '.severity' info
+	[[ "$stderr" != *"warning:"* ]] || fail "warned: $stderr"
+}
+
+# Description: clocks are counted by entry, each a provider's phandle and the cells its
+# #clock-cells asks for, whatever the <…> groups the value writes: one more clock than the
+# binding allows is written, with a warning.
+# Steps:
+#   1. Make the overlay and add adi,ad7768-1 on spi0, whose binding allows one clock.
+#   2. Run update ad7768_1 clocks clocks 20 (cprman, #clock-cells = <1>), with --json; check it
+#      succeeds with severity info, no warning, and the overlay has clocks = <&clocks 20>.
+#   3. Run update ad7768_1 clocks "clk_osc, clocks 20", with --json; check it succeeds with
+#      severity warn, standard error is the one warning clocks takes 1 clock, got 2, and the
+#      overlay has clocks = <&clk_osc>, <&clocks 20>.
+#   4. Run update ad7768_1 clocks clk_osc clocks 20 (one group), with --json; check the same
+#      warning.
+# bats test_tags=req:UPDATE-02, id:L0488
+@test "update counts clocks by each provider's #clock-cells" {
+	with_overlay
+	aa add adi,ad7768-1 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad7768-1 failed"
+	run_json update ad7768_1 clocks clocks 20
+	assert_success
+	assert_json '.severity' info
+	[[ "$stderr" != *"warning:"* ]] || fail "warned: $stderr"
+	grep -q 'clocks = <&clocks 20>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	run_json update ad7768_1 clocks "clk_osc, clocks 20"
+	assert_warned clocks
+	[[ "$stderr" == "warning: clocks takes 1 clock, got 2" ]] || fail "expected the one count warning: $stderr"
+	grep -q 'clocks = <&clk_osc>, <&clocks 20>;' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	run_json update ad7768_1 clocks clk_osc clocks 20
+	assert_warned clocks
+	[[ "$stderr" == "warning: clocks takes 1 clock, got 2" ]] || fail "expected the one count warning: $stderr"
+}
+
+# Description: update with a property and no value shows the property exactly as read does, in
+# text and in JSON.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and set spi-max-frequency 1000000.
+#   2. Run read ad7124_8 spi-max-frequency, then update ad7124_8 spi-max-frequency.
+#   3. Check update succeeds with the same output as read, its first line the property's value.
+#   4. Run the same read and update with --json and check their outputs are the same.
+# bats test_tags=req:UPDATE-03, id:L0316
+@test "update without a value shows the property as read does" {
+	with_adc
+	aa update ad7124_8 spi-max-frequency 1000000 >/dev/null
+	run aa read ad7124_8 spi-max-frequency
+	local read_text="$output"
+	run aa update ad7124_8 spi-max-frequency
+	assert_success
+	assert_output "$read_text"
+	assert_line --index 0 'spi-max-frequency = <1000000>;'
+	run_json read ad7124_8 spi-max-frequency
+	local read_json="$output"
+	run_json update ad7124_8 spi-max-frequency
+	assert_output "$read_json"
+}
+
+# Description: update with a property and no value, on a property that has a value, leaves the
+# workfile as it was.
+# Steps:
+#   1. Make the overlay with the AD7124-8, set spi-max-frequency 1000000 and snapshot the workfile.
+#   2. Run update ad7124_8 spi-max-frequency.
+#   3. Check it succeeds and the workfile is unchanged.
+# bats test_tags=req:UPDATE-03, id:L0317
+@test "update without a value changes nothing when it reads" {
+	with_adc
+	aa update ad7124_8 spi-max-frequency 1000000 >/dev/null
+	snapshot
+	run aa update ad7124_8 spi-max-frequency
+	assert_success
+	assert_unchanged
+}
+
+# Description: update with no value on a property the binding defines as a flag sets the flag.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0.
+#   2. Run update ad7124_8/channel@0 bipolar.
+#   3. Check it succeeds and says the flag bipolar was set on ad7124_8/channel@0.
+#   4. Check the overlay has a line bipolar; on its own.
+# bats test_tags=req:UPDATE-03-LNX, id:L0318
+@test "update without a value sets a flag the binding defines" {
+	with_channel
+	run aa update ad7124_8/channel@0 bipolar
+	assert_success
+	assert_output 'Set flag bipolar on ad7124_8/channel@0'
+	run grep -x $'\t*bipolar;' "$WORKFILE"
+	assert_success
+}
+
+# Description: update with no value on a property the node does not have, and the binding does
+# not define, sets it as a flag.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 adi,some-flag, with --json.
+#   3. Check it succeeds and the message says the flag adi,some-flag was set on ad7124_8.
+#   4. Check the overlay has a line adi,some-flag; on its own.
+# bats test_tags=req:UPDATE-03-LNX, id:L0319
+@test "update without a value sets a property the node does not have as a flag" {
+	with_adc
+	run_json update ad7124_8 adi,some-flag
+	assert_success
+	assert_json '.message' 'Set flag adi,some-flag on ad7124_8'
+	run grep -x $'\t*adi,some-flag;' "$WORKFILE"
+	assert_success
+}
+
+# Description: update --suggest lists the values a property can take instead of setting it.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and snapshot it.
+#   2. Run update ad7124_8 interrupt-parent --suggest, with --json.
+#   3. Check it succeeds and the suggested values include gpio.
+#   4. Check it answers what list value ad7124_8 interrupt-parent answers.
+#   5. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-04, id:L0320
+@test "update --suggest lists the values instead of setting the property" {
+	with_adc
+	snapshot
+	run_json update ad7124_8 interrupt-parent --suggest
+	assert_success
+	assert_json '[.suggestions[].value] | index("gpio") != null' true
+	local suggested=$output
+	run_json list value ad7124_8 interrupt-parent
+	assert_output "$suggested"
+	assert_unchanged
+}
+
+# Description: update --quiet with a property and no value prints the property's value alone.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and set spi-max-frequency 1000000.
+#   2. Run update --quiet ad7124_8 spi-max-frequency.
+#   3. Check it succeeds and prints only spi-max-frequency = <1000000>.
+# bats test_tags=req:UPDATE-05, id:L0321
+@test "update --quiet without a value prints only the value" {
+	with_adc
+	aa update ad7124_8 spi-max-frequency 1000000 >/dev/null
+	run aa update --quiet ad7124_8 spi-max-frequency
+	assert_success
+	assert_output 'spi-max-frequency = <1000000>;'
+}
+
+# Description: update --quiet that creates a child node on a terminal does not ask for its
+# required properties; it lists the missing ones and how to set them.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update --quiet ad7124_8 channel@0 on a terminal, typing nothing.
+#   3. Check it succeeds without asking for any required property.
+#   4. Check it says channel@0 was added, that diff-channels is missing, and the update command
+#      that sets it.
+# bats test_tags=req:UPDATE-05, id:L0322
+@test "update --quiet that creates a child on a terminal asks nothing and lists what is missing" {
+	with_adc
+	tty_run -- update --quiet ad7124_8 channel@0
+	assert_success
+	refute_output --partial 'required property to set'
+	assert_output --partial 'Added channel@0 to ad7124_8'
+	assert_output --partial 'Missing required: diff-channels'
+	assert_output --partial 'Set them with: update ad7124_8/channel@0 <property> <value>'
+}
+
+# Description: update takes decimal and hexadecimal numbers and devicetree macros, writing
+# macros as their numbers and keeping hexadecimal as given.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, and set interrupt-parent gpio.
+#   2. Run update ad7124_8 interrupts 25 IRQ_TYPE_EDGE_FALLING and check it succeeds.
+#   3. Set rdy-gpios gpio 26 GPIO_ACTIVE_LOW, and diff-channels 0x2 3 on channel@0.
+#   4. Check the overlay has interrupts = <25 2>, rdy-gpios = <&gpio 26 1> and
+#      diff-channels = <0x2 3>.
+# bats test_tags=req:UPDATE-07, id:L0323
+@test "update takes numbers, hexadecimal numbers and macros" {
+	with_channel
+	aa update ad7124_8 interrupt-parent gpio >/dev/null
+	run aa update ad7124_8 interrupts 25 IRQ_TYPE_EDGE_FALLING
+	assert_success
+	aa update ad7124_8 rdy-gpios gpio 26 GPIO_ACTIVE_LOW >/dev/null
+	aa update ad7124_8/channel@0 diff-channels 0x2 3 >/dev/null
+	run cat "$WORKFILE"
+	assert_output --partial 'interrupts = <25 2>;'
+	assert_output --partial 'rdy-gpios = <&gpio 26 1>;'
+	assert_output --partial 'diff-channels = <0x2 3>;'
+}
+
+# Description: a reference to another node can be given as its label, with or without the &.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Set interrupt-parent gpio, and rdy-gpios '&gpio' 25 0.
+#   3. Check the overlay has interrupt-parent = <&gpio> and rdy-gpios = <&gpio 25 0>.
+# bats test_tags=req:UPDATE-07, id:L0324
+@test "update takes a reference as a label, with or without &" {
+	with_adc
+	aa update ad7124_8 interrupt-parent gpio >/dev/null
+	aa update ad7124_8 rdy-gpios '&gpio' 25 0 >/dev/null
+	run cat "$WORKFILE"
+	assert_output --partial 'interrupt-parent = <&gpio>;'
+	assert_output --partial 'rdy-gpios = <&gpio 25 0>;'
+}
+
+# Description: a word is written as a string, and several words as a list of strings.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Set clock-names mclk, and adi,names one two.
+#   3. Check the overlay has clock-names = "mclk" and adi,names = "one", "two".
+# bats test_tags=req:UPDATE-07, id:L0325
+@test "update takes strings, several words giving a string list" {
+	with_adc
+	aa update ad7124_8 clock-names mclk >/dev/null
+	aa update ad7124_8 adi,names one two >/dev/null 2>&1
+	run cat "$WORKFILE"
+	assert_output --partial 'clock-names = "mclk";'
+	assert_output --partial 'adi,names = "one", "two";'
+}
+
+# Description: several number tokens make an array, and a comma between them starts a new row of
+# a matrix.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0.
+#   2. Set diff-channels 0 1 on channel@0.
+#   3. Set rdy-gpios gpio 25 GPIO_ACTIVE_LOW, gpio 26 0 on ad7124_8.
+#   4. Check the overlay has diff-channels = <0 1> and rdy-gpios = <&gpio 25 1>, <&gpio 26 0>.
+# bats test_tags=req:UPDATE-07, id:L0326
+@test "update takes an array as several tokens and a matrix with rows separated by commas" {
+	with_channel
+	aa update ad7124_8/channel@0 diff-channels 0 1 >/dev/null
+	aa update ad7124_8 rdy-gpios gpio 25 GPIO_ACTIVE_LOW, gpio 26 0 >/dev/null
+	run cat "$WORKFILE"
+	assert_output --partial 'diff-channels = <0 1>;'
+	assert_output --partial 'rdy-gpios = <&gpio 25 1>, <&gpio 26 0>;'
+}
+
+# Description: a property whose binding gives it 64-bit cells is written with /bits/ 64, so dtc
+# doesn't truncate it, and a label is refused there, as dtc only takes a reference in a 32-bit
+# cell.
+# Steps:
+#   1. Make the overlay, add an ADF4371 on spi0 (label adf4371) and its child channel@0.
+#   2. Set adi,power-up-frequency 8000000000 on channel@0 (a uint64) and check it succeeds.
+#   3. Check the overlay has adi,power-up-frequency = /bits/ 64 <8000000000>.
+#   4. Snapshot the workfile, run update adf4371/channel@0 adi,power-up-frequency gpio, with
+#      --json, and check it is refused (exit 0, .ok false) with the 64-bit message.
+#   5. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-07, id:L0354
+@test "update writes a 64-bit property with /bits/ 64 and refuses a label in it" {
+	with_overlay
+	aa add adi,adf4371 --parent spi0 >/dev/null 2>&1 || fail "add adi,adf4371 failed"
+	aa update adf4371 channel@0 >/dev/null 2>&1 || fail "update adf4371 channel@0 failed"
+	run aa update adf4371/channel@0 adi,power-up-frequency 8000000000
+	assert_success
+	run cat "$WORKFILE"
+	assert_output --partial 'adi,power-up-frequency = /bits/ 64 <8000000000>;'
+	snapshot
+	run_json update adf4371/channel@0 adi,power-up-frequency gpio
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' "'gpio' is a label, and adi,power-up-frequency holds 64-bit cells: dtc only takes a reference in a 32-bit cell"
+	assert_unchanged
+}
+
+# Description: update naming a child node that does not exist creates it, with its reg and
+# address cells, and lists its missing required properties.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 channel@1.
+#   3. Check it succeeds, says channel@1 was added to ad7124_8 and that diff-channels is missing.
+#   4. Check the overlay has a channel@1 node with reg = <1>, and #address-cells = <1> and
+#      #size-cells = <0>.
+# bats test_tags=req:UPDATE-08, id:L0327
+@test "naming a child that does not exist creates the child node" {
+	with_adc
+	run aa update ad7124_8 channel@1
+	assert_success
+	assert_output --partial 'Added channel@1 to ad7124_8'
+	assert_output --partial 'Missing required: diff-channels'
+	run cat "$WORKFILE"
+	assert_output --partial 'channel@1 {'
+	assert_output --partial 'reg = <1>;'
+	assert_output --partial '#address-cells = <1>;'
+	assert_output --partial '#size-cells = <0>;'
+}
+
+# Description: in JSON, creating a child node reports its path and its missing required
+# properties.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 channel@2, with --json.
+#   3. Check it succeeds and the message says channel@2 was added to ad7124_8.
+#   4. Check .path is the full path of the new node under spi@7e204000.
+#   5. Check .missing_required lists diff-channels.
+# bats test_tags=req:UPDATE-08, id:L0328
+@test "a new child's missing required properties are listed in JSON" {
+	with_adc
+	run_json update ad7124_8 channel@2
+	assert_success
+	assert_json '.message' 'Added channel@2 to ad7124_8'
+	assert_json '.path | join("/")' 'soc/spi@7e204000/adi,ad7124-8@2/channel@2'
+	assert_json '[.missing_required[].property] | join(",")' diff-channels
+}
+
+# Description: on a terminal, creating a child node asks for each of its missing required
+# properties, and writes the answers.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 channel@0 on a terminal, answering 0 and 1 to the two diff-channels
+#      prompts.
+#   3. Check it succeeds, said 1 required property was to set, asked for diff-channels and
+#      ended with all required properties set.
+#   4. Check the overlay has diff-channels = <0 1>.
+# bats test_tags=req:UPDATE-08, id:L0329
+@test "on a terminal, a new child's missing required properties are asked for" {
+	with_adc
+	tty_run 'diff-channels 1/2 (number)' $'0\r' 'diff-channels 2/2 (number)' $'1\r' -- update ad7124_8 channel@0
+	assert_success
+	assert_output --partial '1 required property to set'
+	assert_output --partial '[1/1] diff-channels'
+	assert_output --partial 'All required properties are set.'
+	run cat "$WORKFILE"
+	assert_output --partial 'diff-channels = <0 1>;'
+}
+
+# Description: a value given for the name of a child node is refused, pointing to the path form
+# that sets the child's properties.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.
+#   2. Run update ad7124_8 channel@0 5, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message saying channel@0 is a child node and
+#      giving the update ad7124_8/channel@0 command.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-08, id:L0330
+@test "a value given for a child node is refused" {
+	with_channel
+	snapshot
+	run_json update ad7124_8 channel@0 5
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' 'channel@0 is a child node; set its properties with `update ad7124_8/channel@0 <prop> <value>`'
+	assert_unchanged
+}
+
+# `with_adp5055`: the workfile with an ADP5055 on i2c1 (label adp5055), whose bucks are child
+# nodes of a pattern without @ (^buck[0-2]$).
+with_adp5055() {
+	with_overlay
+	aa add adi,adp5055 --parent i2c1 >/dev/null 2>&1 || fail "add adi,adp5055 failed"
+}
+
+# Description: naming a child that the binding's child-node pattern allows creates it, though the
+# pattern has no @ (adi,adp5055's ^buck[0-2]$), and naming it again shows it.
+# Steps:
+#   1. Make the overlay with an ADP5055 on i2c1.
+#   2. Run update adp5055 buck0.
+#   3. Check it succeeds, says buck0 was added to adp5055 and that regulator-name is missing.
+#   4. Check the overlay has an empty buck0 node, with no reg, and no buck0 property.
+#   5. Run update adp5055 buck0 again; check it succeeds and shows the buck0 node.
+# bats test_tags=req:UPDATE-08, id:L0371
+@test "naming a child of a pattern without @ creates the child node" {
+	with_adp5055
+	run aa update adp5055 buck0
+	assert_success
+	assert_output --partial 'Added buck0 to adp5055'
+	assert_output --partial 'Missing required: regulator-name'
+	grep -Pzq 'buck0 \{\n\t*\};' "$WORKFILE" || fail "no empty buck0 node: $(cat "$WORKFILE")"
+	run grep -q 'buck0;' "$WORKFILE"
+	assert_failure
+	run aa update adp5055 buck0
+	assert_success
+	assert_line --index 0 'buck0 {'
+}
+
+# Description: a value given for a child that a pattern without @ allows is refused, and nothing
+# is written.
+# Steps:
+#   1. Make the overlay with an ADP5055 on i2c1, and snapshot it.
+#   2. Run update adp5055 buck1 3, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message saying buck1 is a child node and giving
+#      the update adp5055/buck1 command.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-08, id:L0372
+@test "a value given for a child of a pattern without @ is refused" {
+	with_adp5055
+	snapshot
+	run_json update adp5055 buck1 3
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' 'buck1 is a child node; set its properties with `update adp5055/buck1 <prop> <value>`'
+	assert_unchanged
+}
+
+# Description: a name the binding defines as a property, or doesn't define, is a property, with
+# or without @.
+# Steps:
+#   1. Make the overlay with an ADP5055 on i2c1.
+#   2. Run update adp5055 adi,ocp-blanking (a flag of the binding); check it sets the flag.
+#   3. Run update adp5055 foo@1 (no property or pattern of the binding); check it sets a flag.
+#   4. Check the overlay has adi,ocp-blanking; and foo@1; and no foo@1 node.
+# bats test_tags=req:UPDATE-08, id:L0373
+@test "a name the binding doesn't define as a node is a property, with or without @" {
+	with_adp5055
+	run aa update adp5055 adi,ocp-blanking
+	assert_success
+	assert_output --partial 'Set flag adi,ocp-blanking on adp5055'
+	run aa update adp5055 foo@1
+	assert_success
+	assert_output --partial 'Set flag foo@1 on adp5055'
+	grep -q 'adi,ocp-blanking;' "$WORKFILE" || fail "no flag: $(cat "$WORKFILE")"
+	grep -q 'foo@1;' "$WORKFILE" || fail "no flag: $(cat "$WORKFILE")"
+	run grep -q 'foo@1 {' "$WORKFILE"
+	assert_failure
+}
+
+# Description: changing a node's reg renames the node, its unit address the new reg in
+# hexadecimal.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 reg 10.
+#   3. Check it succeeds and says the node was renamed to adi,ad7124-8@a.
+#   4. Check the overlay has the node adi,ad7124-8@a, label kept, with reg = <10>.
+# bats test_tags=req:UPDATE-09, id:L0331
+@test "changing reg changes the node's unit address, in hexadecimal" {
+	with_adc
+	run aa update ad7124_8 reg 10
+	assert_success
+	assert_output --partial 'Set reg on ad7124_8; renamed to adi,ad7124-8@a'
+	run cat "$WORKFILE"
+	assert_output --partial 'ad7124_8: adi,ad7124-8@a {'
+	assert_output --partial 'reg = <10>;'
+}
+
+# Description: changing a channel's reg renames it with the reg in decimal, as its binding
+# names channels.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0.
+#   2. Run update ad7124_8/channel@0 reg 12.
+#   3. Check it succeeds and says the node was renamed to channel@12.
+#   4. Check the overlay has channel@12 and no longer channel@0.
+# bats test_tags=req:UPDATE-09, id:L0332
+@test "a channel's unit address follows reg in decimal, as its binding names it" {
+	with_channel
+	run aa update ad7124_8/channel@0 reg 12
+	assert_success
+	assert_output 'Set reg on ad7124_8/channel@0; renamed to channel@12'
+	run cat "$WORKFILE"
+	assert_output --partial 'channel@12 {'
+	refute_output --partial 'channel@0 {'
+}
+
+# Description: a reg change that would give a node the name of a sibling is refused.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, add channel@6, and snapshot it.
+#   2. Run update ad7124_8/channel@6 reg 0, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message naming a naming conflict.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-09, id:L0333
+@test "a reg that would give the name of a sibling is refused" {
+	with_channel
+	aa update ad7124_8 channel@6 >/dev/null
+	snapshot
+	run_json update ad7124_8/channel@6 reg 0
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' 'reg update would create a naming conflict; not written'
+	assert_unchanged
+}
+
+# Description: setting interrupts on a node with no interrupt-parent writes the one it inherits,
+# and warns when that controller's cell count differs from the value's.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 interrupts 25 IRQ_TYPE_EDGE_FALLING, with --json.
+#   3. Check it succeeds with severity warn, the message saying interrupt-parent = <&gicv2> was
+#      set, inherited from /.
+#   4. Check standard error warns that gicv2 takes 3 interrupt cells but interrupts has 2.
+#   5. Check the overlay has interrupt-parent = <&gicv2>.
+# bats test_tags=id:L0334
+@test "setting interrupts writes the inherited interrupt-parent, warning when its cells differ" {
+	with_adc
+	run_json update ad7124_8 interrupts 25 IRQ_TYPE_EDGE_FALLING
+	assert_success
+	assert_json '.severity' warn
+	assert_json '.message' 'Set interrupts on ad7124_8; Set interrupt-parent = <&gicv2> on /soc/spi@7e204000/adi,ad7124-8@2 (inherited from /)'
+	[[ "$stderr" == *'gicv2 has #interrupt-cells = <3> but interrupts has 2 cells; set interrupt-parent explicitly'* ]] ||
+		fail "no cell-count warning: $stderr"
+	run cat "$WORKFILE"
+	assert_output --partial 'interrupt-parent = <&gicv2>;'
+}
+
+# Description: the interrupt-parent inherited on setting interrupts is found in the base with the
+# overlay applied: one the overlay sets on the node's bus is the one written on the node, with no
+# cell-count warning when its cells match.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and set interrupt-parent gpio on spi0.
+#   2. Run update ad7124_8 interrupts 25 2, with --json.
+#   3. Check it succeeds with severity info, the message saying interrupt-parent = <&gpio> was set,
+#      inherited from /soc/spi@7e204000, and no warning on standard error.
+#   4. Check the overlay has interrupt-parent = <&gpio> and no <&gicv2>.
+# bats test_tags=id:L0369
+@test "setting interrupts inherits the interrupt-parent the overlay sets on an ancestor" {
+	with_adc
+	aa update spi0 interrupt-parent gpio >/dev/null 2>&1 || fail "update spi0 interrupt-parent failed"
+	run_json update ad7124_8 interrupts 25 2
+	assert_success
+	assert_json '.severity' info
+	assert_json '.message' 'Set interrupts on ad7124_8; Set interrupt-parent = <&gpio> on /soc/spi@7e204000/adi,ad7124-8@2 (inherited from /soc/spi@7e204000)'
+	[[ "$stderr" != *"interrupt-cells"* ]] || fail "cell-count warning: $stderr"
+	run grep -c 'interrupt-parent = <&gpio>;' "$WORKFILE"
+	assert_output 2
+	run grep -q 'gicv2' "$WORKFILE"
+	assert_failure
+}
+
+# Description: setting interrupts to a value that isn't cells writes no interrupt-parent.
+# Steps:
+#   1. Make the overlay and put spidev1 (no binding types its interrupts) in it, with status okay.
+#   2. Run update spidev1 interrupts hello, with --json.
+#   3. Check it succeeds, the overlay has interrupts = "hello", and it has no interrupt-parent.
+# bats test_tags=id:L0370
+@test "setting interrupts to a value that isn't cells writes no interrupt-parent" {
+	with_overlay
+	aa update spidev1 status okay >/dev/null 2>&1 || fail "update spidev1 status failed"
+	run_json update spidev1 interrupts hello
+	assert_success
+	assert_json '.message | test("interrupt-parent")' false
+	grep -q 'interrupts = "hello";' "$WORKFILE" || fail "not written: $(cat "$WORKFILE")"
+	run grep -q 'interrupt-parent' "$WORKFILE"
+	assert_failure
+}
+
+# Description: a workfile with a preprocessor directive doesn't parse (it isn't preprocessed): a
+# command that loads it is refused, naming the file, the directive and its line and column, and
+# nothing is written.
+# Steps:
+#   1. Make the overlay with an AD7124-8 on spi0, add `#include <dt-bindings/gpio/gpio.h>` as its
+#      third line and snapshot it.
+#   2. Update ad7124_8 spi-max-frequency 1000000, with --json; check it is refused (exit 0, .ok
+#      false), saying the workfile does not parse at the #include, line 3, column 1.
+#   3. Check the workfile is unchanged.
+# bats test_tags=req:GEN-12, id:L0376
+@test "a workfile with an #include is refused at the directive, and nothing is written" {
+	with_adc
+	sed -i '2a #include <dt-bindings/gpio/gpio.h>' "$WORKFILE"
+	snapshot
+	run_json update ad7124_8 spi-max-frequency 1000000
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message' "workfile: $WORKFILE does not parse: Failed to parse overlay: Preprocessor directives aren't supported: '#include' (line 3, column 1)"
+	assert_unchanged
+}

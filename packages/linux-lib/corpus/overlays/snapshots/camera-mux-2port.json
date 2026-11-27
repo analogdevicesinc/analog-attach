@@ -1,0 +1,257 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node11",
+          "video-mux",
+          "port@0",
+          "endpoint"
+        ],
+        "message": "video-mux (video-mux): port@0:endpoint: Unevaluated properties are not allowed ('clock-lanes' was unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/media/video-mux.yaml"
+      },
+      {
+        "path": [
+          "node11",
+          "video-mux",
+          "port@1",
+          "endpoint"
+        ],
+        "message": "video-mux (video-mux): port@1:endpoint: Unevaluated properties are not allowed ('clock-lanes' was unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/media/video-mux.yaml"
+      },
+      {
+        "path": [
+          "node11",
+          "video-mux",
+          "port@2",
+          "endpoint"
+        ],
+        "message": "video-mux (video-mux): port@2:endpoint: Unevaluated properties are not allowed ('clock-lanes' was unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/media/video-mux.yaml"
+      },
+      {
+        "path": [
+          "node13",
+          "mipi_sw_oe_hog",
+          "$nodename",
+          "0"
+        ],
+        "message": "mipi_sw_oe_hog: $nodename:0: 'mipi_sw_oe_hog' does not match '-hog(-[0-9]+)?$'\n\tfrom schema $id: http://devicetree.org/schemas/gpio/gpio-hog.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70"
+        ],
+        "message": "pca@70 (nxp,pca9543): Unevaluated properties are not allowed ('#address-cells', '#size-cells', 'i2c@0', 'i2c@1' were unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/i2c/i2c-mux-pca954x.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "$nodename",
+          "0"
+        ],
+        "message": "pca@70 (nxp,pca9543): $nodename:0: 'pca@70' does not match '^(i2c-?)?mux'\n\tfrom schema $id: http://devicetree.org/schemas/i2c/i2c-mux-pca954x.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@0",
+          "arducam_64mp@1a"
+        ],
+        "message": "arducam_64mp@1a (arducam,64mp): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/arducam,64mp.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@0",
+          "imx219@10"
+        ],
+        "message": "imx219@10 (sony,imx219): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/imx219.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@0",
+          "imx258@10"
+        ],
+        "message": "imx258@10 (sony,imx258): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx258.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@0",
+          "imx519@1a"
+        ],
+        "message": "imx519@1a (sony,imx519): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/imx519.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@0",
+          "imx708@1a"
+        ],
+        "message": "imx708@1a (sony,imx708): 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx708.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@0",
+          "imx708@1a",
+          "clock-names",
+          "0"
+        ],
+        "message": "imx708@1a (sony,imx708): clock-names:0: 'inck' was expected\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx708.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@0",
+          "ov5647@36"
+        ],
+        "message": "ov5647@36 (ovti,ov5647): 'avdd-supply', 'dovdd-supply', 'dvdd-supply', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/ovti,ov5647.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@0",
+          "ov64a40@36",
+          "port",
+          "endpoint"
+        ],
+        "message": "ov64a40@36 (ovti,ov64a40): port:endpoint: 'clock-lanes' does not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/ovti,ov64a40.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@0",
+          "ov7251@60"
+        ],
+        "message": "ov7251@60 (ovti,ov7251): 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/ovti,ov7251.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@0",
+          "ov9281@60"
+        ],
+        "message": "ov9281@60 (ovti,ov9281): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/ovti,ov9282.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@1",
+          "arducam_64mp@1a"
+        ],
+        "message": "arducam_64mp@1a (arducam,64mp): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/arducam,64mp.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@1",
+          "imx219@10"
+        ],
+        "message": "imx219@10 (sony,imx219): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/imx219.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@1",
+          "imx258@10"
+        ],
+        "message": "imx258@10 (sony,imx258): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx258.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@1",
+          "imx519@1a"
+        ],
+        "message": "imx519@1a (sony,imx519): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/imx519.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@1",
+          "imx708@1a"
+        ],
+        "message": "imx708@1a (sony,imx708): 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx708.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@1",
+          "imx708@1a",
+          "clock-names",
+          "0"
+        ],
+        "message": "imx708@1a (sony,imx708): clock-names:0: 'inck' was expected\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx708.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@1",
+          "ov5647@36"
+        ],
+        "message": "ov5647@36 (ovti,ov5647): 'avdd-supply', 'dovdd-supply', 'dvdd-supply', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/ovti,ov5647.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@1",
+          "ov64a40@36",
+          "port",
+          "endpoint"
+        ],
+        "message": "ov64a40@36 (ovti,ov64a40): port:endpoint: 'clock-lanes' does not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/ovti,ov64a40.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@1",
+          "ov7251@60"
+        ],
+        "message": "ov7251@60 (ovti,ov7251): 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/ovti,ov7251.yaml"
+      },
+      {
+        "path": [
+          "node8",
+          "pca@70",
+          "i2c@1",
+          "ov9281@60"
+        ],
+        "message": "ov9281@60 (ovti,ov9281): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/ovti,ov9282.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

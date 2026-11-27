@@ -1,0 +1,30 @@
+{
+	"version": 2,
+	"cases": [
+		{
+			"id": "board-and-eval",
+			"prompt": "Set up a firmware project for my MAX32690 EVKIT with an EVAL-ADXL355-PMDZ plugged in",
+			"expect": "trigger"
+		},
+		{
+			"id": "add-sensor-wiring",
+			"prompt": "Add an ADXL355 to my CAPI project and tell me how to wire it to the board",
+			"expect": "trigger"
+		},
+		{
+			"id": "build-flash",
+			"prompt": "Generate, build and flash the CAPI firmware for my board",
+			"expect": "trigger"
+		},
+		{
+			"id": "linux-overlay-no-trigger",
+			"prompt": "Add an AD7124 on SPI0 to my Raspberry Pi's devicetree overlay",
+			"expect": "no-trigger"
+		},
+		{
+			"id": "linux-driver-no-trigger",
+			"prompt": "Write a Linux IIO driver for the ADXL355",
+			"expect": "no-trigger"
+		}
+	]
+}

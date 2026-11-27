@@ -1,0 +1,4 @@
+$type: enum
+$symbol: mode_enum
+values: [MODE_A, MODE_B, MODE_C]
+default: MODE_B

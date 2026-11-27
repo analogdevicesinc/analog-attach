@@ -20,7 +20,7 @@ needs_extensions = {
     'adi_doctools': '0.4.33'
 }
 
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ['_build', '.venv', 'Thumbs.db', '.DS_Store']
 source_suffix = '.rst'
 
 # -- External docs configuration ----------------------------------------------
@@ -31,8 +31,6 @@ interref_repos = [
     'pyadi-iio',
     'scopy',
     'linux',
-    'no-OS',
-    'precision-converters-firmware',
 ]
 
 # -- Options for HTML output --------------------------------------------------

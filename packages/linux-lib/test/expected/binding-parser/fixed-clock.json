@@ -1,0 +1,140 @@
+{
+    "examples": [
+        "clock {\n  compatible = \"fixed-clock\";\n  #clock-cells = <0>;\n  clock-frequency = <1000000000>;\n  clock-accuracy = <100>;\n};\n"
+    ],
+    "properties": [
+        {
+            "dt_type": "string-array",
+            "key": "compatible",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "default": "fixed-clock",
+                    "enum": [
+                        "fixed-clock"
+                    ],
+                    "enum_type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "#clock-cells",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        "0n"
+                    ],
+                    "enum_type": "number"
+                },
+                "default": "0n",
+                "description": "Number of cells in a clock specifier; Typically 0 for nodes with a single clock output and 1 for nodes with multiple clock outputs."
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "clock-frequency",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "description": "Legacy property for single, fixed frequency clocks",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "uint32",
+            "key": "clock-accuracy",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "description": "accuracy of clock in ppb (parts per billion).",
+                "typeSize": 32
+            }
+        },
+        {
+            "dt_type": "string-array",
+            "key": "clock-output-names",
+            "value": {
+                "_t": "list",
+                "description": "Recommended to be a list of strings of clock output signal\nnames indexed by the first cell in the clock specifier.\nHowever, the meaning of clock-output-names is domain\nspecific to the clock provider, and is only provided to\nencourage using the same meaning for the majority of clock\nproviders.  This format may not work for clock providers\nusing a complex clock specifier format.  In those cases it\nis recommended to omit this property and create a binding\nspecific names property.\n\nClock consumer nodes must never directly reference\nthe provider\\'s clock-output-names property.\n",
+                "item": {
+                    "_t": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "string",
+            "key": "status",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "okay",
+                        "disabled",
+                        "reserved",
+                        "fail",
+                        "fail-needs-probe"
+                    ],
+                    "enum_type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
+            "dt_type": "string-array",
+            "key": "pinctrl-names",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "string"
+                },
+                "minItems": 1,
+                "unique": true
+            }
+        }
+    ],
+    "property_patterns": [
+        {
+            "description": "",
+            "dt_type": "phandle-array",
+            "pattern": "^pinctrl-[0-9]+$",
+            "value": {
+                "_t": "matrix",
+                "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
+                    }
+                ]
+            }
+        }
+    ],
+    "required_properties": [
+        "compatible",
+        "#clock-cells",
+        "clock-frequency"
+    ],
+    "title": "Simple fixed-rate clock sources"
+}

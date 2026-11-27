@@ -1,0 +1,26 @@
+# Run policy of the analog-attach-linux skill's Tier 3 eval. CLI flags override it.
+schema_version: 1
+
+harbor:
+  task_source: evals_json
+  custom_dockerfile_mode: rebase
+  n_attempts: 3
+  # A case passes only when every one of its checks does (grader.py's overall is their share).
+  pass_threshold: 1.0
+  # Attempts at a time: the containers mostly wait on the model (14 cores, 30 GB here).
+  n_concurrent: 6
+  # The setup case builds the binding caches, and validate runs dt-validate: slower than the defaults expect.
+  timeout_multiplier: 2.0
+  resources:
+    cpus: 4
+    memory_mb: 8192
+  agents:
+    claude-code:
+      model: claude-sonnet-5-5
+
+skill_workspace:
+  mode: isolated
+
+# The grader checks the devicetree the agent's overlay makes; no LLM judge, so no API key.
+grading:
+  mode: custom_only

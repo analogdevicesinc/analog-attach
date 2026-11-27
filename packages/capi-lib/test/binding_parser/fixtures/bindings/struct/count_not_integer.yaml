@@ -1,0 +1,10 @@
+$type: struct
+$symbol: bad_init_param
+$description: "The count names a field that cannot hold a length"
+devices:
+  include: "test/element"
+  pointer: true
+  count: nb_devices
+
+nb_devices:
+  type: string

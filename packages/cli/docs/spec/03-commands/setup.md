@@ -1,0 +1,554 @@
+# The setup run
+
+A bare `analog-attach` on a terminal sets up the project: it asks which
+backend the project targets when none is set, then runs the backend's setup.
+Where the backend is linux, that checks the tools on PATH (offering to
+install dt-schema with pipx), asks for the Linux tree, the base
+devicetree and the workfile's name, each only when it isn't set and valid,
+saving each answer at once, builds the binding caches, and then runs `init`,
+which keeps or creates the workfile (`init.md` INIT-018).
+Where the backend is noos, it asks where capi is, which module repositories
+to use and which board, saving each answer at once, and offers to run
+`init` (§9). It isn't a command: it has no name, no options and no JSON mode.
+
+Its questions used to be `init`'s. They keep their numbers here: `INIT-0nn`
+is `SETUP-0nn` for the requirements of §3, §4 and §6 to §8.
+
+## 1. Synopsis
+
+```
+analog-attach
+```
+
+Grammar: an empty `command-line` in `01-grammar.abnf` (GRM-003, GRM-005).
+
+## 2. Terms
+
+| Term | Meaning |
+|---|---|
+| Checkbox question | A question with a list of choices, each checked or not: ↑ and ↓ move, Space checks, `a` checks all, `i` inverts, Enter submits. |
+| Step | Where the backend is linux: the Linux tree, the devicetree or the workfile, asked for only when its setting is unset or not valid (SETUP-055). |
+| Ready | Where the backend is linux: the run ends with `init` (SETUP-034). |
+| Current settings | The effective values of the settings (COM-124), the invalid ones left out. |
+| List question | A question with a list of choices: ↑ and ↓ move the highlight, Enter picks it. The highlight starts on the first choice, or on the one named as the default. |
+| Line question | A question answered with a line of text, with an Enter default shown in parentheses when it has one; Tab completes file system paths. A refused answer is shown under the prompt, and the question stays. |
+
+The setup run doesn't use workspace loading: it needs no resource, and
+checks the answers itself.
+
+## 3. When it runs
+
+**SETUP-001** While in human mode, when argv is empty and the run is a
+terminal run (COM-012), the CLI shall run the setup run.
+
+**SETUP-002** When argv is empty in a run that isn't a terminal run, or argv
+is the one element `--quiet`, the CLI shall write the usage as GRM-005 says,
+and ask nothing. When a backend is set and some of its required settings
+have no value, the CLI shall then write, in human mode, an empty line and
+`Not set yet: <keys>. Run 'analog-attach' on a terminal for the guided
+setup, or 'analog-attach config <first key> <value>'.`, `<keys>` those
+settings joined with `, `. In JSON mode, on a terminal or not, that sentence
+is the result's `message` and the keys its `missing` (GRM-005); with nothing
+missing the message is `Every required setting is set.`, and with no backend
+it is COM-014's and `missing` is `["backend"]`.
+
+## 4. The configuration
+
+**SETUP-010** The CLI shall read the settings files before anything else.
+
+**SETUP-011** If a settings file can't be read or isn't a JSON object
+(COM-121), then the CLI shall write the problem as COM-072 words it (the
+message, an empty line and `Fix or remove <file>.`) to standard error and
+exit with status 2, without asking anything. The same holds when the active
+section of a file isn't an object (COM-134), the problem worded with its
+hint (`Make <id> an object in <file>; …`): before the backend question when
+`backend` is set, and right after it otherwise, the backend just saved
+(SETUP-021) being the one whose section can't be written. An old flat file
+stops the run this way (`02-common.md` §8.1).
+
+**SETUP-012** If the settings files have other problems (COM-123, COM-132,
+COM-133, or a section other than the active one that isn't an object),
+then the CLI shall go on with the current settings: an unknown key is
+ignored and an invalid value is left out. (Open issue S-1.)
+
+## 5. The backend
+
+**SETUP-020** When `backend` is unset, or names no known backend, the CLI
+shall ask the list question `What does this project target?`, one choice
+per offered backend (`02-common.md` COM-017), `<title> (<id>)` (`Linux
+device tree overlays (linux)`), in the registry's order.
+
+**SETUP-021** The CLI shall then write `backend = <id>` to the local
+settings file (COM-129), write `Saved backend = <id> to <file>.` (`<file>`
+with the home directory written `~`) and an empty line, and go on with that
+backend.
+
+**SETUP-022** When the backend has no setup of its own, the CLI shall write
+`<title> needs these settings:`, one line `  <key> — <description>` per
+required setting that is unset, an empty line, and their distinct hints
+(`Run 'analog-attach config <key> <value>'.` for one without), and exit with
+status 0. When none is unset, it shall write `<title>: every required setting
+is set`.
+
+**SETUP-023** When the user stops the backend question (Ctrl-C or Ctrl-D),
+the CLI shall write `Cancelled.` to standard output and exit with status
+130, without writing anything (COM-060). (Open issue S-5.)
+
+## 6. Carrying out the plan
+
+Where the backend is linux:
+
+**SETUP-030** When a step is answered, the CLI shall write the answer at once
+to the `linux` section of the local settings file (COM-129), through the
+checks of `config`, `workfile` being the new file name made absolute against
+the CWD, then write `✓ <key> = <value>` and an empty line. When a step is
+skipped (SETUP-055, SETUP-093), it shall write `✓ <key>: <value>`; a run of
+skipped steps is followed by an empty line before the next step's questions,
+or after the last step. If a write is refused, then the CLI shall report it
+as an input error (COM-041) and stop; what was written before stays.
+
+**SETUP-031** *Withdrawn.* (The settings were loaded again, strictly, after
+saving, and an unknown key refused. Unknown keys are now kept and ignored,
+SETUP-012.)
+
+**SETUP-032** When the caches are current for the Linux tree (COM-116), the
+CLI shall leave them. Otherwise it shall build them (COM-112 to COM-114).
+
+**SETUP-033** If the build can't start or fails, then the CLI shall refuse
+with `<reason>`, a newline, and `Fix the problem, then run 'analog-attach
+config --reload' to build the binding caches and 'analog-attach init' to create
+the workfile.`. `<reason>` is the configuration errors as COM-072 words them,
+or `Compiling binding schemas failed:` followed by a newline and the tool's
+error output.
+
+**SETUP-034** The CLI shall not itself create the workfile. The run is ready
+when the workfile's file exists, when step 3 named a new one (SETUP-092), or
+when the user answered yes to SETUP-093's question; then it shall run `init`
+(SETUP-041), which keeps or creates it. Otherwise it shall create nothing.
+
+**SETUP-035** The CLI shall check the tools (§8.6), run the steps (§8), then SETUP-032 to SETUP-034,
+in that order, and stop at the first failure. What was written before the
+failure stays: a failed cache build leaves the settings the steps saved.
+
+**SETUP-036** The setup run shall not change `overlay-syntax`, `output` or
+the executable variables (02-common.md COM-158), and shall not run `add`.
+
+## 7. Result
+
+**SETUP-041** Where the backend is linux, when the run is ready (SETUP-034),
+the CLI shall write an empty line when it built the caches,
+then run `init` (`init.md`) and end with its result: `init`'s summary
+(INIT-041), its `Overlay:` line ending in `(created)` or `(kept)`, and its
+exit status. When it isn't ready, the CLI shall instead write the
+summary with the heading `Workspace configured`, the `Overlay:` line ending
+in `(not created yet)`, the line `  Caches:        built now|current` after it,
+and next steps that start with `  1. Create the workfile:` and
+`     analog-attach init`, the other two steps numbered 2 and 3, followed by
+an empty line.
+
+**SETUP-042** The CLI shall colour its output (bold headings, dim remarks,
+cyan commands) only when standard output is a terminal.
+
+## 8. Asking
+
+Where the backend is linux:
+
+### 8.1 The questions
+
+**SETUP-050** Once the tools are there (§8.6), the CLI shall take the Linux
+tree (step 1), the devicetree (step 2) and the workfile (step 3), in that
+order, asking only for what SETUP-055 and SETUP-093 leave.
+
+**SETUP-051** Before the first question, the CLI shall write an empty line,
+`analog-attach setup`, a line of 19 `=`, an empty line, `This checks the
+tools and sets up the workspace: a Linux kernel source tree, a base device
+tree and the overlay file.` and an empty line. The lines between the steps are SETUP-030's.
+
+**SETUP-052** *Withdrawn.* (Each step was asked with the configured value
+as its Enter default; a step whose setting is set and valid is now skipped,
+SETUP-055.)
+
+**SETUP-053** At the line questions, Tab shall complete file system paths.
+
+**SETUP-054** When a question of the tools (§8.6) or of the steps is stopped (Ctrl-C or Ctrl-D),
+the CLI shall write `Stopped. What was answered is saved; run analog-attach
+again to go on.` to standard output and exit with status 130, as the noos
+setup does (SETUP-503). The settings already written stay, so the next run
+starts at the first step still unset (open issue S-6).
+
+**SETUP-055** The CLI shall skip step 1 when `linux` is set and is a Linux
+tree (COM-128), and step 2 when `devicetree` is set and is a file. When the
+setting is set but isn't, the CLI shall write `<key> is <value>, which is not
+a Linux source tree.`, `…, which does not exist.` or `…, which is not a
+file.` (yellow) and an empty line, and ask the step.
+
+### 8.2 Step 1: the Linux tree
+
+**SETUP-060** The CLI shall write `Step 1: Linux kernel source tree`, an
+empty line, `analog-attach needs the path to a Linux kernel source tree`,
+`(must contain Documentation/devicetree/bindings/ and include/)`, an empty
+line, `Searching for Linux source trees under ~...` and an empty line, and
+look for Linux trees (COM-128) under the home directory: breadth first,
+directory names in order, skipping hidden directories and `node_modules`,
+`build`, `dist`, `venv`, `__pycache__` and the other tool directories, and
+not looking inside a tree found. It reads directories down to 4 levels below
+the home directory and checks their subdirectories, so a tree is found up to
+5 levels down (`~/a/b/c/d/linux`). Before reading each directory it stops
+when it has 10 trees or 5 seconds have passed, so the last directory read may
+take the count past 10.
+
+**SETUP-061** When trees are found, the CLI shall ask the list question
+`Linux source tree`: the trees, then `Type a path`. Enter takes the first. `Type a
+path` asks the line question `Linux source path`: an empty answer is refused
+with `Type a path`; the answer is expanded (a leading `~` or `~/` is the home
+directory) and made absolute against the CWD; when it doesn't exist it is
+refused with `Path does not exist: <path>`, and when it isn't a Linux tree
+(COM-128) with `no <dir>/ under <path> (not a Linux source tree)`.
+
+**SETUP-062** When no tree is found, the CLI shall
+write `No Linux source trees found under ~.`, an empty line, `To get one,
+clone ADI's Linux kernel (the rpi-6.12.y branch, for the Raspberry Pi) in
+another terminal:`, `  git clone --depth 1 --branch rpi-6.12.y
+https://github.com/analogdevicesinc/linux.git ~/linux-adi` (the command
+cyan), an empty line, `Tab-complete available. Path must contain
+Documentation/devicetree/bindings/ and include/.`, and ask the line question
+`Linux source path` of SETUP-061. The CLI doesn't clone it itself.
+
+### 8.3 Step 2: the base devicetree
+
+**SETUP-070** The CLI shall write `Step 2: Base device tree (context)` and
+an empty line, and ask the list question `Choose how to select the base .dts
+file`: `Search in the Linux tree`,
+`Enter path manually`, and `Export from remote device (coming soon)`, which
+can't be picked (shown as `Not yet available`). Enter takes the first.
+
+**SETUP-071** *Search* shall ask the list question `Architecture`: the
+architectures of the Linux tree that have `boot/dts/`, sorted. It shall then
+write `Scanning <arch>/boot/dts/...`, `Found <n> .dts files.` and an empty
+line, and ask the search question of §8.4 over the `.dts` files under it, as
+paths relative to it, sorted. When there are no architectures, the CLI shall
+write `No architectures with device tree files found.` and `Falling back to
+manual path entry.`, and when there are no files `No .dts files found.`, and
+go on as *Enter path manually*.
+
+**SETUP-072** *Enter path manually* shall write `Tab-complete available.`
+and ask the line question `Path to .dts file` until the answer names an
+existing path ending in `.dts`: an empty answer is refused with `Type a
+path`, and the others with `Path does not exist: <path>` and `File must have
+a .dts extension.`. (Open issue S-2.)
+
+**SETUP-073** *Withdrawn.* (A chosen file was confirmed with `Selected:
+<path>`; the confirmation is now SETUP-030's `✓ devicetree = <path>`.)
+
+### 8.4 The `.dts` search
+
+**SETUP-080** The search question `Filter` shall list the files that contain
+what is typed, ignoring case, in their order, and the choice `← back to the
+architectures`: first while nothing is typed, last once something is. Typing
+narrows the list; ↑ and ↓ move the highlight; Enter picks the highlighted
+choice.
+
+**SETUP-081** Picking `← back to the architectures` shall ask the
+architecture question again (SETUP-071).
+
+### 8.5 Step 3: the workfile
+
+**SETUP-090** When `workfile` is unset, the CLI shall write `Step 3: Overlay workfile`, an empty line,
+`The workfile is the overlay file your changes are written to.` and an empty
+line.
+
+**SETUP-091** *Withdrawn.* (A configured workfile was kept or replaced with
+`Overlay: [k]eep <path> / [n]ew`; it is now kept, SETUP-093, and `config
+workfile` names another.)
+
+**SETUP-092** After SETUP-090, the CLI shall ask the line question
+`Overlay file name`, Enter default the next free name of `init.md` INIT-018.
+The answer is a file name relative to the CWD, with `.dtso` appended unless it
+already ends with it. When that file exists, the answer is refused with
+`<file> already exists; use it with 'config workfile <file>' or pick another
+name`, and when its directory doesn't exist with `<directory> is not a
+directory`, `<directory>` absolute. The name is only saved (SETUP-030);
+`init` creates the file, and the run is ready.
+
+**SETUP-093** When `workfile` is set, the CLI shall skip step 3, writing `✓
+workfile: <path>`. When its file exists, the run is ready. When it doesn't
+and can be created (INIT-019), the CLI shall ask the confirmation `Create
+<file>?`, Enter default yes, `<file>` relative to the CWD when it is under
+it: yes makes the run ready, no doesn't. When it can't be created, the CLI
+shall ask nothing, and the run isn't ready.
+
+### 8.6 The tools
+
+**SETUP-100** Before step 1, the CLI shall look up dtc, the preprocessor of
+`AA_PREPROCESS_COMMAND` (its first word, `cpp` by default; none for a
+command COM-093 runs unchecked), dt-schema and dt-validate as a command does
+(02-common.md COM-093, COM-118, COM-119). When
+it finds no problem, it shall write `✓ dtc: <version>` (dtc's path when it
+prints no version), `✓ <preprocessor>: <version>` (the first `x.y.z` of its
+`--version`, else the tool as the setting names it) and `✓ dt-schema:
+<version>`, as SETUP-030 writes skipped steps, and go on to step 1.
+
+**SETUP-101** When it finds problems, the CLI shall write the `✓` line of
+each tool that has none, then for each problem `✗ <tool>: <message>`
+(yellow, `<tool>` being `dtc`, the preprocessor's file name, `dt-schema` or
+`dt-validate`) and its hint two spaces in, then an empty line. The messages
+and hints are those of COM-118 and COM-119, and for the preprocessor `<tool>
+not found on PATH` with COM-093's hint.
+
+**SETUP-102** When dt-schema or dt-validate has a problem and pipx is on
+PATH, the CLI shall ask the confirmation `Install dt-schema 2026.9 with pipx
+now?`, Enter default yes, once per run. Yes runs `pipx install
+dtschema==2026.9` (`pipx install --force dtschema==2026.9` when another
+version is installed, or when dt-validate is missing), then `pipx inject
+dtschema ruamel.yaml.clib`, in the CWD, their output on standard error under
+`Running '<command>'`, stopping at the first that fails with `'<command>'
+failed (exit status <n>)`; then the CLI shall look the tools up again
+(SETUP-100).
+
+**SETUP-103** Otherwise, the CLI shall ask the confirmation `Check the tools
+again?`, Enter default yes. Yes looks them up again (SETUP-100); no refuses
+(COM-040) with `Install the tools above, then run 'analog-attach' again.`,
+`error_type` `tool-missing`, before any step: nothing is saved. The CLI
+never installs dtc (open issue S-7).
+
+## 9. Where the backend is noos
+
+The setup walks the settings in the order they depend on each other:
+`capi-path`, `module-paths`, `target` (the board), then the workfile.
+A step whose setting is already set is shown and skipped, so a second run
+asks only what is still missing.
+
+**SETUP-500** The CLI shall write `analog-attach setup` (bold) and an empty
+line, then run the steps of SETUP-510 to SETUP-540 in order.
+
+**SETUP-501** When a step writes a setting, the CLI shall write it to the
+`noos` section of the local settings file at once, through the checks of `config` (`config.md`
+§4, §9), and write `✓ <key> = <value>` (`<value>` a list joined with `, `).
+When a step skips a setting that is set, it shall write `✓ <key>: <value>`.
+
+**SETUP-502** If a write is refused, then the CLI shall refuse with the
+refused value's message (COM-041) and stop. The settings written before it
+stay.
+
+**SETUP-503** When the user stops a question (Ctrl-C or Ctrl-D), the CLI
+shall write `Stopped. What was answered is saved; run analog-attach again to
+go on.` to standard output and exit with status 130. The settings already
+written stay (open issue S-6).
+
+**SETUP-510** When `capi-path` is set and names a directory with a
+`module.yml` (`config.md` CONFIG-503), the CLI shall skip the step.
+When it is set and doesn't, the CLI shall write `capi-path is <path>, which
+is not a capi checkout.` (yellow) and ask.
+
+**SETUP-511** The CLI shall look for capi checkouts in the CWD, in each
+directory above it, and in the home directory, and in their subdirectories
+and those subdirectories' `capi/` (hidden ones skipped, symbolic links to
+directories followed), nearest first. When it finds any, it shall ask the
+list question `Where is capi?`, one choice per checkout and last `Another
+folder…`.
+
+**SETUP-512** When it finds none, or after `Another folder…`, the CLI shall
+ask the line question `Path to the capi repository`, `~` and relative paths
+resolved against the home directory and the CWD. A directory counts as a
+capi checkout when its `module.yml` has `name: capi`; any other answer is
+refused with `No capi checkout there (looking for a module.yml with name:
+capi)`. (Open issue `config.md` CF-12.)
+
+**SETUP-520** When `module-paths` is set and not empty, the CLI shall skip
+the step, showing the directories' names joined with `, `.
+
+**SETUP-521** Otherwise the CLI shall look at the directories next to
+`capi-path` (its parent's subdirectories) whose `module.yml` has a `type` of
+`platform`, `driver_collection`, `utility` or `middleware`. When there are
+any, it shall ask the checkbox question `Which module repositories should
+rulesets come from?`, one row per directory, `<name>  <type>` (the module's
+`name`, else the directory's; `_` in the type written as a space, dimmed),
+none checked, and refuse an empty answer. It shall write the checked
+directories as `module-paths`.
+
+**SETUP-522** When there are none, the CLI shall write `No module
+repositories next to <capi-path>.` (yellow) and `  Set them later:
+analog-attach config module-paths <path> <path>...`, and go on.
+
+**SETUP-530** When `target` is set, the CLI shall skip the step. Otherwise,
+when the module repositories have boards, it shall ask the list question
+`Which board?`, one row per board, `<name>  <chip>  <kinds>`: the chip padded
+to nine characters (`?` when the board names none), and the peripheral kinds
+its `board.yml` declares joined with `, ` (dimmed; `no board.yml
+peripherals` when none), twelve rows at a time. It shall write the board as
+`target` (`config.md` CONFIG-505). A chip with no board is set with `config
+target <chip>`; the setup offers boards only.
+
+**SETUP-531** When there are no boards, the CLI shall write `No boards in the
+configured module repositories.` (yellow; or the scan's error), and `  Set
+one later: analog-attach config target <board or chip>`, and skip the workfile step.
+
+**SETUP-540** When a board is set, the CLI shall resolve `workfile`
+(`02-common.md` COM-512). When its file exists, the CLI shall write `✓
+workfile: <path>` (`<path>` relative to the CWD). Otherwise it shall ask the
+confirmation `Create <path> for <board>?` (Enter: yes); after No, it shall
+write `  Create it later: analog-attach init` (dimmed).
+
+**SETUP-541** The CLI shall then write an empty line, `Next` (bold), and the
+rows `analog-attach list devices` (`what can be added: eval boards,
+drivers`), `analog-attach add <eval board>` (`e.g. analog-attach add
+eval-adxl355-pmdz`), `analog-attach read` (`what the workfile holds`),
+`analog-attach config` (`every setting, and how to change one`) and
+`analog-attach --help` (`every command`), each two spaces in, the command
+padded to the longest plus two.
+
+**SETUP-542** When the confirmation of SETUP-540 was answered yes (the setup
+response is `ready`), the CLI shall then write an empty line and run `init`
+(`init.md` INIT-510), and end with its output and exit status. Otherwise it
+shall exit with status 0.
+
+**SETUP-543** The setup shall not change the settings of the `Workfile`,
+`Project` and `Build` categories, and shall not run `add`.
+
+## 10. Open issues
+
+**S-1. Problems of the settings files go unreported.** With an unknown key
+or an invalid value (COM-123, COM-132, COM-133), the setup run says nothing
+(SETUP-012): the unknown key stays in the file, and an invalid value is asked
+for as if unset. (The run used to refuse after saving, SETUP-031.)
+
+**S-2. The `.dts` checks differ by path.** `config devicetree` only checks
+that the path exists (`config.md` CONFIG-104), the configured value must be a
+file with any extension (COM-127), and the manual entry must end in `.dts` but
+may be a directory (SETUP-072).
+
+**S-5. The two cancellations are worded differently.** Stopping the backend
+question writes `Cancelled.` (SETUP-023), stopping a question of a backend's
+steps `Stopped. What was answered is saved; …` (SETUP-054, SETUP-503).
+
+**S-6. Stopping a setup exits 130 after saving.** SETUP-503 and SETUP-054
+exit with status 130, which COM-060 keeps for a question stopped before
+anything was written, although the settings answered before stay written
+(`✓ capi-path = …`, `✓ linux = …` was printed). A fix would be to exit 0 once something is saved, as the add
+interview does (`add.md` ADD-536).
+
+**S-7. dtc and cpp are only named, never installed.** Its install command needs
+root (`sudo apt install device-tree-compiler`), which the setup run doesn't
+ask for; the user runs it, then answers yes to `Check the tools again?`
+(SETUP-103). The same holds for cpp. A pipx bin directory that isn't on PATH yet (`pipx ensurepath`
+changes it for new shells only) isn't found on a check again either.
+
+## 11. Examples
+
+```
+$ analog-attach
+
+analog-attach setup
+===================
+
+This checks the tools and sets up the workspace: a Linux kernel source tree, a base device tree and the overlay file.
+
+✓ dtc: 1.7.0
+✓ cpp: 13.2.0
+✗ dt-schema: dt-mk-schema not found on PATH
+  Install dt-schema 2026.9: 'pipx install dtschema==2026.9', then 'pipx inject dtschema ruamel.yaml.clib' (and 'pipx ensurepath' when pipx's bin directory isn't on PATH).
+
+? Install dt-schema 2026.9 with pipx now? (Y/n) yes
+Running 'pipx install dtschema==2026.9'                                      (stderr)
+…
+✓ dtc: 1.7.0
+✓ cpp: 13.2.0
+✓ dt-schema: 2026.9
+
+Step 1: Linux kernel source tree
+…
+✓ linux = /home/u/linux_rpi
+
+Step 2: Base device tree (context)
+…
+✓ devicetree = /home/u/linux_rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
+
+Step 3: Overlay workfile
+…
+✓ workfile = /work/overlay.dtso
+
+Indexing device bindings and compiling binding schemas...                  (stderr)
+Indexed 23309 compatibles from 5196 bindings and compiled binding schemas in 5.1s   (stderr)
+
+Workspace ready
+
+  Linux:         /home/u/linux_rpi
+  Devicetree:    /home/u/linux_rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
+  Overlay:       /work/overlay.dtso (created)
+  aa_build.sh:   /work/aa_build.sh (created)
+  aa_deploy.sh:  /work/aa_deploy.sh (created)
+
+Next steps:
+
+  1. Search for devices to add to the overlay:
+     analog-attach list devices [filter]
+…
+```
+
+In a directory with no settings, the backend comes first:
+
+```
+$ analog-attach
+? What does this project target?
+❯ Linux device tree overlays (linux)
+Saved backend = linux to ~/work/.analog-attach/config.json.
+
+analog-attach setup
+…
+```
+
+```
+$ analog-attach < /dev/null
+USAGE
+  analog-attach config [--global] [--reset] [--reload] [<key>] [<value>...]
+…                                                       (stdout, exit 0)
+```
+
+Where the backend is noos, a first run (the test fixtures as module
+repositories):
+
+```
+$ analog-attach
+analog-attach setup
+
+? Where is capi?
+❯ /home/u/eco/capi
+  Another folder…
+✓ capi-path = /home/u/eco/capi
+? Which module repositories should rulesets come from?
+❯◉ adc-drivers-test  driver collection
+ ◉ drivers-test      driver collection
+ ◉ platform-test     platform
+✓ module-paths = /home/u/eco/adc-drivers, /home/u/eco/driver-collection, /home/u/eco/platform
+? Which board?
+❯ testboard    testsoc    spi, gpio_port, gpio_pin, mystery
+  otherboard   othersoc   spi, gpio_port
+  twobusboard  othersoc   spi, gpio_port
+✓ board = testboard (and platform = testsoc)
+? Create workfile.json for testboard? (Y/n) Yes
+
+Next
+  analog-attach list devices      what can be added: eval boards, drivers
+  analog-attach add <eval board>  e.g. analog-attach add eval-adxl355-pmdz
+  analog-attach read              what the workfile holds
+  analog-attach config            every setting, and how to change one
+  analog-attach --help            every command
+
+Created a workfile for board testboard (platform testsoc)
+  /home/u/eco/proj/workfile.json
+```
+
+A second run asks nothing:
+
+```
+$ analog-attach
+analog-attach setup
+
+✓ capi-path: /home/u/eco/capi
+✓ module-paths: adc-drivers, driver-collection, platform
+✓ board: testboard
+✓ workfile: workfile.json
+
+Next
+…
+```

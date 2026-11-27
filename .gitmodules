@@ -1,3 +1,0 @@
-[submodule "packages/extension/resources/dt-schema"]
-	path = packages/extension/resources/dt-schema
-	url = https://github.com/devicetree-org/dt-schema

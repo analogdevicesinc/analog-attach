@@ -1,0 +1,5 @@
+$type: struct
+$symbol: child
+$override:
+  $parent:
+    - $mutex: [opt_a, opt_b]

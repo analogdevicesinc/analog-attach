@@ -1,0 +1,9 @@
+$type: struct
+$symbol: test_struct
+enabled:
+  type: bool
+
+$override:
+  - enabled:
+      default: true
+      required: true

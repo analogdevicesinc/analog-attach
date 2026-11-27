@@ -1,0 +1,6 @@
+type: float
+description: "Sample rate in Hz"
+required: true
+default: 1000.5
+minimum: 0.1
+maximum: 51200

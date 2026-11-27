@@ -1,0 +1,180 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": false,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@0"
+        ],
+        "message": "channel@0: 'anyOf' conditional failed, one must be fixed:\n\tchannel@0: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'diff-channels' is a required property\n\t\t'single-channel' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/adc/adc.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@0"
+        ],
+        "message": "channel@0: 'anyOf' conditional failed, one must be fixed:\n\tchannel@0: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'output-range-microamp' is a required property\n\t\t'output-range-microvolt' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/dac.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@0",
+          "num"
+        ],
+        "message": "channel@0: num: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@1"
+        ],
+        "message": "channel@1: 'anyOf' conditional failed, one must be fixed:\n\tchannel@1: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'diff-channels' is a required property\n\t\t'single-channel' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/adc/adc.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@1"
+        ],
+        "message": "channel@1: 'anyOf' conditional failed, one must be fixed:\n\tchannel@1: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'output-range-microamp' is a required property\n\t\t'output-range-microvolt' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/dac.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@1",
+          "num"
+        ],
+        "message": "channel@1: num: b'\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@2"
+        ],
+        "message": "channel@2: 'anyOf' conditional failed, one must be fixed:\n\tchannel@2: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'diff-channels' is a required property\n\t\t'single-channel' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/adc/adc.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@2"
+        ],
+        "message": "channel@2: 'anyOf' conditional failed, one must be fixed:\n\tchannel@2: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'output-range-microamp' is a required property\n\t\t'output-range-microvolt' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/dac.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@2",
+          "num"
+        ],
+        "message": "channel@2: num: b'\\x00\\x00\\x00\\x02' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@3"
+        ],
+        "message": "channel@3: 'anyOf' conditional failed, one must be fixed:\n\tchannel@3: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'diff-channels' is a required property\n\t\t'single-channel' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/adc/adc.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@3"
+        ],
+        "message": "channel@3: 'anyOf' conditional failed, one must be fixed:\n\tchannel@3: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'output-range-microamp' is a required property\n\t\t'output-range-microvolt' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/dac.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@3",
+          "num"
+        ],
+        "message": "channel@3: num: b'\\x00\\x00\\x00\\x03' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@4"
+        ],
+        "message": "channel@4: 'anyOf' conditional failed, one must be fixed:\n\tchannel@4: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'diff-channels' is a required property\n\t\t'single-channel' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/adc/adc.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@4"
+        ],
+        "message": "channel@4: 'anyOf' conditional failed, one must be fixed:\n\tchannel@4: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'output-range-microamp' is a required property\n\t\t'output-range-microvolt' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/dac.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@4",
+          "num"
+        ],
+        "message": "channel@4: num: b'\\x00\\x00\\x00\\x04' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@5"
+        ],
+        "message": "channel@5: 'anyOf' conditional failed, one must be fixed:\n\tchannel@5: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'diff-channels' is a required property\n\t\t'single-channel' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/adc/adc.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@5"
+        ],
+        "message": "channel@5: 'anyOf' conditional failed, one must be fixed:\n\tchannel@5: 'oneOf' conditional failed, one must be fixed:\n\t\t'reg' is a required property\n\t\t'output-range-microamp' is a required property\n\t\t'output-range-microvolt' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/dac.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ad5770r@0",
+          "channel@5",
+          "num"
+        ],
+        "message": "channel@5: num: b'\\x00\\x00\\x00\\x05' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [
+      {
+        "parent_path": "/soc/spi@7e204000",
+        "nodes": [
+          "spidev@0",
+          "ad5770r@0"
+        ],
+        "address": "0x0",
+        "in_overlay": [
+          false,
+          true
+        ]
+      }
+    ],
+    "chip_select_overflows": []
+  }
+}

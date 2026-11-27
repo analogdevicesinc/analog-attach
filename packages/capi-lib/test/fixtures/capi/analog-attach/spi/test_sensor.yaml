@@ -1,0 +1,9 @@
+$type: descriptor
+$symbol: test_sensor
+$description: "Generic sensor handle - the root a user adds"
+$init_function: test_sensor_init
+$remove_function: test_sensor_deinit
+$init_param:
+  include: test_sensor_config
+  pointer: true
+  required: true

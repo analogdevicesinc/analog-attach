@@ -1,0 +1,56 @@
+{
+  "name": "linux-lib",
+  "version": "0.0.1",
+  "description": "Core device tree parsing, schema validation, and binding logic for Analog Attach",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit -p .",
+    "format": "eslint . --fix",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "corpus": "node scripts/corpus-parse.mjs run",
+    "corpus:diff": "node scripts/corpus-parse.mjs diff",
+    "corpus:oracle": "node scripts/corpus-oracle.mjs run",
+    "corpus:oracle:diff": "node scripts/corpus-oracle.mjs diff",
+    "corpus:overlays": "node corpus/overlays/corpus.mjs run",
+    "corpus:overlays:diff": "node corpus/overlays/corpus.mjs diff",
+    "pipeline:view": "vite build --logLevel warn && node scripts/pipeline-view/build.mjs --open",
+    "docs:pipeline": "vite build --logLevel warn && node scripts/pipeline-doc/build.mjs",
+    "coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@apidevtools/json-schema-ref-parser": "^16.0.6",
+    "@types/json-schema": "^7.0.15",
+    "ajv": "^8.17.1",
+    "yaml": "^2.8.3"
+  },
+  "devDependencies": {
+    "@microsoft/api-extractor": "^7.60.1",
+    "@stylistic/eslint-plugin": "^6.0.1",
+    "@types/node": "22.x",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
+    "@typescript-eslint/parser": "^8.72.1",
+    "@vitest/coverage-v8": "^5.1.0",
+    "eslint": "^10.14.0",
+    "eslint-plugin-unicorn": "^79.0.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.7",
+    "vite-plugin-dts": "^5.1.2",
+    "vitest": "^5.1.0"
+  }
+}

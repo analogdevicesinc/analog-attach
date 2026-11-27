@@ -1,0 +1,5 @@
+# run.sh's staging copies, and the results under them
+/.stage/
+# Written by run.sh into the staging copy only; never here
+/evals/environment/assets/
+/evals/results/

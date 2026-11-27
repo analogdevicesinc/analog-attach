@@ -1,0 +1,471 @@
+/* The Linux part's look (controller.mjs), on Harmonic's tokens (../../core/core.css): the tree and
+   its marks, the node, the source, the add panel and the Project tab's settings. What the overlay
+   does to a node has one colour each, everywhere: added is success (green), changed is highlight
+   (purple). */
+
+.lx-key { color: var(--muted); }
+.chip.lx-on { font-family: var(--mono); }
+.chip.lx-base { color: var(--muted); padding: 0 3px; margin-left: 4px; }
+
+.lx-summary h2 { font: var(--type-title-s); }
+/* What the binding still requires: Harmonic's warning banner, embedded in a card. */
+.lx-warning { background: var(--warn-tint); border: 1px solid var(--warn-edge); border-radius: 8px; color: var(--hmc-color-notification-warning-default-text); padding: 8px 12px; margin: 8px 0 0; font: var(--type-body-s); }
+tr.lx-unset td.key { color: var(--fg); font-weight: 600; }
+.lx-add-prop { padding: 12px 8px 4px; border-top: 1px solid var(--line-weak); margin-top: 4px; }
+.lx-add-prop select { flex: 1; max-width: 360px; }
+.lx-add-prop input { flex: 1; max-width: 260px; font: var(--type-code-s); }
+.lx-schema { color: var(--muted); font: var(--type-code-xs); margin-top: 4px; }
+/* A type is read whole, never cropped (dt-schema's can be long: uint32-array · 1 to 16 items · each 0 to 15):
+   it wraps between its parts (type_html), each part on one line. */
+.lx-type-part { white-space: nowrap; }
+
+/* The source, highlighted on the console's surface, the same box everywhere: numbered lines,
+   wrapped under the code; the numbers aren't part of a selection. */
+.lx-source { background: var(--console-bg); color: var(--console-fg); border-radius: 4px; padding: 16px 16px 16px 12px; overflow: auto; font: var(--type-code-xs); margin: 12px 0 0; tab-size: 4; white-space: pre-wrap; overflow-wrap: anywhere; counter-reset: line; }
+.lx-source .ln { display: block; position: relative; min-height: 1lh; padding-left: calc(var(--ln-digits, 2) * 1ch + 2ch); }
+.lx-source .ln::before { counter-increment: line; content: counter(line); position: absolute; left: 0; width: calc(var(--ln-digits, 2) * 1ch); text-align: right; color: var(--console-muted); user-select: none; }
+.lx-source .c { color: var(--console-muted); } .lx-source .s { color: var(--console-orange); } .lx-source .l { color: var(--console-teal); } .lx-source .k { color: var(--console-purple); } .lx-source .n { color: var(--console-blue); }
+/* The lines a change wrote to the overlay, lit for a moment (FLASH_MS in controller.mjs). */
+.lx-source .ln.lx-flash { animation: lx-flash 1.6s ease-out; }
+@keyframes lx-flash { from, 25% { background: color-mix(in srgb, var(--console-blue) 22%, transparent); } to { background: transparent; } }
+
+/* The add panel: the search on the left, the device picked on the right. */
+/* Adding a device: taller than the other panels, so a picked device's form and its preview fit. */
+.panel:has(.lx-add, .lx-add-loading) { height: min(920px, calc(100vh - 48px)); }
+/* The two columns fill the panel: the results take the search column's height, the pick scrolls on its own. */
+.lx-add { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 20px; height: 100%; }
+.lx-add-search { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.lx-add-search #lx-find { height: 40px; font: var(--type-body-s); }
+.lx-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+/* The categories: Harmonic's chips (extra small: 24px, round), selected in the selection colour. */
+#lx-tags .lx-tag { height: 24px; padding: 0 8px; gap: 4px; border: 1px solid var(--hmc-color-selection-unselected-medium-border-idle); border-radius: 32px; background: transparent; color: var(--hmc-color-selection-unselected-medium-content-idle); font: 500 var(--font-size-small)/20px var(--font); }
+#lx-tags .lx-tag:hover { border-color: var(--hmc-color-selection-unselected-medium-border-hover); background: var(--hmc-color-selection-unselected-medium-background-hover); color: var(--hmc-color-selection-unselected-medium-content-hover); }
+#lx-tags .lx-tag:active { border-color: var(--hmc-color-selection-unselected-medium-border-pressed); background: var(--hmc-color-selection-unselected-medium-background-pressed); }
+#lx-tags .lx-tag span { color: var(--muted); }
+#lx-tags .lx-tag.on { background: var(--hmc-color-selection-selected-medium-background-idle); border-color: var(--hmc-color-selection-selected-medium-border-idle); color: var(--hmc-color-selection-selected-medium-content-idle); }
+#lx-tags .lx-tag.on:hover { background: var(--hmc-color-selection-selected-medium-background-hover); border-color: var(--hmc-color-selection-selected-medium-border-hover); color: var(--hmc-color-selection-selected-medium-content-hover); }
+#lx-tags .lx-tag.on span { color: inherit; }
+.lx-results { display: flex; flex-direction: column; gap: 0; overflow: auto; flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 8px; padding: 4px; background: var(--panel); }
+/* A result: Harmonic's list item. */
+.lx-result { height: auto; min-height: 40px; justify-content: space-between; gap: 12px; text-align: left; border: none; background: transparent; padding: 8px 12px; border-radius: 4px; font: var(--type-body-s); color: var(--fg); }
+.lx-result:hover { background: var(--hover); }
+.lx-result.on { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.lx-result .subtle { font: var(--type-body-xs); white-space: nowrap; }
+.lx-add-pick { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 20px; align-self: start; max-height: 100%; overflow: auto; }
+.lx-picked { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 12px; }
+.lx-field { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; font: var(--type-body-s); color: var(--fg); }
+.lx-field span { font: var(--type-body-s); }
+.lx-field select, .lx-field input { height: 40px; }
+/* The node an example or an overlay gives, as add would copy it. */
+#lx-preview { margin-top: 12px; }
+#lx-preview .lx-source { max-height: 280px; margin: 0; }
+.lx-overlay { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 4px 0; font: var(--type-body-xs); }
+.lx-overlay-name { min-width: 0; }
+.lx-overlay-name .mono { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-import-list { max-height: 60vh; overflow-y: auto; }
+.lx-import-failed { margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--err-edge); border-radius: 4px; background: var(--err-tint); color: var(--hmc-color-notification-danger-default-text); font: var(--type-body-xs); white-space: pre-wrap; }
+@media (max-width: 900px) {
+	.lx-add { grid-template-columns: 1fr; grid-template-rows: none; height: auto; }
+	.lx-results { flex: none; max-height: calc(100vh - 300px); }
+	.lx-add-pick { max-height: none; overflow: visible; }
+}
+
+/* The tree's two views: Harmonic's segmented control, then the tree. */
+.lx-tools { flex-direction: column; align-items: stretch; gap: 8px; }
+.lx-legend { display: flex; gap: 12px; font: var(--type-body-xs); color: var(--muted); }
+.lx-legend > span { display: inline-flex; align-items: center; gap: 4px; }
+
+/* What the overlay does to a node: added, changed, changes below. */
+.lx-mark { display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center; font: 600 var(--font-size-small)/14px var(--mono); flex: none; }
+.lx-mark.added { background: var(--ok-tint); color: var(--ok); border: 1px solid var(--ok-edge); }
+.lx-mark.changed { background: var(--mark-tint); color: var(--mark); border: 1px solid var(--mark-edge); }
+.lx-mark.contains { color: var(--accent); }
+.lx-merged .item.lx-m { justify-content: flex-start; gap: 4px; padding-top: 2px; padding-bottom: 2px; min-height: 24px; }
+.lx-merged .item.lx-m .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.lx-merged .item.lx-m.none .name { color: var(--muted); }
+.lx-merged .item.lx-m.added .name, .lx-merged .item.lx-m.changed .name { color: var(--fg); font-weight: 600; }
+.lx-merged .item.lx-m.added { background: var(--ok-tint); }
+.lx-merged .item.lx-m.changed { background: var(--mark-tint); }
+.lx-merged .item.lx-m.active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.lx-merged .item.lx-m.match .name { text-decoration: underline 2px var(--accent); text-underline-offset: 3px; }
+.lx-label { color: var(--accent); font-weight: 600; }
+.lx-merged .item.lx-m.none .lx-label { color: var(--muted); font-weight: 400; }
+.lx-twist { width: 20px; height: 20px; padding: 0; border: none; background: transparent; color: var(--muted); font: var(--type-body-xxs); flex: none; }
+.lx-twist:hover:not(:disabled) { background: var(--hover); color: var(--fg); }
+.lx-twist:disabled { cursor: default; }
+
+/* The node card: where the node comes from, and which values the overlay sets over the base. */
+.lx-path { font-size: var(--font-size-small); line-height: 16px; margin-top: 4px; }
+.chip.lx-origin.added { background: var(--ok-tint); border-color: var(--ok-edge); color: var(--hmc-color-notification-success-default-text); }
+.chip.lx-origin.changed { background: var(--mark-tint); border-color: var(--mark-edge); color: var(--hmc-color-notification-highlight-default-text); }
+.chip.lx-override { background: var(--mark-tint); border-color: var(--mark-edge); color: var(--hmc-color-notification-highlight-default-text); padding: 0 3px; margin-left: 4px; }
+tr.lx-overridden td { background: var(--mark-tint); }
+/* A base value reads as text; hovered or focused, it is the field that overrides it. */
+input.lx-base-input { border-color: transparent; background: transparent; font: var(--type-code-s); color: var(--muted); }
+input.lx-base-input:hover { border-color: var(--hmc-color-input-default-border-idle); background: var(--panel); }
+input.lx-base-input:focus { color: var(--fg); background: var(--panel); }
+
+/* A node that is off (its status not okay): dimmed in the tree, with a tag saying so. */
+.lx-off { font: var(--type-tag-s); padding: 0 3px; border: 1px solid var(--hmc-color-system-neutral-weaker); color: var(--muted); background: var(--panel-2); flex: none; }
+.item.off .name, .item.off .type { opacity: .55; }
+.item.off .name { text-decoration: line-through; text-decoration-color: var(--weak); }
+/* The node's on/off switch, in its card: Harmonic's toggle, the label left. */
+.lx-enable { display: inline-flex; align-items: center; gap: 8px; font: var(--type-body-s); cursor: pointer; }
+.lx-enable .switch { margin: 0; }
+/* A property the binding doesn't define: a custom one, tagged; and the row that adds one. */
+.chip.lx-custom { color: var(--muted); padding: 0 3px; margin-left: 4px; }
+.lx-custom-row { padding: 8px 8px 4px; }
+.lx-custom-row input { font: var(--type-code-s); }
+.lx-custom-row #lx-custom-name { flex: 0 1 220px; }
+.lx-custom-row #lx-custom-value { flex: 1 1 200px; }
+.lx-custom-row select { flex: 0 0 auto; }
+
+/* The shaped editors (editors.mjs). A list of single cells (reg): a row of equal fields, ＋ at its
+   end. A tuple, a fixed array or a matrix: a grid whose columns line up from row to row, a choice
+   column wider than a number one; headed by each column's kind, numbered when rows come and go. */
+.lx-cells { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.lx-cell-wrap { display: flex; min-width: 0; }
+.lx-cell { width: 100%; min-width: 0; height: 32px; font: var(--type-code-s); }
+.lx-cells.lx-grid .lx-row { display: grid; grid-template-columns: var(--lx-template); gap: 4px; align-items: center; max-width: calc(var(--lx-cols) * 220px); }
+.lx-cells.lx-grid.numbered .lx-row { grid-template-columns: 22px var(--lx-template) 28px; max-width: calc(var(--lx-cols) * 220px + 58px); }
+.lx-cells-head > span { font: var(--type-body-xs); color: var(--muted); padding-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lx-row-index { font: var(--type-code-xs); line-height: 32px; color: var(--muted); text-align: right; }
+.lx-row-remove { width: 28px; height: 28px; padding: 0; border: none; background: transparent; color: var(--muted); font-weight: 400; }
+.lx-row-remove:hover { color: var(--err); background: var(--hover); }
+.lx-cells.lx-list { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lx-cells.lx-list .lx-row { display: inline-flex; align-items: center; gap: 2px; }
+.lx-cells.lx-list .lx-cell-wrap { width: 88px; }
+.lx-cells.lx-list .lx-row-remove { width: 16px; height: 16px; font: var(--type-body-xxs); margin-left: -2px; }
+.lx-cells.lx-list .lx-row { gap: 0; }
+.lx-row-add { height: 32px; font: var(--type-action-m); padding: 0 8px; align-self: flex-start; }
+.lx-row-add[hidden] { display: none; }
+.lx-cells.lx-list .lx-row-add { align-self: center; }
+.lx-cell-macro { font: var(--type-code-xs); color: var(--muted); padding-left: 2px; }
+/* A value from the base: still a field (its border shows), greyed until it is edited. */
+.lx-cells.base .lx-cell { background: var(--panel-2); color: var(--muted); }
+.lx-cells.base .lx-cell:hover, .lx-cells.base .lx-cell:focus { background: var(--panel); color: var(--fg); }
+.lx-cells.incomplete input.lx-cell:placeholder-shown { border-color: var(--hmc-color-input-warning-border-idle); }
+/* A value the CLI refused: what was typed, kept for the user to correct. */
+.lx-cells.refused .lx-cell, input.refused, select.refused { border-color: var(--hmc-color-input-error-border-idle); background: var(--hmc-color-input-error-background-idle); }
+.lx-shape-note { font: var(--type-body-xs); color: var(--hmc-color-notification-warning-default-text); background: var(--warn-tint); border: 1px solid var(--warn-edge); border-radius: 4px; padding: 4px 8px; }
+/* Child nodes: the ones there, then the next free name, or any of them by name. */
+.lx-children { margin-bottom: 8px; }
+.lx-add-child { padding-top: 8px; border-top: 1px solid var(--line-weak); }
+.lx-add-child input { width: 200px; font: var(--type-code-s); }
+
+/* ---- The part, after the first Linux GUI: no menu, the tree, the node, and the overlay and its
+   validation side by side; sections titled in capitals; the node's properties read-only, one at a
+   time edited below them. ---- */
+main[data-eco="linux"] { grid-template-columns: 340px minmax(0, 1fr) var(--side-w, 380px); }
+.lx-middle { padding: 16px 24px; }
+/* No node picked: where to look, centred and muted in the middle column. */
+.lx-middle:has(> .lx-placeholder) { display: flex; }
+.lx-placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 240px; color: var(--muted); font: var(--type-body-s); text-align: center; }
+.lx-placeholder p { margin: 0; }
+/* What a change or a form refused, in place: under the field, or by the button (Harmonic's helper
+   text, in the error colour). */
+.lx-problem { margin-top: 4px; color: var(--err); font: var(--type-body-xs); white-space: pre-wrap; overflow-wrap: anywhere; }
+.lx-problem.warn { color: var(--warn); }
+.lx-problem[hidden] { display: none; }
+.lx-field .lx-problem { margin-top: 0; }
+.lx-side { position: relative; border-left: 1px solid var(--line); background: var(--panel); overflow: hidden; min-height: 0; display: flex; flex-direction: column; }
+/* Its pane: the tabs, then the overlay and its validation (scrolling); or, chatting, the tabs alone
+   above the chat docked below them (the core's panel, chat.css). */
+.lx-side-pane { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.lx-side.chatting .lx-side-pane { flex: none; }
+.lx-side-body { flex: 1; min-height: 0; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 20px; }
+.lx-chat-dock { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.lx-side-tabs { display: flex; align-items: stretch; gap: 4px; min-height: 40px; padding: 0 8px 0 12px; border-bottom: 1px solid var(--line); }
+/* Harmonic's tabs, small (40px): the one shown in the selection colour, underlined. */
+.lx-side-tab { display: inline-flex; align-items: center; gap: 4px; height: auto; padding: 0 12px; border: none; border-bottom: 2px solid transparent; border-radius: 4px 4px 0 0; background: none; color: var(--hmc-color-selection-unselected-medium-content-idle); font: var(--type-action-m); white-space: nowrap; }
+.lx-side-tab:hover:not(:disabled) { background: var(--hmc-color-selection-unselected-medium-background-hover); color: var(--hmc-color-selection-unselected-medium-content-hover); border-color: transparent; }
+.lx-side-tab.active { color: var(--hmc-color-selection-selected-medium-content-idle); border-bottom-color: var(--hmc-color-selection-selected-medium-border-idle); }
+.lx-side-tab.active:hover:not(:disabled) { background: var(--hmc-color-selection-selected-medium-background-hover); color: var(--hmc-color-selection-selected-medium-content-hover); border-bottom-color: var(--hmc-color-selection-selected-medium-border-hover); }
+.lx-side-tab .spinner { width: 12px; height: 12px; }
+.lx-side-tabs .lx-fold { align-self: center; }
+/* A section's title: Harmonic's overline. */
+.lx-section-title { display: flex; align-items: center; gap: 8px; justify-content: space-between; font: var(--type-overline); letter-spacing: var(--overline-spacing); text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
+.lx-section-title:first-child { margin-top: 0; }
+.lx-section-title button { height: 24px; font: var(--type-action-s); text-transform: none; letter-spacing: 0; }
+/* The tree's title, ＋ Add Device at its right end. */
+.lx-tree-title { padding: 12px 12px 0; margin: 0; }
+.lx-tree-title .lx-add-device { margin-left: auto; }
+/* The Overlay tab's title: the file's name (cut short with …), the toggle and the tools after it. */
+.lx-side-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-side-tools { align-items: center; flex: none; }
+.lx-side-tools .lx-seg button { height: 24px; padding: 0 8px; font: var(--type-action-s); text-transform: none; letter-spacing: 0; }
+.lx-side-source { margin: 0; max-height: 46vh; }
+/* What dt-validate found: Harmonic's banner, embedded; one that opens its node, outlined on a hover. */
+.lx-finding { border: 1px solid var(--err-edge); border-radius: 4px; background: var(--err-tint); color: var(--hmc-color-notification-danger-default-text); padding: 8px 12px; margin-bottom: 8px; font: var(--type-body-xs); white-space: pre-wrap; }
+.lx-finding.warning { border-color: var(--warn-edge); background: var(--warn-tint); color: var(--hmc-color-notification-warning-default-text); }
+.lx-finding-path { font: var(--type-code-xs); color: var(--muted); margin-bottom: 4px; }
+.lx-finding.opens { cursor: pointer; }
+.lx-finding.opens:hover { box-shadow: inset 0 0 0 1px var(--err-edge); }
+.lx-finding.warning.opens:hover { box-shadow: inset 0 0 0 1px var(--warn-edge); }
+
+/* Tags: Harmonic's subtle tags, small (12px on 14px lines), square: the plain ones its info tag
+   (grey), the overlay's its success (green), a change its highlight (purple), what is missing its
+   warning (orange); a label in the selection's blue, the GUI's own. */
+.lx-tag { display: inline-flex; align-items: center; height: 16px; padding: 0 3px; font: var(--type-tag-s); border: 1px solid var(--chip-edge); background: var(--chip); color: var(--hmc-color-notification-info-default-text); white-space: nowrap; border-radius: 0; }
+.lx-tag.new { background: var(--ok-tint); border-color: var(--ok-edge); color: var(--hmc-color-notification-success-default-text); }
+.lx-tag.changed { background: var(--mark-tint); border-color: var(--mark-edge); color: var(--hmc-color-notification-highlight-default-text); }
+.lx-tag.base { color: var(--muted); }
+.lx-tag.label { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-family: var(--mono); }
+.lx-tag.warn { background: var(--warn-tint); border-color: var(--warn-edge); color: var(--hmc-color-notification-warning-default-text); }
+button.lx-tag { cursor: pointer; }
+button.lx-tag.warn:hover { box-shadow: inset 0 0 0 1px var(--warn-edge); }
+
+/* The tree: names as text, labels after them in grey; added green, changed purple, the way to a
+   change in the accent; no row filled but the picked one. */
+.lx-merged .item.lx-m, .lx-merged .item.lx-m.added, .lx-merged .item.lx-m.changed { background: transparent; min-height: 24px; padding-top: 1px; padding-bottom: 1px; gap: 6px; border-radius: 4px; }
+.lx-merged .item.lx-m:hover { background: var(--hover); }
+.lx-merged .item.lx-m .name { font: var(--type-code-xs); }
+.lx-merged .item.lx-m .lx-node-name { color: var(--fg); font-weight: 400; }
+.lx-merged .item.lx-m.none:not(.leads) .lx-node-name { color: var(--fg); }
+.lx-merged .item.lx-m.leads .lx-node-name { color: var(--accent); font-weight: 600; }
+.lx-merged .item.lx-m.added .lx-node-name { color: var(--ok); font-weight: 600; }
+.lx-merged .item.lx-m.changed .lx-node-name { color: var(--mark); font-weight: 600; }
+.lx-amp { color: var(--muted); }
+.lx-merged .item.lx-m.active { background: transparent; box-shadow: inset 0 0 0 1px var(--accent); }
+.lx-merged .item.lx-m.active.added, .lx-merged .item.lx-m.active { background: var(--accent-soft); }
+.item.off .lx-node-name { text-decoration: line-through; text-decoration-color: var(--weak); opacity: .6; }
+
+/* The node: its path as the title, what it is in tags, its actions in a row. */
+.lx-node-head { display: flex; flex-direction: column; gap: 6px; }
+.lx-node-path { margin: 0; font: 600 var(--font-size-medium)/24px var(--mono); overflow-wrap: anywhere; }
+.lx-node-title { display: flex; align-items: center; gap: 4px; }
+.lx-about-button { padding: 0 4px; min-height: 24px; font: var(--type-body-m); }
+.lx-about-button.on { color: var(--accent); }
+.lx-about { background: var(--panel-2); border-radius: 4px; padding: 8px 12px; font: var(--type-body-xs); display: flex; flex-direction: column; gap: 4px; }
+.lx-about-title { font-weight: 600; }
+.lx-about-text { white-space: pre-wrap; }
+.lx-about-file { font-size: 10px; line-height: 14px; overflow-wrap: anywhere; }
+.lx-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.lx-node-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.lx-pane-empty { max-width: 640px; }
+.lx-pane-empty .lx-node-path { margin-bottom: 4px; }
+
+/* Add Property, under the properties. */
+.lx-props-actions { margin-top: 8px; }
+.lx-editor { margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 16px; background: var(--panel); display: flex; flex-direction: column; gap: 12px; }
+.lx-editor-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lx-editor-field { display: flex; }
+.lx-editor-field .lx-value { flex: 1; max-width: 520px; height: var(--control); font: var(--type-code-s); }
+.lx-editor-label { font: var(--type-overline); text-transform: uppercase; letter-spacing: var(--overline-spacing); }
+.lx-suggestions { display: flex; flex-direction: column; gap: 4px; }
+.lx-suggestions button { justify-content: flex-start; gap: 8px; height: auto; min-height: 32px; padding: 6px 8px; font: var(--type-body-s); text-align: left; white-space: normal; }
+.lx-suggestions button .mono { font-weight: 600; }
+.lx-suggestions button .subtle { font: var(--type-body-xs); }
+.lx-children { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.lx-middle { background: var(--panel); }
+/* Off: dimmed with its tag, not struck through (a base has many). */
+.item.off .lx-node-name, .item.off .name { text-decoration: none; }
+.lx-merged .item.lx-m.off .name { opacity: .55; }
+
+/* The right column folded (side_ribbon): a ribbon on the edge, its name read sideways. */
+main[data-eco="linux"].side-folded { grid-template-columns: 340px minmax(0, 1fr) 36px; }
+main[data-eco="linux"].side-folded .lx-side-resize { display: none; }
+.lx-ribbon { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; height: 100%; padding: 12px 0; border: none; border-radius: 0; background: var(--panel); color: var(--muted); font: var(--type-action-m); }
+.lx-ribbon:hover { background: var(--hover); color: var(--fg); }
+.lx-ribbon-arrow { font: var(--type-body-s); }
+.lx-ribbon-text { writing-mode: vertical-rl; transform: rotate(180deg); font: var(--type-overline); letter-spacing: var(--overline-spacing); text-transform: uppercase; white-space: nowrap; }
+.lx-ribbon-ok { color: var(--ok); font: var(--type-body-s); }
+.badge.warn { background: var(--hmc-color-notification-warning-strong-background); color: var(--hmc-color-notification-warning-strong-text); }
+.lx-side-tools { display: inline-flex; gap: 2px; }
+.lx-fold { width: var(--control); padding: 0; font: var(--type-body-s); }
+/* A narrow window: the column stays, folded unless opened (it was hidden before). */
+@media (max-width: 1280px) {
+	main[data-eco="linux"] { grid-template-columns: 300px minmax(0, 1fr) var(--side-w, 340px); }
+	main[data-eco="linux"].side-folded { grid-template-columns: 300px minmax(0, 1fr) 36px; }
+}
+
+/* The right column's left edge: drag it to resize the column (controller.mjs); a double click resets it. */
+.lx-side-resize { position: absolute; top: 0; bottom: 0; left: 0; width: 6px; cursor: ew-resize; z-index: 3; }
+.lx-side-resize::after { content: ""; position: absolute; top: 50%; left: 1px; width: 4px; height: 40px; margin-top: -20px; border-radius: 2px; background: var(--hmc-color-gray-500); opacity: 0; transition: opacity .12s; }
+.lx-side-resize:hover::after, body.resizing-side .lx-side-resize::after { opacity: 1; }
+body.resizing-side { cursor: ew-resize; user-select: none; }
+body.resizing-side .lx-middle, body.resizing-side .list { pointer-events: none; }
+
+/* While dt-validate reads the overlay again: what it said before, dimmed, and a spinner. */
+.lx-spinning { display: inline-flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.lx-stale { opacity: .45; transition: opacity .15s; }
+.lx-ribbon .spinner { width: 12px; height: 12px; }
+button.loading { pointer-events: none; }
+button.loading::after { content: ""; width: 12px; height: 12px; margin-left: 4px; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 35%, transparent); border-top-color: currentColor; animation: aa-spin .7s linear infinite; }
+/* The Project tab's settings (the gear's popup): a section per category, each setting its name,
+   then its control with Save and Reset in a row, what is wrong and what it is under them. Its
+   cards apart as Preferences' are (.prefs), within a group (General, Workspace, Build) too. */
+.lx-project-section + .lx-project-section, .lx-project-section > .pref-section + .pref-section { margin-top: 8px; }
+.lx-settings table { width: 100%; border-collapse: collapse; }
+.lx-settings td { padding: 8px 0; vertical-align: top; border-bottom: 1px solid var(--line-weak); }
+.lx-settings tr:last-child td { border-bottom: none; }
+.lx-settings td.key { width: 220px; min-width: 220px; padding-top: 14px; padding-right: 12px; font: var(--type-code-s); overflow-wrap: anywhere; }
+.lx-settings .editor { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lx-settings .editor input, .lx-settings .editor select { flex: 1; min-width: 0; font: var(--type-code-s); }
+.lx-settings .editor select { font-family: var(--font); }
+.lx-setting-about { font: var(--type-body-xs); margin-top: 4px; }
+/* A setting's line, a column each, the same in every row: its field, as wide as the row leaves; a
+   path's Browse… or the tree's and the base's Change…; Save; Reset. A column a setting hasn't is
+   kept empty, so the buttons line up from row to row (a path field's span is no box of its own:
+   its field and its button are the line's). The variables' tables below have their own columns. */
+.lx-settings:not(.lx-variables) .setting-row td.edit .editor { display: grid; grid-template-columns: minmax(0, 1fr) 96px 72px 64px; gap: 6px; }
+.lx-settings:not(.lx-variables) .setting-row td.edit .editor .path-field { display: contents; }
+.lx-settings:not(.lx-variables) .setting-row td.edit .editor :is(input, select) { grid-column: 1; width: 100%; max-width: none; }
+.lx-settings:not(.lx-variables) .setting-row td.edit .editor :is([data-path-browse], [data-act="change-setting"]) { grid-column: 2; width: 100%; }
+.lx-settings:not(.lx-variables) .setting-row td.edit .editor [data-act="lx-save-setting"] { grid-column: 3; width: 100%; }
+.lx-settings:not(.lx-variables) .setting-row td.edit .editor [data-act="lx-reset-setting"] { grid-column: 4; width: 100%; }
+.lx-settings .path-field input[readonly] { cursor: default; }
+/* The Project tab's variables: a system variable's value read-only, a project variable's field
+   (or what a secret's row says) as wide as the row leaves, then its tools, a column each: the
+   action (Save, Forget, Add or none, one width), Secret, ✕. The names one column in the three
+   tables (Commands, System and Project variables), as the settings' (.lx-settings td.key), as wide
+   as the longest the CLI gives with its ⓘ; a longer name wraps. */
+.lx-variables td.key { white-space: normal; }
+.lx-variables .setting-row td.edit .editor { min-height: var(--control); }
+.lx-variables .setting-row td.edit .editor > input { max-width: none; }
+.lx-variables .lx-var-value { padding-top: 6px; font-size: var(--font-size-default); overflow-wrap: anywhere; }
+.lx-variables span.lx-var-value { padding-top: 0; flex: 1 1 auto; }
+.lx-variables td.lx-var-tool { width: 1%; padding-left: 6px; white-space: nowrap; }
+.lx-variables td.lx-var-action { width: 72px; min-width: 72px; }
+.lx-variables td.lx-var-action button { width: 100%; }
+.lx-variables td.lx-var-remove { width: 36px; min-width: 36px; }
+.lx-variables .lx-var-secret { height: var(--control); margin: 0; align-items: center; }
+.lx-variables .lx-var-secret input { margin-top: 0; }
+/* The new row: its name field the name column's width (to its gutter), on the line of the value's. */
+.lx-variables .lx-var-new td.key { padding-top: 8px; }
+.lx-variables .lx-var-new td.key input { width: 100%; font: var(--type-code-s); }
+/* A command (Commands): its lines in a code field as wide as the row, Save and Restore Default under it. */
+.lx-commands .editor.lx-command { flex-direction: column; align-items: stretch; gap: 6px; }
+.lx-commands .lx-command textarea { width: 100%; max-width: none; font: var(--type-code-s); resize: vertical; white-space: pre; overflow-x: auto; tab-size: 4; }
+.lx-commands .lx-command-tools { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.lx-commands .lx-command-tools .subtle { margin-right: auto; }
+button.secondary.loading::after, button.ghost.loading::after { border-color: color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent); }
+/* The noos-style editor: a list of properties, each its name (and its type under it), its field
+   and ⓘ ✕, on a grid so names, fields and actions line up; in a narrow pane the field goes under
+   the name. Every field is one height. */
+.lx-noos-card { margin-top: 4px; padding: 4px 16px; }
+.lx-noos-card h3 { margin: 10px 0 2px; }
+.lx-plist { container-type: inline-size; display: flex; flex-direction: column; }
+.lx-plist > .lx-prop { display: grid; grid-template-columns: minmax(110px, 28%) minmax(0, 1fr) 56px; gap: 4px 12px; align-items: start; padding: 10px 2px; border-bottom: 1px solid var(--line-weak); }
+.lx-plist > .lx-prop:last-child { border-bottom: none; }
+.lx-prop-name { grid-column: 1; padding-top: 6px; min-width: 0; line-height: 20px; }
+.lx-prop-name .mono { font: var(--type-code-s); overflow-wrap: anywhere; }
+/* A property still to set: its name and its empty fields in the error colour. */
+.lx-unset .lx-prop-name .mono { font-weight: 600; color: var(--err); }
+.lx-unset .lx-prop-value :is(input, select) { border-color: var(--err-edge); }
+/* What validate finds about a property, under its field: the field outlined for an error. */
+.lx-prop.invalid .lx-prop-value :is(input, select) { border-color: var(--err-edge); }
+.lx-prop-problem { margin-top: 4px; font: var(--type-body-xs); white-space: pre-wrap; overflow-wrap: anywhere; }
+.lx-prop-problem.error { color: var(--err); }
+.lx-prop-problem.warning { color: var(--warn); }
+.lx-prop-problem.stale { opacity: .45; }
+.lx-prop-kind { font: var(--type-body-xs); color: var(--muted); margin-top: 2px; }
+.lx-prop-value { grid-column: 2; min-width: 0; }
+.lx-prop-value .editor { min-width: 0; flex-wrap: wrap; gap: 6px; }
+.lx-prop-value .editor > input, .lx-prop-value .editor > select { flex: 1 1 180px; min-width: 0; max-width: 100%; height: 32px; font: var(--type-code-s); }
+.lx-prop-value .editor > .mono { font: var(--type-code-s); line-height: 32px; overflow-wrap: anywhere; }
+.lx-prop-value .editor > .switch { margin-top: 6px; }
+.lx-prop-value .detail { margin-top: 6px; }
+/* ⓘ and ✕ in slots of their own: ⓘ stays in place whether the row has a ✕ or not. */
+.lx-prop-actions { grid-column: 3; display: grid; grid-template-columns: 24px 24px; gap: 2px; justify-content: end; padding-top: 4px; }
+.lx-prop-actions button.ghost { width: 24px; height: 24px; padding: 0; color: var(--muted); font-weight: 400; }
+/* A matrix's row numbers in the gutter left of its cells: every property's controls start at the
+   same edge, numbered rows or not. The name keeps clear of them. */
+.lx-plist .lx-prop-name { padding-right: 12px; }
+.lx-plist .lx-cells.lx-grid.numbered .lx-row { grid-template-columns: var(--lx-template) 28px; max-width: calc(var(--lx-cols) * 220px + 32px); position: relative; }
+.lx-plist .lx-cells.lx-grid.numbered .lx-row-index { position: absolute; top: 0; right: calc(100% + 4px); width: 20px; }
+@container (max-width: 480px) {
+	.lx-plist > .lx-prop { grid-template-columns: minmax(0, 1fr) 56px; }
+	.lx-prop-actions { grid-column: 2; grid-row: 1; }
+	.lx-prop-value { grid-column: 1 / -1; grid-row: 2; }
+	/* The value under the name: every one in by the gutter, where the numbers go. */
+	.lx-plist .lx-prop-value { padding-left: 24px; }
+}
+.lx-prop-kind .lx-tag { margin-left: 4px; vertical-align: 1px; }
+.lx-prop.from-base .lx-prop-value .editor > input, .lx-prop.from-base .lx-prop-value .editor > select { background: var(--panel-2); color: var(--muted); }
+.lx-prop.from-base .lx-prop-value .editor > input:focus, .lx-prop.from-base .lx-prop-value .editor > select:focus { background: var(--panel); color: var(--fg); }
+
+/* Add Property: the binding's properties to filter and pick from, what the binding says of the one picked. */
+.lx-pick-prop { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 1.3fr); gap: 12px; min-height: 220px; }
+.lx-pick-list { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lx-pick-list input { font: var(--type-code-s); }
+.lx-pick-rows { display: flex; flex-direction: column; max-height: 280px; overflow: auto; border: 1px solid var(--line); border-radius: 4px; }
+.lx-pick-row { height: auto; display: flex; align-items: center; gap: 6px; justify-content: flex-start; text-align: left; padding: 6px 8px; border: 0; border-bottom: 1px solid var(--line-weak); border-radius: 0; background: transparent; font: var(--type-body-s); color: var(--fg); }
+.lx-pick-row[hidden] { display: none; }
+.lx-pick-row:hover { background: var(--hover); }
+.lx-pick-row.on { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.lx-pick-detail { display: flex; flex-direction: column; gap: 8px; min-width: 0; font: var(--type-body-s); }
+.lx-pick-name { font: var(--type-code-s); font-weight: 600; }
+.lx-pick-about { white-space: pre-wrap; max-height: 200px; overflow: auto; }
+.lx-pick-about:empty { display: none; }
+.lx-custom summary { cursor: pointer; font: var(--type-body-xs); color: var(--muted); }
+/* The children (channels): each a button to open it, Add Channel beside the next free one. */
+.lx-child { height: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 8px; font: var(--type-body-s); }
+.lx-child .subtle { font: var(--type-body-xs); }
+.lx-add-child select { font: var(--type-code-s); width: auto; }
+.lx-add-names { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.lx-add-names > .lx-field { min-width: 0; }
+.lx-add-names input { font: var(--type-code-s); }
+.lx-add-names .hint { font: var(--type-body-xs); color: var(--muted); }
+.lx-section-title .count { color: var(--muted); font: var(--type-body-xs); }
+.lx-check { display: flex; gap: 8px; align-items: flex-start; font: var(--type-body-s); margin: 8px 0; }
+.lx-check input { margin-top: 2px; }
+#lx-bus-fields .hint { font: var(--type-body-xs); color: var(--muted); }
+
+/* Two choices side by side (Overlay | Full .dts on the Overlay tab): Harmonic's segmented control
+   (core.css, with Preferences' choices), the one on outlined. */
+.lx-seg { display: inline-flex; flex: none; }
+/* The full .dts, older than the overlay: build again. */
+.lx-older { color: var(--warn); margin: 0; font: var(--type-body-xs); font-weight: 600; }
+
+/* A number field's other representation (decimal typed: hex; hex typed: decimal), greyed at its
+   right edge, not part of the value (editors.mjs with_ghost, sync_ghost). */
+.lx-num { position: relative; display: flex; min-width: 0; }
+.lx-num > input { flex: 1; min-width: 0; width: 100%; }
+.lx-ghost { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font: var(--type-code-xs); color: var(--muted); opacity: .75; pointer-events: none; white-space: nowrap; }
+.lx-ghost:empty { display: none; }
+.lx-editor-field .lx-num { flex: 1; max-width: 520px; }
+.lx-editor-field .lx-num > .lx-value { max-width: none; }
+.lx-prop-value .editor > .lx-num { flex: 1 1 180px; min-width: 0; max-width: 100%; }
+.lx-prop-value .editor > .lx-num > input { max-width: 100%; height: 32px; font: var(--type-code-s); }
+.lx-prop.from-base .lx-prop-value .editor > .lx-num > input { background: var(--panel-2); color: var(--muted); }
+.lx-prop.from-base .lx-prop-value .editor > .lx-num > input:focus { background: var(--panel); color: var(--fg); }
+
+/* A field that may hold a label (editors.mjs with_go): under it, at its right, a link to the
+   node, "go to <label>", while the label exists; the field keeps its whole width. Every one (a
+   one-line field, a select, a grid's or a list's cell) keeps the link's place when it is hidden,
+   so nothing moves as the user types and a grid's rows are as high, its columns lined up; the
+   row's other cells and its ✕ stay level with the field. A list of labels' ＋ Add entries, after
+   its separator, in the accent. */
+.lx-go-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lx-go-field > :is(input, select) { flex: none; width: 100%; max-width: 100%; }
+button.lx-go { display: block; align-self: flex-end; max-width: 100%; height: 16px; padding: 0; border: none; border-radius: 0; background: none; font: var(--type-body-xs); color: var(--accent); text-decoration: underline; text-underline-offset: 2px; overflow: hidden; text-overflow: ellipsis; }
+button.lx-go:hover, button.lx-go:active { background: none; color: var(--accent-strong); }
+.lx-go-field:has(> .lx-go[hidden]) { padding-bottom: 18px; }
+.lx-prop-value .editor > .lx-go-field { flex: 1 1 180px; max-width: 100%; }
+.lx-prop-value .editor > .lx-go-field > :is(input, select) { height: 32px; font: var(--type-code-s); }
+.lx-prop.from-base .lx-prop-value .editor > .lx-go-field > :is(input, select) { background: var(--panel-2); color: var(--muted); }
+.lx-prop.from-base .lx-prop-value .editor > .lx-go-field > :is(input, select):focus { background: var(--panel); color: var(--fg); }
+.lx-editor-field > .lx-go-field { flex: 1; max-width: 520px; }
+.lx-editor-field .lx-go-field > .lx-value { max-width: none; }
+.lx-cells.lx-grid .lx-row:has(> .lx-go-field) { align-items: start; }
+.lx-cells.lx-grid .lx-row:has(> .lx-go-field) > .lx-row-remove { margin-top: 2px; }
+.lx-cells.lx-list:has(.lx-go-field), .lx-cells.lx-list .lx-row:has(> .lx-go-field) { align-items: flex-start; }
+.lx-cells.lx-list .lx-row:has(> .lx-go-field) > .lx-row-remove { margin-top: 8px; }
+.lx-cells.lx-list:has(.lx-go-field) .lx-row-add { align-self: flex-start; }
+option.lx-create { color: var(--accent); }
+/* A reference to a node: a link to it, in the overlay source. */
+a.lx-ref { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.lx-source a.lx-ref { color: var(--console-teal); text-decoration: underline dotted; }
+.lx-source a.lx-ref:hover { text-decoration-style: solid; }
+/* The node opened by a reference: the way back, one step, above its path. */
+button.lx-back { align-self: flex-start; height: 24px; padding: 0 8px; margin-left: -8px; font: var(--type-action-s); color: var(--accent); }
+
+/* The Binding tab: the file's name as it is, then its YAML. */
+.lx-file-name { text-transform: none; letter-spacing: 0; font-family: var(--mono); font-weight: 600; }
+.lx-binding .lx-source { margin: 0; }
+.lx-yaml a { color: var(--console-blue); text-decoration: underline; text-underline-offset: 2px; }
+.lx-side-tab:disabled { color: var(--hmc-color-selection-unselected-medium-content-disabled); cursor: default; }
+
+/* A list's cell that is a list of labels (clocks): wide enough for a label's name, and its link under it. */
+.lx-cells.lx-list .lx-cell-wrap:has(> select.lx-labels) { width: 190px; }

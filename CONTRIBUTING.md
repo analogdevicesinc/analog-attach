@@ -17,13 +17,13 @@ We welcome the following types of contributions:
 
 When submitting a bug report, please include:
 
-1. **VS Code version** and **extension version**
-2. **Operating system** (Linux distribution, macOS, Windows)
-3. **Steps to reproduce** the issue
+1. **analog-attach version** (`analog-attach --version`) and the backend (`linux` or `noos`)
+2. **Operating system** (Linux distribution, macOS, Windows) and Node.js version
+3. **Steps to reproduce** the issue: the `analog-attach` commands run
 4. **Expected behavior** vs **actual behavior**
-5. **Sample DTS/DTSO file** (if applicable)
-6. **Screenshots** (if UI-related)
-7. **Error messages** from the Output panel (View > Output > Extension Host)
+5. **Sample workfile** (the DTSO, or the no-OS `workfile.json`), if applicable
+6. **Screenshots** (if it is in the GUI)
+7. **Error messages**: what the command printed (with `--json`, its answer)
 
 Submit bug reports via [GitHub Issues](https://github.com/analogdevicesinc/analog-attach/issues).
 

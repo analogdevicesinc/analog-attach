@@ -1,0 +1,38 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node2",
+          "pcm5122@4c"
+        ],
+        "message": "pcm5122@4c (ti,pcm5122): 'AVDD-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/sound/ti,pcm512x.yaml"
+      },
+      {
+        "path": [
+          "node2",
+          "pcm5122@4c"
+        ],
+        "message": "pcm5122@4c (ti,pcm5122): 'CPVDD-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/sound/ti,pcm512x.yaml"
+      },
+      {
+        "path": [
+          "node2",
+          "pcm5122@4c"
+        ],
+        "message": "pcm5122@4c (ti,pcm5122): 'DVDD-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/sound/ti,pcm512x.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

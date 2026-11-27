@@ -1,0 +1,5 @@
+# Commits git blame skips: reformats, with no change of behaviour.
+# GitHub reads this file itself; for git blame, run `yarn blame:install` once per clone.
+
+# cli, linux-lib, capi-lib, gui: tabs and ; everywhere
+827478703997f857790a79e4d539c00f2ae009e1

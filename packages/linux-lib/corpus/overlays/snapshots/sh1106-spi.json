@@ -1,0 +1,112 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node3",
+          "sh1106_pins",
+          "brcm,function"
+        ],
+        "message": "sh1106_pins: brcm,function: b'\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "sh1106_pins",
+          "brcm,pins"
+        ],
+        "message": "sh1106_pins: brcm,pins: b'\\x00\\x00\\x00\\x19\\x00\\x00\\x00\\x18' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sh1106@0"
+        ],
+        "message": "sh1106@0 (sinowealth,sh1106): Unevaluated properties are not allowed ('bgr', 'bpp', 'buswidth', 'debug', 'fps', 'rotate', 'sinowealth,height', 'sinowealth,page-offset', 'sinowealth,width' were unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/display/solomon,ssd1307fb.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sh1106@0",
+          "bgr"
+        ],
+        "message": "sh1106@0 (sinowealth,sh1106): bgr: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sh1106@0",
+          "bpp"
+        ],
+        "message": "sh1106@0 (sinowealth,sh1106): bpp: b'\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sh1106@0",
+          "buswidth"
+        ],
+        "message": "sh1106@0 (sinowealth,sh1106): buswidth: b'\\x00\\x00\\x00\\x08' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sh1106@0",
+          "debug"
+        ],
+        "message": "sh1106@0 (sinowealth,sh1106): debug: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sh1106@0",
+          "fps"
+        ],
+        "message": "sh1106@0 (sinowealth,sh1106): fps: b'\\x00\\x00\\x00\\x19' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sh1106@0",
+          "rotate"
+        ],
+        "message": "sh1106@0 (sinowealth,sh1106): rotate: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sh1106@0",
+          "sinowealth,height"
+        ],
+        "message": "sh1106@0 (sinowealth,sh1106): sinowealth,height: b'\\x00\\x00\\x00@' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sh1106@0",
+          "sinowealth,page-offset"
+        ],
+        "message": "sh1106@0 (sinowealth,sh1106): sinowealth,page-offset: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "sh1106@0",
+          "sinowealth,width"
+        ],
+        "message": "sh1106@0 (sinowealth,sh1106): sinowealth,width: b'\\x00\\x00\\x00\\x80' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node3",
+          "rpi_display_pins",
+          "brcm,function"
+        ],
+        "message": "rpi_display_pins: brcm,function: b'\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "rpi_display_pins",
+          "brcm,pins"
+        ],
+        "message": "rpi_display_pins: brcm,pins: b'\\x00\\x00\\x00\\x12\\x00\\x00\\x00\\x17\\x00\\x00\\x00\\x18\\x00\\x00\\x00\\x19' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "rpi_display_pins",
+          "brcm,pull"
+        ],
+        "message": "rpi_display_pins: brcm,pull: b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x02' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "rpi-display@0"
+        ],
+        "message": "rpi-display@0 (ilitek,ili9341): Unevaluated properties are not allowed ('bgr', 'buswidth', 'debug', 'fps', 'led-gpios', 'rotate' were unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/display/panel/ilitek,ili9341.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "rpi-display@0",
+          "buswidth"
+        ],
+        "message": "rpi-display@0 (ilitek,ili9341): buswidth: b'\\x00\\x00\\x00\\x08' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "rpi-display@0",
+          "compatible"
+        ],
+        "message": "rpi-display@0 (ilitek,ili9341): compatible: ['ilitek,ili9341'] is too short\n\tfrom schema $id: http://devicetree.org/schemas/display/panel/ilitek,ili9341.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "rpi-display@0",
+          "compatible",
+          "0"
+        ],
+        "message": "rpi-display@0 (ilitek,ili9341): compatible:0: 'ilitek,ili9341' is not one of ['adafruit,yx240qv29', 'st,sf-tc240t-9370-t', 'canaan,kd233-tft']\n\tfrom schema $id: http://devicetree.org/schemas/display/panel/ilitek,ili9341.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "rpi-display@0",
+          "debug"
+        ],
+        "message": "rpi-display@0 (ilitek,ili9341): debug: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "rpi-display@0",
+          "fps"
+        ],
+        "message": "rpi-display@0 (ilitek,ili9341): fps: b'\\x00\\x00\\x00\\x1e' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "rpi-display@0",
+          "rotate"
+        ],
+        "message": "rpi-display@0 (ilitek,ili9341): rotate: b'\\x00\\x00\\x01\\x0e' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "rpi-display@0",
+          "spi-max-frequency"
+        ],
+        "message": "rpi-display@0 (ilitek,ili9341): spi-max-frequency: 10000000 was expected\n\tfrom schema $id: http://devicetree.org/schemas/display/panel/ilitek,ili9341.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}
